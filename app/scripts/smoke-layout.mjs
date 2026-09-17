@@ -48,9 +48,10 @@ await page.getByText('site data loaded').waitFor({ timeout: 60_000 });
 // Pick the zone in the Site tab, then generate from the Zone layout tab.
 await page.getByRole('button', { name: zoneName }).click();
 await page.getByRole('button', { name: 'Zone layout', exact: true }).click();
-await page.getByRole('button', { name: 'Generate 3 options' }).click();
+const genButton = page.getByRole('button', { name: /Generate 3 options|Place the block/ });
+await genButton.click();
 try {
-  await page.getByText(/options in [\d.]+ s/).waitFor({ timeout: 90_000 });
+  await page.getByText(/options? in [\d.]+ s/).waitFor({ timeout: 90_000 });
 } catch (e) {
   console.error('generation did not report success. sidebar text:');
   console.error((await page.locator('aside').innerText()).slice(0, 2000));
@@ -73,7 +74,15 @@ for (let i = 0; i < Number(process.env.ZOOM_STEPS ?? 8); i++) {
 await page.waitForTimeout(800);
 await page.screenshot({ path: outFile });
 
-const summary = await page.locator('button:has-text("Option 1")').first().innerText();
+let summary = '';
+if (process.env.REPORT_TAB) {
+  await page.getByRole('button', { name: 'Report', exact: true }).click();
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: outFile });
+  summary = (await page.locator('aside').innerText()).slice(0, 1400);
+} else {
+  summary = await page.locator('button:has-text("Option 1")').first().innerText();
+}
 await browser.close();
 server.close();
 

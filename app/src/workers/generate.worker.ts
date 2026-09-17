@@ -9,8 +9,10 @@ import type { ConfigBundle } from '../engine/data/config';
 import { generateVillaLayouts } from '../engine/generators/villa';
 import type { RoadDirection } from '../engine/generators/villa';
 import { generateTowerLayouts } from '../engine/generators/tower';
+import { generateBlockLayout } from '../engine/generators/block';
 import type { LayoutOption } from '../engine/generators/types';
 import type { BandName, MinSideApplies } from '../engine/rules/client';
+import type { Occupancy } from '../engine/rules/kmbr';
 
 /**
  * The generators run here so a regeneration never blocks the plan view. The
@@ -22,7 +24,7 @@ export interface GenerateRequest {
   baseUrl: string;
   overrides: OverrideSet;
   zoneId: string;
-  kind: 'villa' | 'tower';
+  kind: 'villa' | 'tower' | 'block';
   targetUnits: number;
   householdSize: number;
   senior?: boolean;
@@ -33,6 +35,11 @@ export interface GenerateRequest {
   floorOptions?: number[];
   mix?: BandName[];
   flatsPerFloor?: number;
+  /** Block options. */
+  occupancy?: Occupancy;
+  builtUpSft?: number;
+  useLabel?: string;
+  maxSlopeDeg?: number;
 }
 
 export type GenerateResponse =
@@ -70,8 +77,29 @@ self.onmessage = async (event: MessageEvent<GenerateRequest>) => {
 
     post({ id: req.id, status: 'progress', message: `generating ${req.kind} options for ${zone.name}` });
 
+    const blockOption =
+      req.kind === 'block'
+        ? generateBlockLayout({
+            zoneId: zone.id,
+            zoneName: zone.name,
+            zone: zone.geom,
+            dem: site.dem,
+            kmbr: config.kmbr,
+            client: config.client,
+            assumptions: config.assumptions,
+            occupancy: req.occupancy ?? 'F_commercial',
+            builtUpSft: req.builtUpSft ?? 0,
+            useLabel: req.useLabel ?? 'Block',
+            maxSlopeDeg: req.maxSlopeDeg,
+          })
+        : null;
+
     const options: LayoutOption[] =
-      req.kind === 'tower'
+      req.kind === 'block'
+        ? blockOption
+          ? [blockOption]
+          : []
+        : req.kind === 'tower'
         ? generateTowerLayouts({
             zoneId: zone.id,
             zoneName: zone.name,

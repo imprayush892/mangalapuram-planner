@@ -6,8 +6,11 @@ import { useRules } from '../state/useRules';
 import { runGenerate } from '../state/generate';
 import { Button, Panel, Row, StatusDot } from './primitives';
 import { loadProgramme } from '../engine/rules/programme';
+import type { ProgrammeSummary } from '../engine/rules/programme';
 import { sizeVillaPlots } from '../engine/rules/client';
 import { coverageFsi } from '../engine/rules/kmbr';
+import type { Occupancy } from '../engine/rules/kmbr';
+import { inferUse, USE_LABEL } from '../engine/site/level1';
 import { multiPolyArea } from '../engine/geom/planar';
 import { m2ToAcres, m2ToSft } from '../engine/units';
 import { pick } from '../engine/data/config';
@@ -19,6 +22,15 @@ import type { LayoutOption } from '../engine/generators/types';
 const VILLA_ZONE = /VILLA|PHASE|SENIOR/i;
 const SENIOR_ZONE = /SENIOR/i;
 const TOWER_ZONE = /APARTMENT/i;
+
+/** Uses that get a v1 massing block rather than a full internal layout. */
+const BLOCK_USES: Partial<Record<string, { occupancy: Occupancy; lineIds: string[]; label: string; maxSlopeDeg?: number }>> = {
+  school: { occupancy: 'B_school', lineIds: ['school'], label: 'School', maxSlopeDeg: 8 },
+  club: { occupancy: 'D1_recreational', lineIds: ['clubhouse_annex', 'clubhouse_golf'], label: 'Club and mini golf' },
+  commercial: { occupancy: 'F_commercial', lineIds: ['commercial', 'convention'], label: 'Commercial and convention' },
+  hotel: { occupancy: 'A2', lineIds: ['hotel'], label: 'Hotel' },
+  office: { occupancy: 'E_office', lineIds: ['business_hub'], label: 'Business hub' },
+};
 
 /** The cashflow sizes villa land at 20 units per acre (sheet C17: 640 / 20). */
 const VILLA_UNITS_PER_AC = 20;
@@ -42,6 +54,8 @@ export default function ZonePanel(): React.ReactElement {
   const isTower = zone ? TOWER_ZONE.test(zone.name) : false;
   const isVilla = zone ? VILLA_ZONE.test(zone.name) && !isTower : false;
   const isSenior = zone ? SENIOR_ZONE.test(zone.name) : false;
+  const use = zone ? inferUse(zone.name) : 'unassigned';
+  const blockUse = BLOCK_USES[use];
 
   const targetUnits = useMemo(() => {
     if (!zone) return 0;
@@ -107,6 +121,20 @@ export default function ZonePanel(): React.ReactElement {
   const fsi = fsiTiers[switches.fsiTierIndex] ?? fsiTiers[0] ?? 3;
 
   const generate = (): void => {
+    if (blockUse && programme) {
+      runGenerate({
+        overrides,
+        zoneId: zone.id,
+        kind: 'block',
+        targetUnits: 0,
+        householdSize,
+        occupancy: blockUse.occupancy,
+        builtUpSft: blockBuiltUpSft(programme, blockUse.lineIds),
+        useLabel: blockUse.label,
+        maxSlopeDeg: blockUse.maxSlopeDeg,
+      });
+      return;
+    }
     if (isTower) {
       runGenerate({
         overrides,
@@ -143,13 +171,47 @@ export default function ZonePanel(): React.ReactElement {
           value={zone.confidence}
           hint="registration of the client Zoning Plan onto the survey"
         />
-        {!isVilla && !isTower && (
+        <Row label="Use" value={USE_LABEL[use]} hint="inferred from the client zoning plan" />
+        {!isVilla && !isTower && !blockUse && (
           <p className="pt-2 text-[11px] leading-snug text-warn">
-            Villa, phase, senior-living and apartment zones have generators. The school, club, commercial, hotel and
-            business-hub blocks arrive with the next milestone.
+            {use === 'hospital_reserved'
+              ? 'The hospital is deferred until the 26.4 ac balance land is acquired. The zone is kept reserved and nothing is placed on it.'
+              : 'This zone carries no programme line, so there is nothing to generate on it. Reassign it to a use that is short of land.'}
           </p>
         )}
       </Panel>
+
+      {blockUse && programme && (
+        <>
+          <Panel title="Massing block">
+            <Row label="Use" value={blockUse.label} />
+            <Row
+              label="Programme"
+              value={`${blockBuiltUpSft(programme, blockUse.lineIds).toLocaleString('en-IN')} sft`}
+              hint={blockUse.lineIds.join(', ')}
+            />
+            <Row label="Occupancy" value={blockUse.occupancy} hint="KMBR Table 6 row used for coverage and FSI" />
+            {blockUse.maxSlopeDeg !== undefined && (
+              <Row label="Maximum slope" value={`${blockUse.maxSlopeDeg}°`} hint="SPEC §6.3 school siting" />
+            )}
+            <p className="pt-1 text-[11px] leading-snug text-muted">
+              Version 1 places one massing block at the Table 6 coverage and FSI, inside the Table 4 yards, on the
+              flattest ground the zone holds. Parking and access width come from Tables 9, 10, 7 and 8.
+            </p>
+          </Panel>
+          <Panel
+            title="Generate"
+            right={
+              <Button tone="primary" onClick={generate} disabled={status.running}>
+                {status.running ? 'Generating…' : 'Place the block'}
+              </Button>
+            }
+          >
+            {status.message && <p className="text-[11px] text-muted">{status.message}</p>}
+            {status.error && <p className="text-[11px] text-bad">{status.error}</p>}
+          </Panel>
+        </>
+      )}
 
       {isTower && (
         <>
@@ -255,6 +317,11 @@ export default function ZonePanel(): React.ReactElement {
   );
 }
 
+/** Built-up area the named programme lines ask for, in sft. */
+function blockBuiltUpSft(programme: ProgrammeSummary, lineIds: string[]): number {
+  return programme.lines.filter((l) => lineIds.includes(l.id)).reduce((s, l) => s + l.totalPlinthSft, 0);
+}
+
 function FindingChips({ option }: { option: LayoutOption }): React.ReactElement {
   const counts = countByStatus(option.findings);
   return (
@@ -307,7 +374,14 @@ function OptionDetail({ option }: { option: LayoutOption }): React.ReactElement 
           value={`${m2ToAcres(m.saleableAreaM2).toFixed(2)} ac · ${(m.shares.saleable * 100).toFixed(1)}%`}
           hint="target 50%"
         />
-        {option.kind === 'tower' ? (
+        {option.kind === 'block' ? (
+          <>
+            <Row label="Built up" value={`${fmt(m2ToSft(m.totalFloorAreaM2))} sft`} />
+            <Row label="Footprint" value={`${fmt(m2ToSft(m.footprintM2))} sft`} />
+            <Row label="FSI used" value={m.fsiUsed.toFixed(2)} />
+            <Row label="Coverage" value={`${m.coveragePct.toFixed(1)}%`} />
+          </>
+        ) : option.kind === 'tower' ? (
           <>
             <Row label="Towers" value={`${m.towerCount}`} />
             <Row label="Flats" value={`${m.unitCount} of ${m.targetUnits}`} />
@@ -334,6 +408,32 @@ function OptionDetail({ option }: { option: LayoutOption }): React.ReactElement 
         <Row label="Retaining face" value={`${fmt(Math.round(m.retainingFaceM2))} m²`} />
         <FallBreakdown option={option} />
       </Panel>
+
+      {option.kind === 'block' && (
+        <Panel title="Block">
+          {option.blocks.map((b) => (
+            <div key={b.id} className="py-1">
+              <div className="flex items-baseline justify-between">
+                <span className="text-fg">{b.use}</span>
+                <span className="num text-muted">
+                  {b.floors} F · {b.heightM.toFixed(0)} m
+                </span>
+              </div>
+              <div className="num flex flex-wrap gap-x-3 text-[11px] text-muted">
+                <span>footprint {Math.round(b.footprintM2).toLocaleString('en-IN')} m²</span>
+                <span>{Math.round(m2ToSft(b.builtUpM2)).toLocaleString('en-IN')} sft</span>
+                <span>platform RL {Number.isFinite(b.terrain.platformRl) ? b.terrain.platformRl.toFixed(2) : '—'}</span>
+                <span>fall {Number.isFinite(b.terrain.fall) ? `${b.terrain.fall.toFixed(1)} m` : '—'}</span>
+              </div>
+              {b.notes.map((n) => (
+                <p key={n} className="pt-1 text-[11px] leading-snug text-muted">
+                  {n}
+                </p>
+              ))}
+            </div>
+          ))}
+        </Panel>
+      )}
 
       {option.kind === 'tower' && (
         <Panel title="Towers">
