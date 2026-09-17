@@ -38,11 +38,16 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' });
 await page.getByText('site data loaded').waitFor({ timeout: 60_000 });
 
-// Generate a villa zone so the exports have something to draw.
-await page.getByRole('button', { name: 'PROJECT - 2 (VILLAS)' }).click();
-await page.getByRole('button', { name: 'Zone layout', exact: true }).click();
-await page.getByRole('button', { name: 'Generate 3 options' }).click();
-await page.getByText(/options? in [\d.]+ s/).waitFor({ timeout: 120_000 });
+// Generate one zone of each kind so the exports carry plots, towers and a block.
+const zones = (process.env.EXPORT_ZONES ?? 'PROJECT - 2 (VILLAS)').split('|');
+for (const zoneName of zones) {
+  await page.getByRole('button', { name: 'Site', exact: true }).click();
+  await page.getByRole('button', { name: zoneName }).click();
+  await page.getByRole('button', { name: 'Zone layout', exact: true }).click();
+  await page.getByRole('button', { name: /Generate 3 options|Place the block/ }).click();
+  await page.getByText(/options? in [\d.]+ s/).waitFor({ timeout: 120_000 });
+  await page.waitForTimeout(400);
+}
 
 await page.getByRole('button', { name: 'Exports', exact: true }).click();
 await page.waitForTimeout(1500);
