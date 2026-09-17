@@ -76,6 +76,7 @@ The 2D plan and the 3D terrain share the `2D plan` / `3D` toggle, top right.
 
 ```
 docs/SPEC.md              the build spec (authoritative)
+docs/STATUS.md            what is built against the PRD, and what is next
 docs/DECISIONS.md         client decisions and the interpretations made
 docs/DATA.md              data dictionary and known data issues
 config/*.yaml             rules, programme, assumptions
