@@ -3,6 +3,7 @@ import type { LayoutOption } from '../generators/types';
 import type { SiteModel } from '../site/loadSite';
 import type { MultiPoly, Pt, Ring } from '../geom/types';
 import { multiCentroid } from '../geom/planar';
+import { difference } from '../geom/boolean';
 import { m2ToAcres } from '../units';
 
 /**
@@ -96,6 +97,11 @@ export function exportDxf(opts: DxfExportOptions): string {
 
   /* the layouts */
   for (const layout of opts.layouts) {
+    // Rule 22 ground gets its own layer: a drawing office needs to see what was
+    // taken out of the buildable area and why.
+    for (const poly of difference(zoneOf(layout, opts.site), layout.buildable)) {
+      for (const ring of poly) polyline(ring, LAYERS.unbuildable.name);
+    }
     for (const os of layout.openSpace) {
       multi(os.geom, os.countsAsRecreation ? LAYERS.recreation.name : LAYERS.openSpace.name);
     }
@@ -135,6 +141,11 @@ export function exportDxf(opts: DxfExportOptions): string {
   }
 
   return w.stringify();
+}
+
+/** The zone a layout was generated on, for subtracting its buildable area. */
+function zoneOf(layout: LayoutOption, site: SiteModel): MultiPoly {
+  return site.zones.find((z) => z.id === layout.zoneId)?.geom ?? layout.buildable;
 }
 
 function centroidOfRing(ring: Ring): Pt {
