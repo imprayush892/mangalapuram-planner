@@ -42,6 +42,15 @@ page.on('response', (r) => {
   if (r.status() >= 400) errors.push(`HTTP ${r.status()} ${r.url()}`);
 });
 
+if (process.env.BLOCK_WORKERS) {
+  // Prove the main-thread fallback works where a host refuses module workers.
+  await page.addInitScript(() => {
+    // eslint-disable-next-line no-global-assign
+    window.Worker = function () {
+      throw new Error('workers are blocked in this host');
+    };
+  });
+}
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' });
 await page.getByText('site data loaded').waitFor({ timeout: 60_000 });
 

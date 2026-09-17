@@ -1,25 +1,72 @@
 import { useLayout } from './layoutStore';
-import type { GenerateRequest, GenerateResponse } from '../workers/generate.worker';
+import type { GenerateRequest, GenerateResponse } from '../engine/runGeneration';
+import type { LayoutOption } from '../engine/generators/types';
 
 let worker: Worker | null = null;
+let workerBlocked = false;
 let nextId = 1;
 
-function ensureWorker(): Worker {
-  worker ??= new Worker(new URL('../workers/generate.worker.ts', import.meta.url), { type: 'module' });
-  return worker;
+/**
+ * Returns the worker, or null where the host will not start one — a sandboxed
+ * iframe, a file:// page, or a browser with module workers disabled. The engine
+ * then runs on the main thread instead: slower to the point of a visible pause,
+ * but the same result rather than a dead button.
+ */
+function ensureWorker(): Worker | null {
+  if (workerBlocked) return null;
+  if (worker) return worker;
+  try {
+    worker = new Worker(new URL('../workers/generate.worker.ts', import.meta.url), { type: 'module' });
+    return worker;
+  } catch {
+    workerBlocked = true;
+    return null;
+  }
 }
 
+/** Resolved on the main thread: the worker bundle lives under /assets, so a relative base URL would resolve against the wrong directory there. */
+const dataBaseUrl = (): string => new URL(`${import.meta.env.BASE_URL}data`, window.location.href).href;
+
 /**
- * Runs one generation in the worker and files the result in the layout store.
- * A newer request supersedes an older one: late replies are dropped.
+ * Runs one generation and files the result in the layout store. A newer request
+ * supersedes an older one: late replies are dropped.
  */
 export function runGenerate(request: Omit<GenerateRequest, 'id' | 'baseUrl'>): void {
   const { setStatus, setOptions } = useLayout.getState();
   const id = nextId++;
-  const w = ensureWorker();
   const started = Date.now();
+  const full: GenerateRequest = { ...request, id, baseUrl: dataBaseUrl() };
 
   setStatus({ running: true, zoneId: request.zoneId, message: 'starting…', elapsedMs: 0, error: null });
+
+  const finish = (options: LayoutOption[], elapsedMs: number): void => {
+    setOptions(request.zoneId, options);
+    setStatus({
+      running: false,
+      message: `${options.length} option${options.length === 1 ? '' : 's'} in ${(elapsedMs / 1000).toFixed(1)} s`,
+      elapsedMs,
+      error: options.length === 0 ? 'No option could be generated for this zone.' : null,
+    });
+  };
+
+  const fail = (error: string): void => {
+    setStatus({ running: false, message: '', error, elapsedMs: Date.now() - started });
+  };
+
+  const w = ensureWorker();
+
+  if (!w) {
+    // No worker: run on the main thread. The yield lets the "generating…"
+    // message paint before the engine locks the thread.
+    setStatus({ message: 'generating on the main thread (this tab will pause)' });
+    setTimeout(() => {
+      void import('../engine/runGeneration')
+        .then(({ runGeneration }) => runGeneration(full, (message) => setStatus({ message })))
+        .then((options) => finish(options, Date.now() - started))
+        .catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
+    }, 50);
+    return;
+  }
 
   const onMessage = (event: MessageEvent<GenerateResponse>): void => {
     const msg = event.data;
@@ -29,22 +76,20 @@ export function runGenerate(request: Omit<GenerateRequest, 'id' | 'baseUrl'>): v
       return;
     }
     w.removeEventListener('message', onMessage);
-    if (msg.status === 'error') {
-      setStatus({ running: false, message: '', error: msg.error, elapsedMs: Date.now() - started });
-      return;
-    }
-    setOptions(request.zoneId, msg.options);
-    setStatus({
-      running: false,
-      message: `${msg.options.length} option${msg.options.length === 1 ? '' : 's'} in ${(msg.elapsedMs / 1000).toFixed(1)} s`,
-      elapsedMs: msg.elapsedMs,
-      error: msg.options.length === 0 ? 'No option could be generated for this zone.' : null,
-    });
+    if (msg.status === 'error') fail(msg.error);
+    else finish(msg.options, msg.elapsedMs);
+  };
+
+  // A worker that fails after construction (a blocked module import, say) would
+  // otherwise leave the button spinning for good.
+  const onError = (): void => {
+    w.removeEventListener('message', onMessage);
+    workerBlocked = true;
+    worker = null;
+    runGenerate(request);
   };
 
   w.addEventListener('message', onMessage);
-  // Resolved here, on the main thread: the worker bundle lives under /assets,
-  // so a relative base URL would resolve against the wrong directory there.
-  const baseUrl = new URL(`${import.meta.env.BASE_URL}data`, window.location.href).href;
-  w.postMessage({ ...request, id, baseUrl } satisfies GenerateRequest);
+  w.addEventListener('error', onError, { once: true });
+  w.postMessage(full);
 }
