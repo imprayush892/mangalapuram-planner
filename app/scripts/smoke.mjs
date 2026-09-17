@@ -10,6 +10,7 @@ const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(appDir, 'dist');
 const outFile = process.argv[2] ?? path.join(appDir, 'smoke.png');
 const raster = process.argv[3] ?? null;
+const tab = process.argv[4] ?? null;
 
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
@@ -47,6 +48,10 @@ page.on('response', (r) => {
 
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' });
 await page.getByText('site data loaded').waitFor({ timeout: 45_000 });
+if (tab) {
+  await page.getByRole('button', { name: tab, exact: true }).click();
+  await page.waitForTimeout(600);
+}
 if (raster) {
   await page.locator('select').first().selectOption(raster);
   await page.waitForTimeout(1200);

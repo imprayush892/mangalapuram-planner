@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useSite } from './state/store';
 import PlanView from './ui/PlanView';
 import SitePanel from './ui/SitePanel';
+import ProgrammePanel from './ui/ProgrammePanel';
+import RulesPanel from './ui/RulesPanel';
+import CompliancePanel from './ui/CompliancePanel';
 
 type Tab = 'site' | 'programme' | 'zone' | 'rules' | 'compliance' | 'report';
 
@@ -79,6 +82,12 @@ function TabBody({ tab }: { tab: Tab }): React.ReactElement {
   switch (tab) {
     case 'site':
       return <SitePanel />;
+    case 'programme':
+      return <ProgrammePanel />;
+    case 'rules':
+      return <RulesPanel />;
+    case 'compliance':
+      return <CompliancePanel />;
     default:
       return (
         <div className="p-3 text-muted">
