@@ -5,3 +5,5 @@ dist/
 app/public/data/
 coverage/
 .vite/
+app/dist/
+app/smoke.png
