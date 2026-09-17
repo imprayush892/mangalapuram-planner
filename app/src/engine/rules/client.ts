@@ -206,6 +206,12 @@ export interface ApartmentInputs {
   flatsPerFloor: number;
   /** Open item (SPEC §11): default 0.80. */
   flatsShareOfFootprint?: number;
+  /**
+   * Floors the footprint is sized against. The client's rule divides by the
+   * literal 20 of their floor cap, which is the default; a scheme actually
+   * built at fewer floors needs `floors` here, or it leaves FSI unused.
+   */
+  floorsForSizing?: number;
 }
 
 export interface ApartmentSizing {
@@ -258,14 +264,15 @@ export function sizeApartments(client: YamlDoc, input: ApartmentInputs): Apartme
   );
 
   const totalFloorArea = input.landM2 * input.fsi;
-  const totalFootprint = totalFloorArea / maxFloors;
+  const sizingFloors = input.floorsForSizing ?? maxFloors;
+  const totalFootprint = totalFloorArea / sizingFloors;
   const avgSft = input.mix.reduce((s, b) => s + bandMidpointSft(client, b), 0) / Math.max(1, input.mix.length);
   const avgM2 = sftToM2(avgSft);
   const plate = (input.flatsPerFloor * avgM2) / flatsShare;
   const towers = plate > 0 ? Math.ceil(totalFootprint / plate) : 0;
-  // Flats follow from the saleable share of the footprint over all 20 floors,
+  // Flats follow from the saleable share of the footprint over every floor,
   // independent of how they are split between towers.
-  const flats = Math.round(((flatsShare * totalFootprint) / avgM2) * maxFloors);
+  const flats = Math.round(((flatsShare * totalFootprint) / avgM2) * sizingFloors);
 
   const footprintShareOfLand = input.landM2 > 0 ? totalFootprint / input.landM2 : 0;
   const notes: string[] = [];

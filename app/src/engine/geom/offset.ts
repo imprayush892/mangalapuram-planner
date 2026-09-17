@@ -1,6 +1,7 @@
 import { Clipper, EndType, FillRule, JoinType, Path64, Paths64, Point64 } from 'clipper2-js';
 import type { MultiPoly, Pt, Ring } from './types';
 import { openRing, polyArea } from './planar';
+import { intersect as intersectMulti } from './boolean';
 
 /**
  * Clipper2 works on integers. Local metres scaled by 1000 gives millimetre
@@ -76,6 +77,18 @@ export function offsetMulti(mp: MultiPoly, delta: number, join: JoinType = JoinT
   if (delta === 0) return mp;
   const out = Clipper.InflatePaths(toPaths(mp), delta * SCALE, join, EndType.Polygon, 2);
   return fromPaths(out);
+}
+
+/**
+ * Inward offset of an irregular boundary, such as a zone. Miter joins spike
+ * outside the original shape at sharp concave corners, so this squares the
+ * joins and clips the result back, guaranteeing the output lies inside `mp`.
+ */
+export function insetMulti(mp: MultiPoly, distance: number): MultiPoly {
+  if (mp.length === 0 || distance <= 0) return mp;
+  const shrunk = offsetMulti(mp, -distance, JoinType.Square);
+  if (shrunk.length === 0) return [];
+  return intersectMulti(shrunk, mp);
 }
 
 /** Buffer an open polyline into a strip of the given total width. */

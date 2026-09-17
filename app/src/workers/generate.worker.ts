@@ -8,8 +8,9 @@ import { loadConfig } from '../engine/data/config';
 import type { ConfigBundle } from '../engine/data/config';
 import { generateVillaLayouts } from '../engine/generators/villa';
 import type { RoadDirection } from '../engine/generators/villa';
+import { generateTowerLayouts } from '../engine/generators/tower';
 import type { LayoutOption } from '../engine/generators/types';
-import type { MinSideApplies } from '../engine/rules/client';
+import type { BandName, MinSideApplies } from '../engine/rules/client';
 
 /**
  * The generators run here so a regeneration never blocks the plan view. The
@@ -21,12 +22,17 @@ export interface GenerateRequest {
   baseUrl: string;
   overrides: OverrideSet;
   zoneId: string;
-  kind: 'villa';
+  kind: 'villa' | 'tower';
   targetUnits: number;
   householdSize: number;
   senior?: boolean;
   minSideApplies?: MinSideApplies;
   directions?: RoadDirection[];
+  /** Tower options. */
+  fsi?: number;
+  floorOptions?: number[];
+  mix?: BandName[];
+  flatsPerFloor?: number;
 }
 
 export type GenerateResponse =
@@ -64,20 +70,36 @@ self.onmessage = async (event: MessageEvent<GenerateRequest>) => {
 
     post({ id: req.id, status: 'progress', message: `generating ${req.kind} options for ${zone.name}` });
 
-    const options: LayoutOption[] = generateVillaLayouts({
-      zoneId: zone.id,
-      zoneName: zone.name,
-      zone: zone.geom,
-      dem: site.dem,
-      kmbr: config.kmbr,
-      client: config.client,
-      assumptions: config.assumptions,
-      targetUnits: req.targetUnits,
-      householdSize: req.householdSize,
-      minSideApplies: req.minSideApplies,
-      directions: req.directions,
-      senior: req.senior,
-    });
+    const options: LayoutOption[] =
+      req.kind === 'tower'
+        ? generateTowerLayouts({
+            zoneId: zone.id,
+            zoneName: zone.name,
+            zone: zone.geom,
+            dem: site.dem,
+            kmbr: config.kmbr,
+            client: config.client,
+            assumptions: config.assumptions,
+            fsi: req.fsi ?? 3,
+            floorOptions: req.floorOptions ?? [12, 15, 20],
+            mix: req.mix ?? ['2BHK', '3BHK'],
+            flatsPerFloor: req.flatsPerFloor ?? 4,
+            householdSize: req.householdSize,
+          })
+        : generateVillaLayouts({
+            zoneId: zone.id,
+            zoneName: zone.name,
+            zone: zone.geom,
+            dem: site.dem,
+            kmbr: config.kmbr,
+            client: config.client,
+            assumptions: config.assumptions,
+            targetUnits: req.targetUnits,
+            householdSize: req.householdSize,
+            minSideApplies: req.minSideApplies,
+            directions: req.directions,
+            senior: req.senior,
+          });
 
     post({ id: req.id, status: 'done', options, elapsedMs: Date.now() - started });
   } catch (err) {
