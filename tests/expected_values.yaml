@@ -1,0 +1,58 @@
+# GOLDEN VALUES — computed in the analysis sessions (Sep 2026). Engines must reproduce these within tolerance.
+site:
+  parcel_total_ac: {value: 73.544, tol_pct: 1.0}        # deed labels sum 73.54
+  parcel_P1_ac: {value: 47.37, tol_pct: 1.0}
+  tbm_local_xy: {value: [231.787, 630.257], tol_m: 0.1}
+  tbm_rl: 100.000
+terrain_parcel_clipped_tin:
+  vertices: 7488
+  faces: 13814
+  meshed_plan_area_ac: {value: 60.68, tol_pct: 0.5}
+  rl_min: 68.627
+  rl_max: 143.534
+  summit_utm: [706666.0, 953990.3]
+  facet_slope_bands_ac: {tol_pct: 2.0, values: {"0-5": 17.40, "5-10": 10.63, "10-15": 10.30, "15-20": 8.83, "20-30": 9.65, "30-45": 2.92, "45-90": 0.95}}
+  plot_window_fall_ac:   # 11.4 x 14.2 m window, fall = max-min
+    note: "from survey_update_1209_evaluation.txt; method-sensitive, tol 10%"
+    values: {"<0.5": 4.35, "0.5-1": 6.32, "1-2": 9.16, "2-3": 7.53, ">3": 28.65}
+zoning_registration:
+  median_fit_m: {value: 0.65, max: 1.0}
+  scale: {value: 1.0336, tol: 0.003}
+  rotation_deg: {value: -1.03, tol: 0.2}
+zones_in_scope_ac:   # tol ±0.3 ac ("approximate" zones ±1 ac)
+  "PROJECT - 2 (VILLAS)": 7.77
+  "CLUBHOUSE": 7.38
+  "PHASE 2": 9.36
+  "PHASE 3": 8.55
+  "SCHOOL": 6.98
+  "PROJECT - 3(PREMIUM VILLAS)": 6.79
+  "APARTMENTS & FUTURE DEVELOPMENT": 5.39
+  "PROJECT - 4 (VILLAS)": 4.81
+  "SENIOR LIVING": 3.06
+  "HOSPITAL": 0.42
+  "PHASE 4": 0.0
+commercial:
+  apartment_sbua_from_plinth_1500: 1976.4
+  villa_sbua_from_plinth_2000: 2150
+kmbr:
+  yard_increase_m: {H10: 0.0, H15: 1.0, H24: 2.5, H36: 4.5, H45: 6.0, H60: 8.5, H70: 10.0, H75: 11.0}
+  A1_front_avg_at_60m: 11.5
+  access_A1_total_floor_30000m2: 8.0
+  parking_A1_per_du_139m2: 1.0
+  high_rise: {"15m_5fl": false, "16m_5fl": true, "15m_6fl": true}
+villa_20_30_50:   # min side 18 m (long side), ratio <= 2.5, tolerance 3%
+  balance_villas: {land_ac: 32, units: 640, unit_plot_m2: 101.2, grouping: 2, plot_m2: 202.3, plots: 320, dims_long18: [11.24, 18.0], footprint_m2: 91.1}
+  senior_enclave: {land_ac: 5, units: 160, unit_plot_m2: 63.2, grouping: 2, plot_m2: 126.5, plots: 80, dims_long18: [7.03, 18.0], aspect: 2.56}
+  min_plot_area_m2: 129.6
+apartments_client_method:   # 10.8 ac, FSI 3, 20 floors, core 20%, band mid-points
+  total_floor_area_m2: 131118
+  total_footprint_m2: 6556
+  footprint_share_of_land: 0.15
+  rows:
+    - {mix: [2BHK, 3BHK], per_floor: 4, plate_m2: 592, towers: 12, flats: 886}
+    - {mix: [2BHK, 3BHK], per_floor: 6, plate_m2: 888, towers: 8, flats: 886}
+    - {mix: [2BHK], per_floor: 6, plate_m2: 732, towers: 9, flats: 1075}
+    - {mix: [3BHK], per_floor: 4, plate_m2: 697, towers: 10, flats: 753}
+    - {mix: [3BHK, 4BHK], per_floor: 4, plate_m2: 836, towers: 8, flats: 627}
+    - {mix: [4BHK, 5BHK], per_floor: 4, plate_m2: 1115, towers: 6, flats: 470}
+  flats_rounding: "floor(total flats) — reported values are round(0.8*footprint_sft/avg*20)"

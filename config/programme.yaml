@@ -1,0 +1,32 @@
+# PROGRAMME BASELINE — from Phasing_and_Cashflows_V4_06092026.xlsx (formulas read directly) + client decisions.
+# Areas per unit are PLINTH sft (client confirmed). SBUA via client_rules.commercial_definitions.
+version: 2026-09-17
+scope:
+  in_scope_land_ac: 73.54          # 47.3681 + 21.892 + 4.28 (deed labels); computed polygon 73.544
+  deferred_land_ac: 26.4           # outside current survey; excluded until client advises
+  scheme_total_ac: 100
+population:
+  target_now: 4000
+  final_capacity: 6300
+  household_size: {family: 3.5, senior: 1.6}   # assumption
+lines:
+  - {id: pkg1_apartments,  use: apartments, occupancy: A1, units: 100, plinth_sft: 1500, land_ac: 1.2, build_rate_rs_sft: 3000, sale_value_cr: 78.04, start: 2026-Q4, months: 24}
+  - {id: pkg1_villas,      use: villas,     occupancy: A1, units: 60,  plinth_sft: 1750, land_ac: 3.0, build_rate_rs_sft: 3000, sale_value_cr: 78.04, type: standard}
+  - {id: pkg1_senior,      use: senior,     occupancy: A2_senior_villa_style, units: 32, plinth_sft: 1000, land_ac: 1.0, build_rate_rs_sft: 4000, sale_value_cr: 29.97}
+  - {id: school,           use: school,     occupancy: B_upto_higher_secondary, bua_sft: 200000, land_ac: {core_campus: 3.0, developable: 6.0, zone_total: 10.3}, curricula: [CBSE, ICSE, IGCSE, IB], build_rate_rs_sft: 3000, sale_value_cr: 133.65}
+  - {id: hospital,         use: hospital,   occupancy: C_hospital, bua_sft: 300000, land_ac: 5.0, beds_assumed: [250, 300], status: DEFERRED_until_land_acquired, build_rate_rs_sft: 5000, sale_value_cr: 282.45}
+  - {id: senior_enclave,   use: senior,     occupancy: A2_senior_villa_style, units: 160, plinth_sft: 1000, land_ac: 5.0, build_rate_rs_sft: 4000, sale_value_cr: 137.15}
+  - {id: clubhouse_annex,  use: club,       occupancy: D1, bua_sft: 10000, land_ac: 1.0}
+  - {id: clubhouse_golf,   use: club,       occupancy: D1, bua_sft: 40000, land_ac: 7.0, includes: mini_golf}
+  - {id: commercial,       use: commercial, occupancy: F, bua_sft: 300000, land_ac: 4.0}
+  - {id: balance_villas,   use: villas,     occupancy: A1, units: 640, plinth_sft: 2000, land_ac: 32.0, type: standard_and_premium, sale_value_cr: 1002.59}
+  - {id: balance_apartments, use: apartments, occupancy: A1, units: 900, plinth_sft: 1500, land_ac: 10.8, sale_value_cr: 875.13}
+  # added by client decision 17 Sep 2026 (educated assumptions — editable)
+  - {id: hotel,            use: hotel,      occupancy: A2, keys: 120, bua_sft: 120000, land_ac: 3.0, assumption: true, rationale: "Technocity/Technopark business travel, weddings, conventions, captive township"}
+  - {id: convention,       use: convention, occupancy: D_convention, hall_m2: 1080, bua_sft: 11625, land_ac: 0, host: hotel_or_commercial, source: "Zoning Plan block 'Convention Centre 1080 m2'"}
+  - {id: business_hub,     use: office,     occupancy: E, bua_sft: 100000, seats: [800, 1000], land_ac: 1.5, phase1_sft: 50000, assumption: true}
+cashflow_notes:
+  villa_land_formula: "units / 20 per acre (sheet C17 = 640/20)"
+  land_line_label_error: "'80 acres @ Rs 5 Lakh/acre' but computes Rs 500 Cr on 100 ac (Rs 1,147/sft ≈ Rs 5 Cr/acre)"
+  sale_value: "cost-plus-margin formula (land x1.25, construction x1.2, interest), not market price"
+zoning_plan_client: {file: data/processed/zones_client_registered.geojson, status: starting_point_only}

@@ -1,0 +1,166 @@
+UPDATED SURVEY — EVALUATION AND DEVIATION REPORT
+MANGALAPURAM_CSV_FINAL_1209.csv assessed against the terrain issued 09-09
+================================================================================
+
+1. DATA QUALITY — FOUR ROWS REJECTED OF 9,319
+--------------------------------------------------------------------------------
+  id 3757   N = 753722.82   northing 200 km south of the site
+  id 4301   N = 753724.43   same
+  id 4578   RL = 40.936     deviates -57.7 m from its own neighbours
+  id 8670   RL = 0.000      null elevation
+
+The two northings are a leading-digit typo, 753 for 953. Corrected to 953722.82
+and 953724.43 they land 3.0 m and 2.7 m from real survey points carrying
+RL 74.37 and 73.89, against their own recorded 74.24 and 73.73 — agreement to
+0.2 m. The correction is near-certain, but I have EXCLUDED rather than silently
+corrected them. They cost nothing: other points already reach 72 m further
+south, so no coverage is lost. Have the surveyor confirm and reissue.
+
+  id 4578 sits 6.6–15.3 m from neighbours reading RL 90.6 to 101.4, and records
+  40.9. That is a gross blunder, not a terrain feature. id 8670 is a null.
+
+  1,827 further rows are exact duplicate positions. Median RL spread at a
+  duplicated position is 0.000 m, so these are re-recordings, not conflicts.
+  Collapsed to a single median value each. Only 8 duplicated positions disagree
+  by more than 0.5 m; the worst is 4.00 m at E 706594.16 N 953804.25
+  (ids 4118/4119, RL 75.918 vs 79.918 — note the digit pattern). Worth a look.
+
+  RESULT: 9,319 rows -> 9,315 accepted -> 7,488 unique positions.
+
+
+2. CONTINUITY — THE NEW FILE IS A STRICT SUPERSET
+--------------------------------------------------------------------------------
+  Every one of the 4,430 points behind the 09-09 terrain is present in the new
+  file. None dropped.
+
+  Shared positions          4,430
+  Mean |dZ| on shared       0.00041 m
+  Shared differing >0.05 m  7
+  Genuinely new positions   3,058
+
+  This is the same survey, extended and densified. No re-levelling, no datum
+  shift, no systematic drift. Everything issued earlier remains valid; the new
+  mesh simply covers more ground.
+
+  The local origin is UNCHANGED at E 706106.927, N 953717.901, so the new OBJ
+  overlays the existing contours, boundary, DXF and KMZ without adjustment.
+  A handful of new points fall about 6 m south of the origin, so a few Y values
+  are slightly negative. That is expected and harmless.
+
+
+3. WHAT THE NEW DATA ACTUALLY ADDS
+--------------------------------------------------------------------------------
+Your reading — that the file is more exhaustive in area — is right on coverage
+but the split is worth knowing:
+
+  Coverage (8 m cell occupancy)   32.06 -> 52.14 acres      +63%
+  Meshed within the parcel        37.05 -> 60.68 acres      +64%
+  Parcel coverage                 50.4% -> 82.5%
+  Point spacing (median)          3.27 -> 3.12 m
+
+  Of the 3,058 new positions:
+     2,647 (87%) are INFILL inside the previously surveyed footprint
+       318 (10%) extend south, below the old N limit
+        93  (3%) extend east, beyond the old E limit
+
+  Extent grew only 37 m east and 72 m south. The real gain is that the holes
+  have been filled — the eastern block, the central gap and the southern strip
+  that were grey on every earlier drawing are now surveyed. That is the more
+  valuable outcome, because the gaps were what broke the drainage analysis.
+
+
+4. DEVIATIONS IN THE TERRAIN ITSELF — THERE ARE NONE OF SUBSTANCE
+--------------------------------------------------------------------------------
+  Relief          74.91 m  ->  74.91 m      identical
+  Summit          RL 143.53 at E 706666.0 N 953990.3, the SAME point
+  Mean slope      12.80°  ->  13.04°        +0.24°
+  Rugosity        1.0590  ->  1.0555        -0.3%
+
+  Slope distribution within the parcel:
+
+     band        09-09 acres   12-09 acres   09-09 %   12-09 %
+     0–5°           11.46         17.40       30.9      28.7
+     5–10°           6.82         10.63       18.4      17.5
+     10–15°          6.34         10.29       17.1      17.0
+     15–25°          7.70         14.71       20.8      24.2
+     25°+            4.73          7.65       12.8      12.6
+     TOTAL          37.05         60.68
+
+  Absolute areas rise by about two thirds across every band. The PROPORTIONS
+  move by 1 to 3 percentage points, with the only real shift a rise in the
+  15–25° band from 20.8% to 24.2% — the newly surveyed ground is marginally
+  steeper than the average of what came before, which is what you would expect
+  of land that was left until last.
+
+  NO MAJOR DEVIATION. The terrain model has not changed character. Every
+  conclusion drawn from the 09-09 data survives.
+
+  One correction to my own earlier statement: I said the ridge crest lay in the
+  unsurveyed east. That was wrong. The summit at E 706666 was already 206 m
+  inside the surveyed hull on the old data, and it is the same point at the same
+  RL now. What was missing was the eastern ARM of the parcel, not the summit.
+  Density around the summit has doubled — 53 to 100 points within 30 m — so the
+  peak is better resolved, but it has not moved.
+
+
+5. KNOCK-ON EFFECTS ON THE EARLIER ANALYSIS
+--------------------------------------------------------------------------------
+  BUILDABILITY — essentially unchanged in proportion, larger in area.
+     fall across a plot-sized window: median 2.89 -> 3.08 m
+     under 0.5 m      2.54 -> 4.35 acres   7.8% -> 7.8%
+     0.5–1 m          4.21 -> 6.32 acres  12.8% -> 11.3%
+     1–2 m            5.48 -> 9.16 acres  16.7% -> 16.3%
+     2–3 m            4.67 -> 7.53 acres  14.3% -> 13.4%
+     over 3 m        15.84 -> 28.65 acres 48.4% -> 51.2%
+     The headline stands: only about a fifth of surveyed ground takes the drawn
+     plot without a level change.
+
+  RETAINING — marginally worse, as expected on slightly steeper ground.
+     median step between platforms   1.23 -> 1.28 m
+     retaining face                  831 -> 895 m² per acre
+     cost at Rs 2,500–6,000/m²       Rs 22.4–53.7 lakh per acre
+     Still set against a Rs 75 lakh per acre infrastructure allowance that also
+     has to buy roads, drainage, water, sewerage and power.
+
+  DRAINAGE — improved but still not sufficient.
+     largest resolvable catchment    0.75 -> 1.04 ha
+     outlets leaving surveyed ground   11 -> 19
+     Better, but the survey still does not reach the watershed divides, so these
+     remain LOCAL flow directions. Do not size culverts or retention from them.
+
+  PROGRAMME AND FINANCIAL FINDINGS — untouched. The villa density arithmetic,
+  the land-take shortfall, the road-width and open-space compliance points and
+  the tax-threshold work all rest on the layouts, the rules and the cashflow,
+  not on the terrain. Nothing there moves.
+
+
+6. WHAT IS STILL MISSING
+--------------------------------------------------------------------------------
+  Parcel surveyed          60.68 of 73.57 acres (82.5%)
+  Parcel still unsurveyed  about 12.9 acres
+  Scheme as described      100 acres, so roughly 39 acres outside this boundary
+                           has neither levels nor a boundary on file
+
+  The remaining gaps inside the parcel are the north-western lobe, a pocket in
+  the centre and fragments along the eastern edge. They are small enough now
+  that one short return visit should close them.
+
+  Still outstanding: the level datum is not stated on any drawing. RL 68.6 to
+  143.5 remains consistent with these inland laterite hills, so MSL is likely,
+  but it is unconfirmed and should not be relied on for drainage or connection
+  levels.
+
+
+7. FILES REISSUED
+--------------------------------------------------------------------------------
+  mangalapuram_terrain.obj            7,488 verts, 13,814 faces, clipped to parcel
+  mangalapuram_terrain_full.obj       7,488 verts, 14,686 faces, full extent
+  mangalapuram_contours_1m.obj/.dxf   919 polylines
+  mangalapuram_contours_5m.obj/.dxf   200 polylines
+  mangalapuram_levels_master.csv      7,488 points, UTM + lat/long + local
+  mangalapuram_water_channels.png     redrawn
+  mangalapuram_plot_suitability.png   redrawn
+  mangalapuram_survey_update_comparison.png   what changed, side by side
+
+  All share the unchanged local origin, so they drop straight onto the existing
+  set. Both OBJs validate clean: no degenerate triangles, all indices in range.

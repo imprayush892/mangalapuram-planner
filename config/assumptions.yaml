@@ -1,0 +1,15 @@
+# Every value here is an ASSUMPTION — show in UI as editable, never hard-code.
+household_size_family: 3.5
+household_size_senior: 1.6
+hospital_sft_per_bed: [1000, 1200]
+hotel_gross_sft_per_key: 1000
+office_sft_per_seat: [100, 125]
+floor_to_floor_m: {apartments: 3.0, max_for_70m_at_20_floors: 3.5}
+parking_gross_m2_per_car: 30
+road_gradient: {desirable: "1:12", max_short: "1:8"}     # confirm with civil engineer
+retaining_cost_rs_per_m2: [2500, 6000]
+infrastructure_allowance_rs_per_acre: 7500000              # cashflow line 2
+plot_fall_thresholds_m: {build_as_drawn: 0.5, absorb_in_plinth: 1.0, stepped_plinth: 2.0, split_level: 3.0}
+sprinklered_towers: true    # affects travel-distance limit (45 m vs 30 m)
+aai_height_cap_m: null      # unknown — slider
+tbm_msl_offset_m: null      # unknown — blocks outfall design

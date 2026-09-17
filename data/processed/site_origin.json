@@ -1,0 +1,25 @@
+{
+  "crs": "EPSG:32643 (WGS84 / UTM 43N)",
+  "local_origin_utm": [
+    706106.927,
+    953717.901
+  ],
+  "local_origin_wgs84": [
+    76.87294742947331,
+    8.623363045711377
+  ],
+  "site_reference_point_client": "8\u00b037'38.7\"N 76\u00b052'34.4\"E",
+  "tbm": {
+    "rl": 100.0,
+    "utm": [
+      706338.714,
+      954348.158
+    ],
+    "local": [
+      231.78700000001118,
+      630.2570000000997
+    ],
+    "note": "All survey RLs are relative to this TBM (assumed 100.000). MSL offset unknown."
+  },
+  "units": "metres"
+}

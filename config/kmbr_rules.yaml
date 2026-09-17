@@ -1,0 +1,162 @@
+# KMBR 2019 (amended to 17.01.2023) AS AMENDED BY KMBR (Amendment) Rules 2025, G.O.(P) 53/2025/LSGD, 29.10.2025.
+# Client confirmed KMBR governs (not KPBR). Source text: docs/kmbr_source/*.txt (pdftotext of data/raw/regulation/*.pdf).
+# `verified: true` = value read from the 2025 amended text. Anything else: re-check against source before relying on it.
+version: 2025-10-29
+
+rule22_site_suitability:
+  no_building_slope_deg_over: 45
+  no_building_on: [flood_liable_land, soil_unsuitable_for_percolation, floodable_area_in_master_plan]
+  verified: true
+
+table4_yards_up_to_10m:   # [front_avg, front_min, rear_avg, rear_min, side_avg, side_min] metres
+  A1_A2_any__F_upto200: [3.0, 1.8, 1.5, 1.0, 1.0, 1.0]
+  small_plot_A1_F_bua_le200_plot_le125: [1.8, 1.2, 1.0, 0.5, 0.6, 0.6]
+  B_C_E_200_500: [5.0, 3.0, 2.0, 1.5, 2.0, 1.5]
+  B_C_E_over500: [6.0, 4.5, 3.0, 1.5, 2.0, 1.5]
+  D_200_500: [6.0, 4.5, 2.0, 1.5, 2.0, 1.5]
+  D_500_800: [7.5, 5.0, 3.0, 1.5, 4.0, 1.5]
+  D_over800: [10.5, 6.0, 3.0, 1.5, 5.0, 1.5]
+  D1_recreational: [3.0, 3.0, 1.5, 1.5, 1.5, 1.5]
+  F_over200: [3.0, 3.0, 1.5, 1.5, 1.0, 1.0]
+  H_over300: [6.0, 4.5, 3.0, 1.5, 2.0, 1.5]
+  J_multiplex: [10.5, 10.5, 5.0, 5.0, 5.0, 5.0]
+  average_yard_note: "average = yard area / length between building and boundary"
+  verified: true
+
+rule26:
+  height_increment: {above_m: 10, add_m: 0.5, per_m: 3, round: up, applies_to: "min and avg of every yard and interior open space", cap_min_yard_m: 16}
+  group_of_buildings: {yards_at: plot_boundary, gap_between_buildings_m: {upto_10m: 2.0, above_10m: 3.0}}
+  villa_groups_upto_8m_gap_m: 1.5
+  podium: {max_height_m: 16, ground_yards_for: podium_height, ground_yard_min_m: 3.0, full_height_yards_at: podium_top, no_gap_rule_between_buildings_on_same_podium: true}
+  unpaved_share_of_open_space_min: 0.50
+  verified: true
+
+table6_coverage_fsi:   # coverage %, FSI free, FSI with Rs5000/m2 fee, FSI with Rs7500/m2 fee
+  A1_residential:      {coverage: 65, fsi: [3, 4, 6]}
+  A2_lodging_special:  {coverage: 65, fsi: [2.5, 4]}
+  B_upto_higher_secondary: {coverage: 40, fsi: [2.5, 3]}
+  B_other:             {coverage: 50, fsi: [2.5, 3]}
+  C_hospital:          {coverage: 50, fsi: [2.5, 3.5]}
+  D_assembly:          {coverage: 40, fsi: [1.5, 2.5]}
+  D1_recreational:     {coverage: 70, fsi: [1.5, 1.5]}
+  E_office:            {coverage: 60, fsi: [3, 4]}
+  F_commercial:        {coverage: 65, fsi: [3, 4, 6]}
+  J_multiplex:         {coverage: 65, fsi: [3, 4]}
+  group_or_multiple_occupancy_fsi: "weighted average by floor area: sum(f_i*A_i)/sum(A_i)"
+  group_coverage: "sum over buildings of footprint/coverage_i must be <= plot area"
+  fsi_definition: "total floor area on all floors / plot area"
+  verified: true
+
+table7_access_A1:   # total floor area m2 upper bound -> min access width m
+  - [300, 1.2]      # multiple units (single unit <=300: no minimum)
+  - [600, 2.0]
+  - [1000, 3.0]
+  - [4000, 3.6]
+  - [8000, 5.0]
+  - [18000, 6.0]
+  - [24000, 7.0]
+  - [.inf, 8.0]
+table8_access_B_C_D_E_F:
+  - [300, 1.2]
+  - [1000, 3.0]
+  - [1500, 3.6]
+  - [6000, 5.0]
+  - [12000, 6.0]
+  - [18000, 7.0]
+  - [.inf, 8.0]
+table8_access_A2:
+  - [300, 2.4]
+  - [1000, 3.0]
+  - [4000, 3.6]
+  - [8000, 5.0]
+  - [18000, 6.0]
+  - [.inf, 8.0]
+table8_access_D1: [[3000, 3.0], [.inf, 5.0]]
+access_notes:
+  motorable_to_parking_min_m: 3.0
+  motorable_to_parking_A1_le8_units_m: 2.4
+  multiple_occupancy: "use total floor area with the most restrictive occupancy"
+  commercial_fsi_over_4_access_m: 8
+  headroom_through_building_m: 5.5
+  verified: true
+
+chapter17_high_rise:
+  definition: {height_m_ge: 16, or_floors_gt: 5, excluding: basements}
+  access_min_m: 5
+  fire_open_space: {width_m: 5, sides: two_adjacent, one_contiguous_to_access: true, keep_free_of_parking: true}
+  gap_between_blocks_m: 5
+  entry_gate: {width_m_min: 5, arch_headroom_m_min: 5}
+  staircases_min: 2
+  stretcher_lift_if_units_gt: 16
+  verified: true
+
+rule29_parking:
+  car_bay_m: [5.5, 2.7]
+  two_wheeler_bay_m2: 3.0     # verify: amendment text reads "3 square metres and 1.5 square metres" for different bay types
+  table9_A1_flats:            # floor area per DU m2 upper bound -> cars per DU
+    - [75, 0.5]
+    - [185, 1.0]
+    - [300, 1.5]
+    - [.inf, 2.0]
+  visitor_parking_A1_extra_share: 0.15
+  two_wheeler_area_share_of_car_area: 0.25
+  table10_other:   # m2 floor area per car
+    A2: {first_m2: 1170, rate_first: 90, rate_after: 60}
+    A2_senior_living_share: 0.25      # old-age homes / retirement / community living for senior citizens
+    B_school: 300
+    B_higher_education: 120
+    C_hospital: 90
+    D_convention_wedding_auditorium: {rate: 15, area_basis: "larger of main hall(s) or dining hall"}
+    D_other: 20
+    D1_recreational: 250
+    E_office: {first_m2: 1170, rate_first: 90, rate_after: 60}
+    F_commercial: {first_m2: 1170, rate_first: 90, rate_after: 60}
+    J_multiplex: 60
+  rounding: "sum fractional requirements across occupancies, then round up"
+  ramps: {one_way_m: 3.5, two_way_m: 5.5, curve_one_way_m: 4.0, curve_two_way_m: 6.0, max_slope: "1:7", two_way_not_needed_if: {A1_cars_le: 75, other_cars_le: 25}}
+  aisle_m: 4.0
+  headroom_m: 2.2
+  yard_parking: "max 50% of each mandatory yard may be used for parking"
+  mechanised_max_share: 0.50
+  ev_charging: required
+  table10A_loading_F: "30 m2 per 1000 m2 floor area beyond first 700 m2; >=1 bay 3x6 m"
+  verified: true
+
+rule31_subdivision:
+  min_plot_m2: 125
+  min_avg_width_m: 6
+  row_housing_min_avg_width_m: 4.5
+  min_frontage_m: 4
+  street_min_m: 7
+  cul_de_sac: [{max_len_m: 250, min_width_m: 5}, {max_len_m: 75, min_width_m: 3}]
+  cul_de_sac_turning: {area_m2: 81, side_m: 9}
+  access_street_to_land_by_extent_ha: [[0.5, 1.5], [1, 3.6], [2, 5], [.inf, 6]]
+  recreation: {trigger: "layout > 10 plots and >= 0.5 ha", share: 0.10, one_piece: true, min_area_m2: 200, min_width_m: 6, own_access: true}
+  junction_splay_m: {roads_le_10m: 4, roads_gt_10m: 10}
+  transformer_site_required_if_ha_ge: 2
+  dtp_approval_if: "plots > 20 or land > 0.5 ha"
+  note: "client set approval route aside; report only"
+  verified: partial
+
+table11_dtp_approval:
+  A1_dwelling_units_gt: 100
+  A2_B_builtup_gt_m2: 8000
+  C_E_builtup_gt_m2: 6000
+  D_builtup_gt_m2: 3000
+  F_builtup_gt_m2: 8000
+  verified: true
+
+rule36_travel_distance_m: {sprinklered: 45, other: 30}
+rule40_lifts:
+  required_if_storeys_gt: {C_hospital: 3, others: 4}
+  additional: "1 per 2500 m2 built-up (excl. parking) beyond first 4000 m2, or NBC calculation"
+  stretcher_lift_if_more_than_one_lift: true
+rule41_daylight_max_depth_from_opening_m: 7.5
+rule43_apartment_recreation:
+  applies_if_units_gt: 12
+  share_of_total_floor_area: 0.06
+  min_share_at_ground: 0.35
+  min_dimension_m: 1.2
+  counts: [swimming_pool, recreation_hall, health_club]
+rule76_rainwater: "storage mandatory for BUA > 300 m2"
+aai_noc: {trigger_km_from_ARP: 20, site_distance_km_estimate: 17, permissible_height: unknown}

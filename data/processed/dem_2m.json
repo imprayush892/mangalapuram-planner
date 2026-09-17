@@ -1,0 +1,15 @@
+{
+  "format": "raw little-endian float32, row-major, row 0 = southernmost row (y0)",
+  "nodata": "NaN (unsurveyed)",
+  "cell_m": 2.0,
+  "x0": 0.0,
+  "y0": -10.0,
+  "nx": 460,
+  "ny": 345,
+  "cell_centre": "x = x0 + cell*(i+0.5), y = y0 + cell*(j+0.5)",
+  "coords": "local metres (see site_origin.json)",
+  "source": "linear interpolation of mangalapuram_terrain_15_sept.obj (parcel-clipped TIN)",
+  "valid_cells": 61389,
+  "rl_min": 68.70343780517578,
+  "rl_max": 143.0540008544922
+}

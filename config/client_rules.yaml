@@ -1,0 +1,85 @@
+# CLIENT (ONÈO / developer) PLANNING RULES — these GOVERN the first-cut layout.
+# KMBR (kmbr_rules.yaml) is then checked on top; where they disagree, show both and apply the stricter.
+# Sources: "Planning Considerations" sheet (data/raw/client/planning_considerations_p*.jpg),
+#          client emails 15–17 Sep 2026 (docs/DECISIONS.md).
+version: 2026-09-17
+
+roads:
+  main_spine:   {width_m: 18, alignment: north_south_strict, angular_tolerance_deg: 0}
+  public:       {width_m: 10, note: "existing roads (blue lines, site_features RD) retained and widened to 10 m"}
+  internal:     {width_m: 6, note: "inside each zone; KMBR asks 7 m for through-streets in subdivisions — flag, do not block"}
+  cul_de_sac:   {turning_area_m2_min: 81, turning_side_m_min: 9}
+  inner_turning_radius_m_min: 3.5
+
+plot_orientation:
+  preferred_facing: [E, W, N]
+  corner_plots: premium   # larger/optimised, never at the cost of road widths or setbacks
+
+setbacks_client:   # client sheet: for roads 6 m and below
+  front_m: 2.0
+  rear_m: 1.5
+  side_m_each: 1.0
+  kmbr_check: "KMBR Table 4 row 1 = front avg 3.0 / min 1.8; rear 1.5/1.0; side 1.0/1.0 → front conflict must be flagged"
+
+recreational_area:
+  share_of_development_or_cluster: 0.10
+  min_width_m: 6
+
+villa_and_senior_land_split:      # applies to villa zones AND senior-living zones (senior = villa-style plots)
+  roads: 0.20
+  open_space: 0.30
+  saleable: 0.50
+
+villa_plots:
+  unit_plot_area: "saleable_area / number_of_units"
+  aspect_ratio: {min: 1.0, max: 2.5}          # short:long from 1:1 to 1:2.5
+  min_side_m: 18                              # confirmed METRES, applies to the PLOT (not the villa)
+  min_side_applies_to: long_side              # INTERPRETATION from client's 63 m2 -> 126 m2 row-housing example.
+                                              # Keep switchable: [long_side, both_sides]. both_sides => min plot 324 m2.
+  min_plot_area_m2_derived: 129.6             # 18 x 7.2 at 1:2.5 (long_side reading)
+  aspect_tolerance: 0.03                      # client's 126 m2 example gives 1:2.56
+  row_housing:
+    trigger: "unit_plot_area < min_plot_area (with tolerance)"
+    rule: "group k units per plot (k = 2 first) so plot_area = k * unit_plot_area >= min"
+    client_example: "63 m2 per unit -> row housing -> ~126 m2 plots"
+  footprint_placeholder:                      # client will decide villa footprint later
+    shape: rectangle
+    aspect_ratio: 2.5
+    share_of_plot_area: 0.45
+  types:                                      # client confirmed
+    standard: {plinth_sft: [1750, 2000], zones: ["PROJECT - 1", "PROJECT - 2", "PROJECT - 4"]}
+    premium:  {note: "larger plots on ridge and corner sites", zones: ["PROJECT - 3 (PREMIUM VILLAS)"]}
+    # plot sizes for both come from the 20/30/50 rule
+
+apartments:
+  buildable_share_of_land: {min: 0.30, max: 0.50}   # footprint must fit inside this share of the land
+  total_floor_area: "land_allocated * FSI"          # FSI from KMBR Table 6 (A1: 3 free, 4 / 6 with fees)
+  max_floors: 20
+  max_height_m: 70
+  total_footprint: "total_floor_area / 20"
+  core_share_of_footprint: 0.20                     # lifts, stairs, services
+  flats_share_of_footprint: 0.80                    # OPEN: client note says "remaining 20%" — treat as 80% (switchable)
+  unit_bands_plinth_sft:                            # confirmed PLINTH (not SBUA)
+    2BHK: [900, 1200]
+    3BHK: [1200, 1800]
+    4BHK: [1800, 2400]
+    5BHK: [2400, 3000]
+  allowed_mixes: [[2BHK, 3BHK], [3BHK, 4BHK], [4BHK, 5BHK], [2BHK], [3BHK], [4BHK], [5BHK]]
+  flats_per_floor: {min: 4, max: 6}
+  plate: "flats_per_floor * avg_unit_plinth / flats_share_of_footprint"
+  towers: "ceil(total_footprint / plate)"
+  spacing:
+    strategy: maximise_distance
+    min_clear_m: 12                               # stricter than KMBR Ch.XVII 5 m
+    joining:
+      allowed_only_when: "zone too small to keep 12 m"
+      gap_m: 0
+      configurations: [short_side_to_short_side, L_shape]
+      joined_block_inside: "zone boundary offset inward by 6 m"
+      kmbr_override: "use max(6 m, KMBR height-driven yard) — at 60 m tall yards are front 11.5 / rear 10 / side 9.5 m avg"
+
+commercial_definitions:          # client point 9
+  villa_sbua: "plinth_sft + 150"
+  apartment_sbua: "plinth_sft * 1.22 * 1.08"   # 22% loading, then 8% amenity (~150 sft on a 1,500 sft flat)
+  senior_sbua: "plinth_sft + 150"              # villa-style
+  uds_note: "UDS assumes recreational space 4–10% and roads ~10% (superseded by 20/30/50 for villa/senior zones)"

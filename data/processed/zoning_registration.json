@@ -1,0 +1,20 @@
+{
+  "method": "similarity fit of Level_Datum BD boundary onto Zoning_plan linework (ICP-style, Nelder-Mead)",
+  "zoning_to_utm": "utm = R(-th) @ ((p - [dx,dy]) / sc) + cB",
+  "dx": 25209.167751246507,
+  "dy": -15987.53947153686,
+  "th": -0.01792388588806171,
+  "sc": 1.0336005715992354,
+  "cB": [
+    706616.7505350958,
+    954029.4795289558
+  ],
+  "scale_note": "Zoning Plan is drawn ~3.4 pct oversize (sc=1.0336), rotated -1.03 deg",
+  "fit_error_m": {
+    "p25": 0.37,
+    "median": 0.65,
+    "p75": 1.01,
+    "p90": 2.21
+  },
+  "missing": "PHASE 5 hatch not recovered; commercial/batching/project-1 split approximate (\u00b11 ac)"
+}
