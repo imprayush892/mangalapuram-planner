@@ -2,15 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSite } from '../state/store';
 import type { RasterLayer } from './raster';
 import { buildRaster } from './raster';
-import { fitView, niceScaleBar, screenToWorld, worldToScreen } from './view';
+import { fitView, screenToWorld } from './view';
 import type { View } from './view';
-import { fillMulti, label, strokePolyline, zoneColour } from './draw';
-import { bboxOfMulti, multiCentroid, pointInMulti } from '../engine/geom/planar';
+import { bboxOfMulti, pointInMulti } from '../engine/geom/planar';
+import { drawPlan } from './planRenderer';
 import { m2ToAcres } from '../engine/units';
 import { pick } from '../engine/data/config';
 import type { Pt } from '../engine/geom/types';
 import { useLayout } from '../state/layoutStore';
-import { drawLayout } from './drawLayout';
 
 export default function PlanView(): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -65,95 +64,14 @@ export default function PlanView(): React.ReactElement {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, view.width, view.height);
-    ctx.fillStyle = '#0f1518';
-    ctx.fillRect(0, 0, view.width, view.height);
-
-    if (raster) {
-      const topLeft = worldToScreen(view, [raster.x0, raster.y0 + raster.heightM]);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(
-        raster.canvas,
-        topLeft[0],
-        topLeft[1],
-        raster.widthM * view.scale,
-        raster.heightM * view.scale,
-      );
-      ctx.imageSmoothingEnabled = true;
-    }
-
-    if (layers.contours) {
-      for (const c of site.contours) {
-        if (layers.majorContoursOnly && !c.major) continue;
-        strokePolyline(ctx, view, c.line, c.major ? 'rgba(146,168,178,0.55)' : 'rgba(120,140,150,0.25)', c.major ? 1 : 0.6);
-      }
-    }
-
-    if (layers.zones) {
-      for (const zone of site.zones) {
-        if (zone.geom.length === 0) continue;
-        const selected = zone.id === selectedZoneId;
-        const colour = zoneColour(zone.name);
-        fillMulti(
-          ctx,
-          view,
-          zone.geom,
-          selected ? `${colour}33` : `${colour}1a`,
-          selected ? colour : `${colour}88`,
-          selected ? 2 : 1,
-        );
-      }
-    }
-
-    if (layers.layout && activeLayout) drawLayout(ctx, view, activeLayout);
-
-    if (layers.parcel) {
-      fillMulti(ctx, view, site.parcel, undefined, '#e6edf0', 1.6);
-    }
-
-    if (layers.roads || layers.drains) {
-      for (const f of site.features) {
-        const isRoad = f.layer === 'RD';
-        const isDrain = f.layer === 'DR';
-        if (isRoad && !layers.roads) continue;
-        if (isDrain && !layers.drains) continue;
-        if (!isRoad && !isDrain) continue;
-        for (const line of f.lines) {
-          strokePolyline(ctx, view, line, isRoad ? 'rgba(230,180,85,0.85)' : 'rgba(110,190,230,0.8)', isRoad ? 1.2 : 1);
-        }
-      }
-    }
-
-    if (layers.points) {
-      for (const f of site.features) {
-        if (!f.point) continue;
-        const [x, y] = worldToScreen(view, f.point);
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = f.layer === 'TBM' ? '#e6b455' : '#9db6e6';
-        ctx.fill();
-        if (view.scale > 0.35) label(ctx, view, [f.point[0], f.point[1] + 8 / view.scale], f.layer);
-      }
-    }
-
-    if (layers.zoneLabels && view.scale > 0.18) {
-      for (const zone of site.zones) {
-        if (zone.geom.length === 0) continue;
-        const c = multiCentroid(zone.geom);
-        label(ctx, view, c, zone.name, zoneColour(zone.name), '600 11px ui-sans-serif, system-ui, sans-serif');
-        label(
-          ctx,
-          view,
-          [c[0], c[1] - 14 / view.scale],
-          `${zone.computedInScopeAc.toFixed(2)} ac`,
-          'rgba(223,231,234,0.75)',
-          '10px ui-sans-serif, system-ui, sans-serif',
-        );
-      }
-    }
-
-    drawScaleBar(ctx, view);
-    drawNorthArrow(ctx, view);
+    drawPlan(ctx, view, {
+      site,
+      layers,
+      raster,
+      layouts: activeLayout ? [activeLayout] : [],
+      selectedZoneId,
+      background: '#0f1518',
+    });
   }, [view, site, raster, layers, selectedZoneId, activeLayout]);
 
   useEffect(() => {
@@ -274,43 +192,4 @@ function Legend({ legend }: { legend: NonNullable<RasterLayer['legend']> }): Rea
   );
 }
 
-function drawScaleBar(ctx: CanvasRenderingContext2D, view: View): void {
-  const { metres, px } = niceScaleBar(view);
-  const x = view.width - px - 16;
-  const y = view.height - 48;
-  ctx.strokeStyle = 'rgba(223,231,234,0.85)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + px, y);
-  ctx.moveTo(x, y - 4);
-  ctx.lineTo(x, y + 4);
-  ctx.moveTo(x + px, y - 4);
-  ctx.lineTo(x + px, y + 4);
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(223,231,234,0.85)';
-  ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${metres} m`, x + px / 2, y - 8);
-}
 
-function drawNorthArrow(ctx: CanvasRenderingContext2D, view: View): void {
-  const x = view.width - 28;
-  const y = 92;
-  ctx.strokeStyle = 'rgba(223,231,234,0.85)';
-  ctx.fillStyle = 'rgba(223,231,234,0.85)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x, y + 18);
-  ctx.lineTo(x, y - 14);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x, y - 20);
-  ctx.lineTo(x - 5, y - 8);
-  ctx.lineTo(x + 5, y - 8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('N', x, y + 30);
-}

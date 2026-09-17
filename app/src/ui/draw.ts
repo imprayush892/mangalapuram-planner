@@ -64,13 +64,17 @@ export function label(
   at: Pt,
   text: string,
   colour = '#dfe7ea',
-  font = '11px ui-sans-serif, system-ui, sans-serif',
+  font: string | undefined = '11px ui-sans-serif, system-ui, sans-serif',
+  pen = 1,
 ): void {
   const [x, y] = worldToScreen(view, at);
-  ctx.font = font;
+  // Sheet exports render several times larger than the screen, so text and
+  // haloes are scaled with the pen rather than staying at screen pixel sizes.
+  const base = font ?? '11px ui-sans-serif, system-ui, sans-serif';
+  ctx.font = pen === 1 ? base : base.replace(/(\d+(?:\.\d+)?)px/, (_, n) => `${Number(n) * pen}px`);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 3 * pen;
   ctx.strokeStyle = 'rgba(8,12,14,0.85)';
   ctx.strokeText(text, x, y);
   ctx.fillStyle = colour;

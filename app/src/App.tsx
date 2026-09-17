@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useSite } from './state/store';
 import PlanView from './ui/PlanView';
 import SitePanel from './ui/SitePanel';
@@ -7,8 +7,13 @@ import RulesPanel from './ui/RulesPanel';
 import CompliancePanel from './ui/CompliancePanel';
 import ZonePanel from './ui/ZonePanel';
 import ReportPanel from './ui/ReportPanel';
+// three.js, SheetJS and the DXF writer are only needed once the user asks for
+// 3D or an export, so they load on demand rather than in the first bundle.
+const ExportPanel = lazy(() => import('./ui/ExportPanel'));
+const ThreeView = lazy(() => import('./ui/ThreeView'));
 
-type Tab = 'site' | 'programme' | 'zone' | 'rules' | 'compliance' | 'report';
+type Tab = 'site' | 'programme' | 'zone' | 'rules' | 'compliance' | 'report' | 'exports';
+type ViewMode = '2d' | '3d';
 
 const TABS: readonly { id: Tab; label: string }[] = [
   { id: 'site', label: 'Site' },
@@ -17,6 +22,7 @@ const TABS: readonly { id: Tab; label: string }[] = [
   { id: 'rules', label: 'Rules' },
   { id: 'compliance', label: 'Compliance' },
   { id: 'report', label: 'Report' },
+  { id: 'exports', label: 'Exports' },
 ];
 
 export default function App(): React.ReactElement {
@@ -24,6 +30,7 @@ export default function App(): React.ReactElement {
   const error = useSite((s) => s.error);
   const load = useSite((s) => s.load);
   const [tab, setTab] = useState<Tab>('site');
+  const [viewMode, setViewMode] = useState<ViewMode>('2d');
 
   useEffect(() => {
     void load();
@@ -38,11 +45,27 @@ export default function App(): React.ReactElement {
             73.54 ac in scope · Thiruvananthapuram · KMBR 2019 (amended 2023) + 2025 amendment
           </span>
         </div>
-        <span className="text-[11px] text-muted">
-          {status === 'loading' && 'loading site data…'}
-          {status === 'ready' && 'site data loaded'}
-          {status === 'error' && <span className="text-bad">{error}</span>}
-        </span>
+        <div className="flex items-center gap-3">
+          <div className="flex overflow-hidden rounded border border-line">
+            {(['2d', '3d'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                className={`px-2 py-1 text-[11px] transition ${
+                  viewMode === mode ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-panel-2 hover:text-fg'
+                }`}
+              >
+                {mode === '2d' ? '2D plan' : '3D'}
+              </button>
+            ))}
+          </div>
+          <span className="text-[11px] text-muted">
+            {status === 'loading' && 'loading site data…'}
+            {status === 'ready' && 'site data loaded'}
+            {status === 'error' && <span className="text-bad">{error}</span>}
+          </span>
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -73,11 +96,21 @@ export default function App(): React.ReactElement {
         </aside>
 
         <main className="min-w-0 flex-1">
-          <PlanView />
+          {viewMode === '2d' ? (
+            <PlanView />
+          ) : (
+            <Suspense fallback={<Loading what="the 3D view" />}>
+              <ThreeView />
+            </Suspense>
+          )}
         </main>
       </div>
     </div>
   );
+}
+
+function Loading({ what }: { what: string }): React.ReactElement {
+  return <div className="p-3 text-muted">Loading {what}…</div>;
 }
 
 function TabBody({ tab }: { tab: Tab }): React.ReactElement {
@@ -94,6 +127,12 @@ function TabBody({ tab }: { tab: Tab }): React.ReactElement {
       return <CompliancePanel />;
     case 'report':
       return <ReportPanel />;
+    case 'exports':
+      return (
+        <Suspense fallback={<Loading what="the exporters" />}>
+          <ExportPanel />
+        </Suspense>
+      );
     default:
       return (
         <div className="p-3 text-muted">

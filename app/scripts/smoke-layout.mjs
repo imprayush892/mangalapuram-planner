@@ -75,7 +75,20 @@ await page.waitForTimeout(800);
 await page.screenshot({ path: outFile });
 
 let summary = '';
-if (process.env.REPORT_TAB) {
+if (process.env.THREE_D) {
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(3000);
+  const c = page.locator('canvas').last();
+  const bb = await c.boundingBox();
+  await page.mouse.move(bb.x + bb.width * 0.42, bb.y + bb.height * 0.62);
+  for (let i = 0; i < Number(process.env.THREE_D_ZOOM ?? 0); i++) {
+    await page.mouse.wheel(0, -200);
+    await page.waitForTimeout(80);
+  }
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: outFile });
+  summary = '3D view rendered';
+} else if (process.env.REPORT_TAB) {
   await page.getByRole('button', { name: 'Report', exact: true }).click();
   await page.waitForTimeout(800);
   await page.screenshot({ path: outFile });

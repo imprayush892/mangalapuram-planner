@@ -16,24 +16,30 @@ const COLOURS = {
   block: { fill: 'rgba(240,149,107,0.25)', stroke: 'rgba(245,175,140,0.9)' },
 } as const;
 
-export function drawLayout(ctx: CanvasRenderingContext2D, view: View, layout: LayoutOption): void {
-  fillMulti(ctx, view, layout.buildable, COLOURS.buildable, 'rgba(111,211,199,0.25)', 1);
+export function drawLayout(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  layout: LayoutOption,
+  pen = 1,
+): void {
+  fillMulti(ctx, view, layout.buildable, COLOURS.buildable, 'rgba(111,211,199,0.25)', 1 * pen);
 
   for (const os of layout.openSpace) {
     const c = os.countsAsRecreation ? COLOURS.recreation : COLOURS.open;
-    fillMulti(ctx, view, os.geom, c.fill, c.stroke, 1);
+    fillMulti(ctx, view, os.geom, c.fill, c.stroke, 1 * pen);
   }
 
   for (const road of layout.roads) {
     const c = road.kind === 'cul_de_sac' ? COLOURS.culDeSac : COLOURS.road;
-    fillMulti(ctx, view, road.geom, c.fill, c.stroke, 0.8);
-    if (road.headGeom) fillMulti(ctx, view, road.headGeom, COLOURS.culDeSac.fill, COLOURS.culDeSac.stroke, 0.8);
+    fillMulti(ctx, view, road.geom, c.fill, c.stroke, 0.8 * pen);
+    if (road.headGeom) fillMulti(ctx, view, road.headGeom, COLOURS.culDeSac.fill, COLOURS.culDeSac.stroke, 0.8 * pen);
   }
 
   const showDetail = view.scale > 0.6;
+  void pen;
   for (const plot of layout.plots) {
     const c = plot.corner ? COLOURS.cornerPlot : COLOURS.plot;
-    strokePolyline(ctx, view, plot.ring, c.stroke, 0.9, true);
+    strokePolyline(ctx, view, plot.ring, c.stroke, 0.9 * pen, true);
     if (view.scale > 0.25) {
       ctx.beginPath();
       plot.ring.forEach((p, i) => {
@@ -45,11 +51,11 @@ export function drawLayout(ctx: CanvasRenderingContext2D, view: View, layout: La
       ctx.fillStyle = c.fill;
       ctx.fill();
     }
-    if (showDetail && plot.footprint) strokePolyline(ctx, view, plot.footprint, COLOURS.footprint, 0.8, true);
+    if (showDetail && plot.footprint) strokePolyline(ctx, view, plot.footprint, COLOURS.footprint, 0.8 * pen, true);
   }
 
   for (const tower of layout.towers) {
-    strokePolyline(ctx, view, tower.ring, COLOURS.tower.stroke, 1.4, true);
+    strokePolyline(ctx, view, tower.ring, COLOURS.tower.stroke, 1.4 * pen, true);
     ctx.beginPath();
     tower.ring.forEach((p, i) => {
       const [x, y] = worldToScreen(view, p);
@@ -60,12 +66,12 @@ export function drawLayout(ctx: CanvasRenderingContext2D, view: View, layout: La
     ctx.fillStyle = COLOURS.tower.fill;
     ctx.fill();
     if (view.scale > 0.35) {
-      label(ctx, view, tower.centre, `${tower.id} · ${tower.floors}F`, '#f4d9ee', '600 10px ui-sans-serif, sans-serif');
+      label(ctx, view, tower.centre, `${tower.id} · ${tower.floors}F`, '#f4d9ee', '600 10px ui-sans-serif, sans-serif', pen);
     }
   }
 
   for (const block of layout.blocks) {
-    strokePolyline(ctx, view, block.ring, COLOURS.block.stroke, 1.4, true);
+    strokePolyline(ctx, view, block.ring, COLOURS.block.stroke, 1.4 * pen, true);
     ctx.beginPath();
     block.ring.forEach((p, i) => {
       const [x, y] = worldToScreen(view, p);

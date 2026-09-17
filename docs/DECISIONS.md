@@ -37,3 +37,47 @@
 - "Remaining 20%" read as 80% of footprint for flats (core 20%).
 - 18 m minimum read as the plot's long side (from the 126 m² example); a both-sides reading gives a 324 m² minimum plot.
 - Apartment SBUA = plinth × 1.22 × 1.08.
+
+### Added while building the app (17 Sep 2026)
+Each of these is a switch or an editable assumption, not a silent decision.
+
+1. **Minimum plot area carries the aspect tolerance.** The client's own worked
+   example (63 m² per unit → ~126 m² row-housing plots) sits just under the
+   129.6 m² that 18 m at 1:2.5 gives, at 1:2.56. The 3% tolerance the client
+   states for the aspect ratio is therefore applied to the minimum plot area as
+   well, or their example would be rejected by their own rule.
+2. **Plot dimensions.** Under the long-side reading the long side is held at the
+   18 m minimum until the plot is big enough that the short side would exceed
+   it, after which the rectangle simply grows. This reproduces the golden
+   dimensions exactly and stays continuous for larger plots.
+3. **Cross roads inside villa zones.** Double-loaded strips at 2 × depth + road
+   width give a road share of about 14%, not the 20% the client budgets. The
+   generator adds cross roads to make up the difference, which also gives every
+   strip a second connection. The residual difference is reported.
+4. **Tower footprint at fewer than 20 floors.** The client's rule divides the
+   floor area by the literal 20 of their floor cap. A scheme actually built at
+   12 or 15 floors needs the footprint divided by the floors it has, or a third
+   of the FSI goes unused. The 20-floor case is unchanged, so the golden values
+   still hold.
+5. **Tower count rounding.** `towers = ceil(footprint / plate)` would put more
+   floor area on the site than the FSI allows. The footprint is spread evenly
+   over that many towers instead, so the FSI lands exactly on the chosen tier
+   and every tower is the same size. The client's plate is reported as the
+   maximum.
+6. **Spacing has no middle ground.** The client says never less than 12 m, and a
+   0 m join only where the zone is too small. A 7 m gap satisfies neither rule
+   and breaches the KMBR 5 m minimum, so the generator either keeps 12 m or
+   joins short side to short side; a join is never allowed to crowd a third
+   tower, and every join is flagged.
+7. **Plate depth.** KMBR Rule 41 puts habitable space within 7.5 m of an
+   opening. A double-loaded plate can therefore be twice that plus the corridor,
+   which is not habitable. **New assumption: `corridor_width_m: 2.0`.**
+8. **Where a zone cannot hold its programme line**, the tool places what fits and
+   reports the shortfall (towers short, sft short, units short) rather than
+   drawing something illegal or returning nothing.
+9. **Difficult ground is a warning, never a compliance failure.** No rule is
+   breached by a steep plot; the cost is reported through the fall classes, cut,
+   fill and retaining face.
+10. **Buildable ground is tested on a 2 m raster eroded by one cell**, so a plot
+    or tower cannot overhang the zone boundary or a Rule 22 face by a
+    rasterisation sliver.
