@@ -5,6 +5,7 @@ import SitePanel from './ui/SitePanel';
 import ProgrammePanel from './ui/ProgrammePanel';
 import RulesPanel from './ui/RulesPanel';
 import CompliancePanel from './ui/CompliancePanel';
+import ZonePanel from './ui/ZonePanel';
 
 type Tab = 'site' | 'programme' | 'zone' | 'rules' | 'compliance' | 'report';
 
@@ -84,6 +85,8 @@ function TabBody({ tab }: { tab: Tab }): React.ReactElement {
       return <SitePanel />;
     case 'programme':
       return <ProgrammePanel />;
+    case 'zone':
+      return <ZonePanel />;
     case 'rules':
       return <RulesPanel />;
     case 'compliance':
