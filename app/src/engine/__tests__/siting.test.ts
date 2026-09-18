@@ -247,7 +247,12 @@ describe('Phase 7 — allocation', () => {
     const best = result.alternatives[0]!;
     for (const alloc of best.allocations) {
       if (alloc.locked) continue;
-      expect(alloc.factors.length).toBe(7);
+      // Seven PRD factors, plus water fit wherever the goal gives water weight.
+      expect(alloc.factors.length).toBeGreaterThanOrEqual(7);
+      const keys = alloc.factors.map((f) => f.key);
+      for (const k of ['buildable_area', 'earthwork', 'access_frontage', 'adjacency', 'view_elevation', 'drainage_risk', 'phase_order']) {
+        expect(keys, `${k} missing`).toContain(k);
+      }
       expect(alloc.constraints.length).toBeGreaterThan(0);
       // The rejected alternative is what a rationale card reports. It loses on
       // priority, not necessarily on raw score: a use can score higher and
@@ -288,7 +293,8 @@ describe('Phase 7 — allocation', () => {
     // The first cut of this engine let villas, which suit almost any zone,
     // take the whole site while apartments, the school and commercial got
     // nothing. Unmet demand and a starvation boost now spread the land.
-    const balanced = (await siting()).alternatives.find((a) => a.id === 'balanced')!;
+    // The first alternative is the goal as the user set it.
+    const balanced = (await siting()).alternatives.find((a) => a.id === 'goal')!;
     for (const u of balanced.byUse) {
       if (u.demandAc <= 0) continue;
       expect(u.allocatedAc, `${u.use} got no land`).toBeGreaterThan(0);

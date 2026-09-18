@@ -26,6 +26,9 @@ import type { BlockResult, LayoutMetrics, LayoutOption, OpenSpaceResult, Terrain
 import { ZoneRaster } from './zoneRaster';
 import { fail, info, pass, warn } from '../rules/findings';
 import type { Finding } from '../rules/findings';
+import { builtWaterMetrics } from '../terrain/water';
+import type { WaterModel } from '../terrain/water';
+import type { SuperGoal } from '../optimise/goal';
 
 export interface BlockGeneratorInput {
   zoneId: string;
@@ -42,6 +45,10 @@ export interface BlockGeneratorInput {
   /** School only: the core campus must sit on ground no steeper than this. */
   maxSlopeDeg?: number;
   noGo?: MultiPoly;
+  /** Hydrology, so the layout can be scored on its relationship to water. */
+  water?: WaterModel;
+  /** The three objectives and their weights. */
+  goal?: SuperGoal;
 }
 
 /**
@@ -169,6 +176,9 @@ export function generateBlockLayout(input: BlockGeneratorInput): LayoutOption | 
   const grossPerCar = pick<number>(assumptions, 'parking_gross_m2_per_car', 30);
   const parking = parkingForOther(kmbr, input.occupancy, builtTotalM2, grossPerCar);
   const access = accessWidthM(kmbr, input.occupancy, builtTotalM2);
+  const hydro = input.water
+    ? builtWaterMetrics(dem, input.water, zone, blocks.map((b) => [[b.ring]] as MultiPoly))
+    : { wetShare: 0, channelsClear: 1 };
 
   const metrics: LayoutMetrics = {
     zoneAreaM2,
@@ -195,6 +205,10 @@ export function generateBlockLayout(input: BlockGeneratorInput): LayoutOption | 
     cutM3: Number.isFinite(terrain.cutM3) ? terrain.cutM3 : 0,
     fillM3: Number.isFinite(terrain.fillM3) ? terrain.fillM3 : 0,
     retainingFaceM2: Number.isFinite(terrain.fall) ? (terrain.fall / 2) * (length + depth) * 2 : 0,
+    meanPlotFallM: Number.NaN,
+    meanRoadGrade: 0,
+    wetPlotShare: hydro.wetShare,
+    channelsKeptClear: hydro.channelsClear,
     cornerPlots: 0,
     goodOrientationShare: 1,
     populationCapacity: 0,
@@ -220,6 +234,8 @@ export function generateBlockLayout(input: BlockGeneratorInput): LayoutOption | 
       roadShare: 100,
       openSpaceQuality: Math.min(100, metrics.shares.openSpace * 150),
       corners: 100,
+      roadGrade: 100,
+      water: (1 - hydro.wetShare) * 60 + hydro.channelsClear * 40,
       total: 0,
     },
     findings: [],

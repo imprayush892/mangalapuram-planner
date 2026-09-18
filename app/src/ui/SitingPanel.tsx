@@ -23,6 +23,7 @@ const WEIGHT_LABELS: Record<keyof ScoreWeights, string> = {
   view_elevation: 'View and position',
   drainage_risk: 'Drainage',
   phase_order: 'Phase order',
+  water_fit: 'Water fit',
 };
 
 export default function SitingPanel(): React.ReactElement {

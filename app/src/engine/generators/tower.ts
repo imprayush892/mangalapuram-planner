@@ -30,6 +30,9 @@ import type {
 } from './types';
 import { ZoneRaster } from './zoneRaster';
 import { checkTowerLayout } from '../rules/towerCompliance';
+import { builtWaterMetrics } from '../terrain/water';
+import type { WaterModel } from '../terrain/water';
+import type { SuperGoal } from '../optimise/goal';
 
 export interface TowerGeneratorInput {
   zoneId: string;
@@ -46,6 +49,10 @@ export interface TowerGeneratorInput {
   flatsPerFloor: number;
   householdSize: number;
   noGo?: MultiPoly;
+  /** Hydrology, so the layout can be scored on its relationship to water. */
+  water?: WaterModel;
+  /** The three objectives and their weights. */
+  goal?: SuperGoal;
   keep?: number;
 }
 
@@ -232,6 +239,9 @@ function buildTowerOption(input: TowerGeneratorInput, ctx: TowerContext): Layout
 
   const footprintM2 = towers.length * builtPlateM2;
   const totalFloorAreaM2 = footprintM2 * ctx.floors;
+  const hydro = input.water
+    ? builtWaterMetrics(input.dem, input.water, input.zone, towers.map((t) => [[t.ring]] as MultiPoly))
+    : { wetShare: 0, channelsClear: 1 };
   const metrics: LayoutMetrics = {
     zoneAreaM2: ctx.zoneAreaM2,
     buildableAreaM2: ctx.raster.buildableAreaM2,
@@ -260,6 +270,10 @@ function buildTowerOption(input: TowerGeneratorInput, ctx: TowerContext): Layout
       (s, t) => s + (Number.isFinite(t.terrain.fall) ? (t.terrain.fall / 2) * (t.lengthM + t.depthM) * 2 : 0),
       0,
     ),
+    meanPlotFallM: Number.NaN,
+    meanRoadGrade: 0,
+    wetPlotShare: hydro.wetShare,
+    channelsKeptClear: hydro.channelsClear,
     cornerPlots: 0,
     goodOrientationShare: 1,
     populationCapacity: towers.reduce((s, t) => s + t.flats, 0) * input.householdSize,
@@ -719,6 +733,8 @@ export function scoreTowerLayout(
     earthwork,
     orientation: spacing,
     roadShare,
+    roadGrade: 100,
+    water: (1 - m.wetPlotShare) * 60 + m.channelsKeptClear * 40,
     openSpaceQuality,
     corners: coverage,
     total,

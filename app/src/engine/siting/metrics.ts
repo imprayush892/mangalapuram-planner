@@ -1,7 +1,8 @@
 import type { MultiPoly, Pt } from '../geom/types';
 import { dist, distToSegment, multiCentroid, multiPolyArea, ringPerimeter } from '../geom/planar';
 import type { Dem } from '../terrain/dem';
-import { flowAccumulation } from '../terrain/analysis';
+import { buildWaterModel, waterStatsFor } from '../terrain/water';
+import type { WaterModel } from '../terrain/water';
 import type { SiteModel } from '../site/loadSite';
 import type { Zone } from '../site/types';
 import { ZoneRaster } from '../generators/zoneRaster';
@@ -26,6 +27,10 @@ const FRONTAGE_SAMPLE_M = 5;
 
 export interface MetricsOptions {
   frontageSearchM?: number;
+  /** Reuse a model already built rather than recomputing the hydrology. */
+  water?: WaterModel;
+  /** Strip either side of a watercourse counted as "near water". */
+  waterBufferM?: number;
 }
 
 export function measureZones(
@@ -38,12 +43,20 @@ export function measureZones(
   const frontageSearchM = opts.frontageSearchM ?? pick<number>(siting, 'defaults.frontage_search_m', 60);
 
   const roads = roadSegments(site);
-  const accumulation = flowAccumulation(site.dem);
+  const water =
+    opts.water ??
+    buildWaterModel({
+      dem: site.dem,
+      minUpslopeCells: pick<number>(siting, 'defaults.channel_upslope_cells', 250),
+      features: site.features,
+    });
+  const accumulation = water.accumulation;
   const fallGrid = site.dem.windowFallGrid(PLOT_WINDOW_X_M, PLOT_WINDOW_Y_M, 0.75);
+  const bufferM = opts.waterBufferM ?? pick<number>(siting, 'defaults.water_buffer_m', 15);
 
   const zones = site.zones.filter((z) => z.geom.length > 0);
   const raw = zones.map((zone) =>
-    measureZone(zone, site, slopeLimit, roads, accumulation, fallGrid, frontageSearchM),
+    measureZone(zone, site, slopeLimit, roads, accumulation, fallGrid, frontageSearchM, water, bufferM),
   );
 
   // Elevation and edge are ranked against the other zones, not in absolute
@@ -75,11 +88,14 @@ function measureZone(
   accumulation: Float32Array,
   fallGrid: Float32Array,
   frontageSearchM: number,
+  water: WaterModel,
+  waterBufferM: number,
 ): ZoneMetrics {
   const raster = new ZoneRaster(site.dem, zone.geom, slopeLimit);
   const areaM2 = multiPolyArea(zone.geom);
 
   const terrain = zoneTerrain(site.dem, raster, accumulation, fallGrid);
+  const hydro = waterStatsFor(site.dem, water, zone.geom, waterBufferM);
   const frontage = measureFrontage(zone.geom, roads, frontageSearchM);
   const centroid = multiCentroid(zone.geom);
 
@@ -104,6 +120,13 @@ function measureZone(
     distanceToParcelEdgeM: distanceToBoundary(centroid, site.parcel),
     edgeRank: 0,
     drainageShare: terrain.drainageShare,
+
+    wetnessRank: hydro.wetnessRank,
+    minDistanceToWaterM: hydro.minDistanceToWaterM,
+    meanDistanceToWaterM: hydro.meanDistanceToWaterM,
+    nearWaterShare: hydro.nearWaterShare,
+    pondingShare: hydro.pondingShare,
+    catchments: hydro.catchments,
     phase: phaseOf(zone.name),
   };
 }

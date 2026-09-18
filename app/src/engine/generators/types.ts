@@ -119,6 +119,21 @@ export interface LayoutMetrics {
   cornerPlots: number;
   goodOrientationShare: number;
   populationCapacity: number;
+  /**
+   * Mean fall across a plot, metres. Available while the search is running,
+   * unlike cut and fill, which are only known once the plots exist — so this
+   * is what the terrain objective actually steers on.
+   */
+  meanPlotFallM: number;
+  /**
+   * Mean along-road gradient as a rise:run fraction, over the grid's own
+   * roads. What "optimise road alignment for cut and fill" is measured by.
+   */
+  meanRoadGrade: number;
+  /** Share of plot land that sits on ground the hydrology says is wet. */
+  wetPlotShare: number;
+  /** Share of the zone's channel cells left unbuilt, which is what water-led means here. */
+  channelsKeptClear: number;
 }
 
 export interface ScoreBreakdown {
@@ -128,6 +143,10 @@ export interface ScoreBreakdown {
   roadShare: number;
   openSpaceQuality: number;
   corners: number;
+  /** How flat the grid's own roads run. */
+  roadGrade: number;
+  /** How well the layout keeps off wet ground and leaves the channels open. */
+  water: number;
   total: number;
 }
 

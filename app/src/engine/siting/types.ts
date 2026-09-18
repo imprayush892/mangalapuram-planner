@@ -40,6 +40,19 @@ export interface ZoneMetrics {
   /** Share of the zone's cells carrying a drainage channel. */
   drainageShare: number;
 
+  /* --------------------------------------------------------- hydrology */
+  /** 0 (sheds water) to 1 (collects it), from the topographic wetness index. */
+  wetnessRank: number;
+  /** Nearest watercourse from anywhere in the zone, metres. */
+  minDistanceToWaterM: number;
+  meanDistanceToWaterM: number;
+  /** Share of the zone within the water buffer. */
+  nearWaterShare: number;
+  /** Share of the zone that ponds. */
+  pondingShare: number;
+  /** Catchments the zone spans: more than one means it cannot drain as one. */
+  catchments: number;
+
   /** Phase read from the zone name, or null. */
   phase: number | null;
 }

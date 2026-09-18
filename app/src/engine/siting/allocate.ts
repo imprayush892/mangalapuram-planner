@@ -7,6 +7,8 @@ import type { ProgrammeSummary, UseKind } from '../rules/programme';
 import { checkConstraints, isEligible, unevaluableNotes } from './constraints';
 import { loadWeights, scoreCandidate } from './score';
 import type { ScoreContext, ScoreWeights } from './score';
+import { BALANCED_GOAL, normaliseGoal, sitingWeightsFor } from '../optimise/goal';
+import type { SuperGoal } from '../optimise/goal';
 import { measureZones } from './metrics';
 import type {
   SitingAlternative,
@@ -71,11 +73,40 @@ export interface AllocateInput {
   keep?: number;
   /** Supplied by the caller to avoid re-measuring; measured here when absent. */
   metrics?: ZoneMetrics[];
+  /**
+   * The three objectives and their relative weight. Every factor's influence is
+   * re-derived from this, so the same engine produces a space-led, terrain-led
+   * or water-led allocation without branching into separate modes.
+   */
+  goal?: SuperGoal;
 }
 
 export function runSiting(input: AllocateInput): SitingResult {
   const metrics = input.metrics ?? measureZones(input.site, input.kmbr, input.siting);
-  const weights = input.weights ?? loadWeights(input.siting);
+  const goal = normaliseGoal(input.goal ?? BALANCED_GOAL);
+  const configured = input.weights ?? loadWeights(input.siting);
+  // The goal reshapes the configured weights rather than replacing them: an
+  // edit made in the Rules tab still counts, it is just pushed by the goal.
+  const shaped = sitingWeightsFor(goal, {
+    buildableArea: configured.buildable_area,
+    earthwork: configured.earthwork,
+    accessFrontage: configured.access_frontage,
+    adjacency: configured.adjacency,
+    viewElevation: configured.view_elevation,
+    drainageRisk: configured.drainage_risk,
+    phaseOrder: configured.phase_order,
+    waterFit: Math.max(configured.water_fit, 20),
+  });
+  const weights: ScoreWeights = {
+    buildable_area: shaped.buildableArea,
+    earthwork: shaped.earthwork,
+    access_frontage: shaped.accessFrontage,
+    adjacency: shaped.adjacency,
+    view_elevation: shaped.viewElevation,
+    drainage_risk: shaped.drainageRisk,
+    phase_order: shaped.phaseOrder,
+    water_fit: shaped.waterFit,
+  };
   const locks = input.locks ?? pickLocks(input.siting);
   const demand = landDemand(input.programme);
 
@@ -99,7 +130,12 @@ export function runSiting(input: AllocateInput): SitingResult {
   }
 
   const tilts: { id: string; label: string; strategy: string; weights: ScoreWeights }[] = [
-    { id: 'balanced', label: 'Balanced', strategy: 'the weights as configured', weights },
+    {
+      id: 'goal',
+      label: goal.label,
+      strategy: `the goal as set: space ${Math.round(goal.space * 100)}%, terrain ${Math.round(goal.terrain * 100)}%, water ${Math.round(goal.water * 100)}%`,
+      weights,
+    },
     {
       id: 'buildability',
       label: 'Least earthwork',

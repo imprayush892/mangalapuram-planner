@@ -1,3 +1,4 @@
+import type { WaterModel } from '../terrain/water';
 import type { Dem } from '../terrain/dem';
 import type { MultiPoly, Pt } from '../geom/types';
 import type { SiteFeature } from '../site/types';
@@ -77,6 +78,13 @@ export interface CirculationInput {
    * values hug the contours; 0 routes straight over anything passable.
    */
   gradePenaltyM: number;
+  /**
+   * Metres of detour a route will accept to avoid crossing a watercourse. A
+   * crossing is a culvert, so a water-led plan pays to go round.
+   */
+  waterPenaltyM?: number;
+  /** Hydrology, so a route can be charged for the water it crosses. */
+  water?: WaterModel;
 }
 
 const BLOCKED = -1;
@@ -90,14 +98,17 @@ class RouteGrid {
   /** -1 blocked, otherwise the per-metre multiplier for entering the cell. */
   readonly passable: Int8Array;
   readonly rl: Float32Array;
+  /** 1 where the cell carries water, so a step onto it is a crossing. */
+  readonly wet: Uint8Array;
 
-  constructor(dem: Dem, parcel: MultiPoly, unbuildableSlopeDeg: number) {
+  constructor(dem: Dem, parcel: MultiPoly, unbuildableSlopeDeg: number, water?: WaterModel) {
     this.dem = dem;
     this.nx = dem.meta.nx;
     this.ny = dem.meta.ny;
     this.cell = dem.cell;
     this.passable = new Int8Array(this.nx * this.ny);
     this.rl = new Float32Array(this.nx * this.ny);
+    this.wet = new Uint8Array(this.nx * this.ny);
     const slope = dem.slopeGrid();
     const b = bboxOfMulti(parcel);
     for (let j = 0; j < this.ny; j += 1) {
@@ -117,6 +128,7 @@ class RouteGrid {
         // An unsurveyed cell is crossable but flagged, never silently treated
         // as flat: NaN slope means we do not know, not that it is fine.
         this.passable[k] = Number.isNaN(s) || s <= unbuildableSlopeDeg ? 1 : BLOCKED;
+        if (water && water.distanceToWaterM[k]! <= this.cell) this.wet[k] = 1;
       }
     }
   }
@@ -141,6 +153,7 @@ function spread(
   grid: RouteGrid,
   sources: Iterable<number>,
   gradePenaltyM: number,
+  waterPenaltyM = 0,
 ): { cost: Float64Array; from: Int32Array } {
   const n = grid.nx * grid.ny;
   const cost = new Float64Array(n).fill(Number.POSITIVE_INFINITY);
@@ -214,7 +227,9 @@ function spread(
         const b = grid.rl[nk]!;
         // Unsurveyed ground carries no known climb, so it costs its length.
         const rise = Number.isNaN(a) || Number.isNaN(b) ? 0 : Math.abs(b - a);
-        const step = run + gradePenaltyM * rise;
+        // Entering a wet cell is a crossing, charged once at the bank.
+        const crossing = waterPenaltyM > 0 && grid.wet[nk] === 1 && grid.wet[k] === 0 ? waterPenaltyM : 0;
+        const step = run + gradePenaltyM * rise + crossing;
         const next = c + step;
         if (next < cost[nk]!) {
           cost[nk] = next;
@@ -385,7 +400,7 @@ function publicRoads(input: CirculationInput): CirculationRoad[] {
 }
 
 export function generateCirculation(input: CirculationInput): CirculationResult {
-  const grid = new RouteGrid(input.dem, input.parcel, input.unbuildableSlopeDeg);
+  const grid = new RouteGrid(input.dem, input.parcel, input.unbuildableSlopeDeg, input.water);
   const notes: string[] = [];
   const roads: CirculationRoad[] = [];
 
@@ -434,7 +449,7 @@ export function generateCirculation(input: CirculationInput): CirculationResult 
   const pending = input.zones.filter((z) => z.geom.length > 0);
   let collectorCount = 0;
   while (pending.length > 0) {
-    const { cost, from } = spread(grid, sources, input.gradePenaltyM);
+    const { cost, from } = spread(grid, sources, input.gradePenaltyM, input.waterPenaltyM ?? 0);
 
     let bestZone: { index: number; cell: number; cost: number } | null = null;
     for (let z = 0; z < pending.length; z += 1) {
@@ -522,7 +537,11 @@ export function generateCirculation(input: CirculationInput): CirculationResult 
     seed(zone.geom);
   }
 
-  notes.push(`${collectorCount} collectors traced over the terrain to join the zones to the network`);
+  notes.push(
+    `${collectorCount} collectors traced over the terrain to join the zones to the network, detouring ${input.gradePenaltyM.toFixed(0)} m per metre of climb${
+      (input.waterPenaltyM ?? 0) > 0 ? ` and ${(input.waterPenaltyM ?? 0).toFixed(0)} m to avoid each watercourse crossing` : ''
+    }`,
+  );
   return { roads, gates, unreachable, notes };
 }
 

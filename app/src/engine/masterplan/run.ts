@@ -14,6 +14,10 @@ import { pick } from '../data/config';
 import { multiPolyArea } from '../geom/planar';
 import { briefForZone } from './brief';
 import { circulationFootprint, generateCirculation } from './circulation';
+import { buildWaterModel, pondingGround, waterBuffer } from '../terrain/water';
+import { BALANCED_GOAL, goalExplanation, normaliseGoal, settingsFor } from '../optimise/goal';
+import type { SuperGoal } from '../optimise/goal';
+import { union } from '../geom/boolean';
 import { buildJunctions } from './junctions';
 import { gradientLimits, measureGradient, summariseGradients } from '../rules/roadGradient';
 import { subdivisionRules } from '../rules/kmbr';
@@ -41,6 +45,8 @@ export interface MasterPlanOptions {
   apartmentMix: BandName[];
   flatsPerFloor: number;
   runId: number;
+  /** The three objectives and their relative weight. */
+  goal?: SuperGoal;
 }
 
 function totalsOf(
@@ -95,7 +101,36 @@ export function runMasterPlan(
   onProgress: (message: string, done: number, total: number) => void = () => {},
 ): MasterPlan {
   const started = Date.now();
+  const goal = normaliseGoal(opts.goal ?? BALANCED_GOAL);
   const programme = loadProgramme(config.programme, config.client, config.kmbr, config.assumptions);
+
+  // The hydrology is built once and shared: every zone, the circulation and the
+  // scoring all read the same model, so a water-led plan is one judgement
+  // rather than several that could disagree.
+  onProgress('reading the hydrology', 0, 0);
+  const water = buildWaterModel({
+    dem: site.dem,
+    minUpslopeCells: pick<number>(config.siting, 'defaults.channel_upslope_cells', 250),
+    features: site.features,
+  });
+  const goalSettings = settingsFor(goal, {
+    routeGradePenaltyM: pick<number>(config.assumptions, 'route_grade_penalty_m', 12),
+    waterBufferM: pick<number>(config.siting, 'defaults.water_buffer_m', 15),
+  });
+
+  /*
+   * Water-led planning is this: the strip either side of every watercourse, and
+   * the ground that ponds, come OUT of the buildable area before anything is
+   * laid out. The higher the water weight the wider that strip, so water
+   * organises the plan rather than being drawn on afterwards.
+   */
+  const waterNoGo =
+    goalSettings.waterBufferM > 0
+      ? union(
+          waterBuffer(site.dem, water, site.parcel, goalSettings.waterBufferM),
+          ...(goalSettings.excludePonding ? [pondingGround(site.dem, water, site.parcel)] : []),
+        )
+      : [];
   const householdFamily = pick<number>(config.assumptions, 'household_size_family', 3.5);
   const householdSenior = pick<number>(config.assumptions, 'household_size_senior', 1.6);
   const widths = roadWidths(config.client);
@@ -130,9 +165,11 @@ export function runMasterPlan(
     publicWidthM: widths.publicM,
     spineWidthM: widths.spineM,
     unbuildableSlopeDeg: unbuildableSlopeDeg(config.kmbr),
-    gradePenaltyM: pick<number>(config.assumptions, 'route_grade_penalty_m', 12),
+    gradePenaltyM: goalSettings.routeGradePenaltyM,
+    waterPenaltyM: goalSettings.routeWaterPenaltyM,
+    water,
   });
-  const roadNoGo = circulationFootprint(circulation.roads);
+  const roadNoGo = union(circulationFootprint(circulation.roads), waterNoGo);
 
   const zones: MasterPlanZone[] = [];
   let done = 0;
@@ -162,6 +199,8 @@ export function runMasterPlan(
       client: config.client,
       assumptions: config.assumptions,
       noGo: roadNoGo,
+      water,
+      goal: opts.goal,
     };
 
     let options: ReturnType<typeof generateVillaLayouts> = [];
@@ -268,7 +307,12 @@ export function runMasterPlan(
   const splayAreaM2 = multiPolyArea(junctions.splays);
   const totals = totalsOf(zones, circLength, circArea, junctions.junctions.length, splayAreaM2);
 
-  const notes: string[] = [...circulation.notes];
+  const notes: string[] = [...goalExplanation(goal, goalSettings), ...circulation.notes];
+  if (multiPolyArea(waterNoGo) > 0) {
+    notes.push(
+      `${(multiPolyArea(waterNoGo) / 4046.8564).toFixed(2)} ac taken out of the buildable area as the ${goalSettings.waterBufferM.toFixed(0)} m watercourse buffer${goalSettings.excludePonding ? ' and ground that ponds' : ''}.`,
+    );
+  }
   const skipped = zones.filter((z) => z.empty);
   for (const z of skipped) notes.push(`${z.zoneName}: ${z.empty}`);
   for (const u of circulation.unreachable) {

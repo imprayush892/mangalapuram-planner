@@ -12,6 +12,26 @@
 # quietly waves through what it cannot measure is worse than no veto engine.
 version: 2026-09-17
 
+# How each use should sit on the water network. Read by the water-fit factor,
+# which only carries weight when the super goal gives water some priority.
+#   wants_frontage  a view or an address on water is worth something to this use
+#   dry             the use needs ground that sheds water, not ground that collects it
+#   tolerates_wet   the use can take wet ground, so it is the right thing to put there
+#   low_point       the use belongs at the bottom of a catchment
+water_fit:
+  villas:          {dry: true,  wants_frontage: true}
+  senior:          {dry: true,  wants_frontage: true}   # step-free ground must also be dry
+  apartments:      {dry: true,  wants_frontage: true}
+  school:          {dry: true}                          # playing fields must drain
+  club:            {tolerates_wet: true, wants_frontage: true}  # a pond is the amenity
+  commercial:      {dry: true,  wants_frontage: true}
+  hotel:           {dry: true,  wants_frontage: true}
+  office:          {dry: true}
+  infrastructure:  {low_point: true, tolerates_wet: true}       # the STP belongs downstream
+  hospital_reserved: {dry: true}
+  unassigned:      {}
+  provenance: PRD (water-sensitive zoning) + CLIENT (club pond)
+
 # Weights for the 0-100 siting score (PRD §5.3). Relative, normalised at use.
 scoring_weights:
   buildable_area: 25      # how much of the zone is usable at all
@@ -30,6 +50,8 @@ defaults:
   # Zone counts as having road frontage when its boundary comes this close to
   # an existing road edge.
   frontage_search_m: 60
+  water_buffer_m: 15              # ASSUMPTION: strip either side of a watercourse counted as "near water"; the super goal scales it
+  channel_upslope_cells: 250      # cells of upslope area before a flow path counts as a channel (2 m grid, so 1,000 m2)
   # Walk distance is measured centroid to centroid; a straight line understates
   # a real walk, so it is multiplied by this before testing `within_walk_m`.
   walk_detour_factor: 1.35

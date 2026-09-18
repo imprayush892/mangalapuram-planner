@@ -23,6 +23,12 @@ export interface ScoreWeights {
   view_elevation: number;
   drainage_risk: number;
   phase_order: number;
+  /**
+   * How well the use suits its position on the water network. Zero by default:
+   * it only carries weight when the super goal gives water some priority, which
+   * is what makes water-led planning an objective rather than a mode.
+   */
+  water_fit: number;
 }
 
 export const DEFAULT_WEIGHTS: ScoreWeights = {
@@ -33,7 +39,19 @@ export const DEFAULT_WEIGHTS: ScoreWeights = {
   view_elevation: 10,
   drainage_risk: 10,
   phase_order: 5,
+  water_fit: 0,
 };
+
+/** What a use wants from its position on the water network. */
+export interface WaterFitRule {
+  dry?: boolean;
+  tolerates_wet?: boolean;
+  wants_frontage?: boolean;
+  low_point?: boolean;
+}
+
+export const waterFitRule = (siting: YamlDoc, use: ZoneUse): WaterFitRule =>
+  pick<WaterFitRule>(siting, `water_fit.${use}`, {});
 
 export function loadWeights(siting: YamlDoc): ScoreWeights {
   const raw = pick<Partial<ScoreWeights>>(siting, 'scoring_weights', {});
@@ -135,6 +153,19 @@ export function scoreCandidate(
       wantsDrainage ? ', which this use wants as a water feature' : ''
     }`,
   });
+
+  /* Water fit: is this use in the right place on the water network? Only
+     carries weight when the goal asks for it. */
+  if (weights.water_fit > 0) {
+    const fit = scoreWaterFit(siting, use, metrics);
+    factors.push({
+      key: 'water_fit',
+      label: 'Water fit',
+      value: fit.value,
+      weight: weights.water_fit,
+      detail: fit.detail,
+    });
+  }
 
   /* Phase order: does the zoning plan's phase match the programme's? */
   const phase = scorePhase(use, metrics, ctx);
@@ -269,4 +300,73 @@ function scorePhase(use: ZoneUse, metrics: ZoneMetrics, ctx: ScoreContext): { va
     value: Math.max(0, 100 - gap * 40),
     detail: `zoning plan phase ${metrics.phase} against programme phase ${wanted}`,
   };
+}
+
+
+/**
+ * How well one use sits on the water network.
+ *
+ * Four separate judgements, each only made where the rule asks for it, and the
+ * score is their mean so a use with no water rule is not penalised for it:
+ *
+ *  - `dry`            wet ground is wrong for it, and ponding is worse
+ *  - `tolerates_wet`  wet ground is what it is FOR, so wetness scores up
+ *  - `wants_frontage` being near water is worth something, but sitting in the
+ *                     buffer is not: the best position is close to water and
+ *                     not on it
+ *  - `low_point`      it belongs at the bottom of a catchment
+ */
+function scoreWaterFit(
+  siting: YamlDoc,
+  use: ZoneUse,
+  metrics: ZoneMetrics,
+): { value: number; detail: string } {
+  const rule = waterFitRule(siting, use);
+  const parts: string[] = [];
+  const scores: number[] = [];
+
+  if (rule.dry) {
+    const dryness = (1 - metrics.wetnessRank) * 100;
+    const pondPenalty = Math.min(100, metrics.pondingShare * 300);
+    scores.push(Math.max(0, dryness - pondPenalty));
+    parts.push(
+      `needs dry ground: wetness ${(metrics.wetnessRank * 100).toFixed(0)}/100${
+        metrics.pondingShare > 0.01 ? `, ${(metrics.pondingShare * 100).toFixed(0)}% ponds` : ''
+      }`,
+    );
+  }
+
+  if (rule.tolerates_wet) {
+    scores.push(metrics.wetnessRank * 100);
+    parts.push(`suits wet ground: wetness ${(metrics.wetnessRank * 100).toFixed(0)}/100`);
+  }
+
+  if (rule.wants_frontage) {
+    // Close to water is worth most; on top of it is not frontage, it is a flood
+    // risk, so the curve peaks just outside the buffer and falls away after.
+    const d = metrics.minDistanceToWaterM;
+    const value = Number.isFinite(d) ? (d < 10 ? 40 + d * 4 : Math.max(0, 100 - (d - 10) / 3)) : 50;
+    scores.push(value);
+    parts.push(
+      Number.isFinite(d)
+        ? `water ${Math.round(d)} m away at the nearest point`
+        : 'no surveyed water relationship',
+    );
+  }
+
+  if (rule.low_point) {
+    // The bottom of a catchment is where water already goes, so elevation rank
+    // is the measure: low is right.
+    scores.push((1 - metrics.elevationRank) * 100);
+    parts.push(`belongs downstream: sits in the ${(metrics.elevationRank * 100).toFixed(0)}th percentile of the site by level`);
+  }
+
+  if (metrics.catchments > 1) {
+    parts.push(`spans ${metrics.catchments} catchments, so it cannot drain as one`);
+  }
+
+  if (scores.length === 0) {
+    return { value: 50, detail: `no water rule for ${USE_LABEL[use].toLowerCase()}` };
+  }
+  return { value: scores.reduce((s, v) => s + v, 0) / scores.length, detail: parts.join('; ') };
 }

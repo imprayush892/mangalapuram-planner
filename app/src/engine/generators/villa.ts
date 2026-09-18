@@ -10,6 +10,12 @@ import { pick } from '../data/config';
 import { aspectBand, clientSetbacks, cornerPlotsArePremium, landSplit, roadWidths, sizeVillaPlots } from '../rules/client';
 import type { MinSideApplies, PlotSizing } from '../rules/client';
 import { subdivisionRules, unbuildableSlopeDeg } from '../rules/kmbr';
+import { BALANCED_GOAL, layoutWeightsFor, normaliseGoal } from '../optimise/goal';
+import type { NormalGoal, SuperGoal } from '../optimise/goal';
+
+/** The goal this run is optimising for; balanced where the caller set none. */
+const goalOf = (input: { goal?: SuperGoal }): NormalGoal =>
+  normaliseGoal(input.goal ?? BALANCED_GOAL);
 import { gradientLimits, measureGradient, summariseGradients } from '../rules/roadGradient';
 import { toRad } from '../units';
 import type {
@@ -24,6 +30,8 @@ import type {
 } from './types';
 import { ZoneRaster } from './zoneRaster';
 import { checkVillaLayout } from '../rules/villaCompliance';
+import { builtWaterMetrics, isWetCell } from '../terrain/water';
+import type { WaterModel } from '../terrain/water';
 
 export type RoadDirection = 'contour' | 'north_south' | 'east_west';
 
@@ -41,6 +49,10 @@ export interface VillaGeneratorInput {
   householdSize: number;
   /** User-drawn no-go areas, subtracted from the buildable area. */
   noGo?: MultiPoly;
+  /** Hydrology, so the layout can be scored on its relationship to water. */
+  water?: WaterModel;
+  /** The three objectives and their weights. */
+  goal?: SuperGoal;
   minSideApplies?: MinSideApplies;
   directions?: RoadDirection[];
   keep?: number;
@@ -207,7 +219,23 @@ function evaluate(
 
   const good = new Map<number, number>();
   const bad = new Map<number, number>();
+  // Wet and channel cells are tallied in the same pass, so the SEARCH can
+  // optimise for water rather than only the winner being measured against it.
+  const wetByKey = new Map<number, number>();
+  const channelByKey = new Map<number, number>();
+  const water = input.water;
+  // Terrain, measured while the search runs. Cut and fill are only known once
+  // the plots exist, so a search scored on them scores every candidate the
+  // same; plot fall and road gradient are both available here and are what
+  // actually drive the earthwork.
+  const loKey = new Map<number, number>();
+  const hiKey = new Map<number, number>();
+  const slopeGrid = raster.dem.slopeGrid();
+  const aspectGrid = raster.dem.aspectGrid();
+  let roadGradeSum = 0;
+  let roadGradeCells = 0;
   let roadCells = 0;
+  let zoneChannelCells = 0;
 
   for (let j = 0; j < raster.ny; j++) {
     for (let i = 0; i < raster.nx; i++) {
@@ -221,7 +249,20 @@ function evaluate(
       const onStrip = vv < road;
       const onCross = uu < road;
       if (onStrip || onCross) {
-        if (inZone) roadCells++;
+        if (inZone) {
+          roadCells++;
+          // The gradient a road actually climbs is the ground's steepest
+          // gradient resolved along the road's own direction.
+          const gk = (raster.j0 + j) * raster.dem.meta.nx + (raster.i0 + i);
+          const slopeDeg = slopeGrid[gk]!;
+          const aspectDeg = aspectGrid[gk]!;
+          if (Number.isFinite(slopeDeg) && Number.isFinite(aspectDeg)) {
+            const roadAngle = onStrip ? candidate.angle : candidate.angle + Math.PI / 2;
+            const along = Math.abs(Math.cos((aspectDeg * Math.PI) / 180 - roadAngle));
+            roadGradeSum += Math.tan((slopeDeg * Math.PI) / 180) * along;
+            roadGradeCells += 1;
+          }
+        }
         continue;
       }
 
@@ -236,28 +277,89 @@ function evaluate(
       const key = plotKey(row, side, col);
       if (buildable) good.set(key, (good.get(key) ?? 0) + 1);
       else bad.set(key, (bad.get(key) ?? 0) + 1);
+
+      const rl = raster.rl[j * raster.nx + i]!;
+      if (Number.isFinite(rl)) {
+        const lo = loKey.get(key);
+        const hi = hiKey.get(key);
+        if (lo === undefined || rl < lo) loKey.set(key, rl);
+        if (hi === undefined || rl > hi) hiKey.set(key, rl);
+      }
+
+      if (water && inZone) {
+        const wk = (raster.j0 + j) * water.nx + (raster.i0 + i);
+        if (isWetCell(water, wk)) wetByKey.set(key, (wetByKey.get(key) ?? 0) + 1);
+        if (water.distanceToWaterM[wk]! <= raster.cell) {
+          zoneChannelCells += 1;
+          channelByKey.set(key, (channelByKey.get(key) ?? 0) + 1);
+        }
+      }
     }
   }
 
   // A plot must be whole: no cell outside the buildable area, and essentially
   // all of the cells its rectangle should contain.
   const expectedCells = (width * depth) / raster.cellAreaM2;
-  const whole: { key: number; cells: number }[] = [];
+  const whole: { key: number; cells: number; fall: number; wet: number }[] = [];
   for (const [key, cells] of good) {
     if ((bad.get(key) ?? 0) > 0) continue;
     if (cells < expectedCells * 0.9) continue;
-    whole.push({ key, cells });
+    const lo = loKey.get(key);
+    const hi = hiKey.get(key);
+    whole.push({
+      key,
+      cells,
+      fall: lo !== undefined && hi !== undefined ? hi - lo : Number.NaN,
+      wet: (wetByKey.get(key) ?? 0) / Math.max(1, cells),
+    });
   }
   if (whole.length === 0) return null;
 
-  // Take the plots nearest the zone centre first, so a short line drops the
-  // most marginal plots rather than an arbitrary corner.
-  whole.sort((a, b) => b.cells - a.cells || a.key - b.key);
+  /*
+   * Which plots to keep when the grid offers more than the programme wants.
+   *
+   * This used to be completeness alone, which meant the goal could choose a
+   * different grid but never a different plot within one: a terrain-led run
+   * kept the same steep plots a space-led run did. The order now follows the
+   * goal — space keeps the most complete plots, terrain keeps the flattest,
+   * water keeps the driest — so dropping a plot is a decision, not an accident
+   * of iteration order.
+   */
+  const goal = goalOf(input);
+  whole.sort((a, b) => {
+    const rank = (p: typeof a): number =>
+      goal.space * (p.cells / Math.max(1, expectedCells)) +
+      goal.terrain * (Number.isFinite(p.fall) ? Math.max(0, 1 - p.fall / 3) : 0.5) +
+      goal.water * (1 - p.wet);
+    return rank(b) - rank(a) || a.key - b.key;
+  });
   const accepted = whole.slice(0, sizing.plots).map(({ key }) => unKey(key));
   const plotCells = whole.slice(0, sizing.plots).reduce((s, w) => s + w.cells, 0);
   const openCells = Math.max(0, raster.zoneCells - roadCells - plotCells);
 
-  const metrics = rasterMetrics(raster, sizing, split, input, accepted, roadCells, plotCells, openCells, candidate);
+  const acceptedKeys = whole.slice(0, sizing.plots).map(({ key }) => key);
+  let wetOnPlots = 0;
+  let channelOnPlots = 0;
+  let fallSum = 0;
+  let fallCount = 0;
+  for (const key of acceptedKeys) {
+    wetOnPlots += wetByKey.get(key) ?? 0;
+    channelOnPlots += channelByKey.get(key) ?? 0;
+    const lo = loKey.get(key);
+    const hi = hiKey.get(key);
+    if (lo !== undefined && hi !== undefined) {
+      fallSum += hi - lo;
+      fallCount += 1;
+    }
+  }
+  const hydro = {
+    wetPlotShare: plotCells > 0 ? wetOnPlots / plotCells : 0,
+    channelsKeptClear: zoneChannelCells > 0 ? 1 - channelOnPlots / zoneChannelCells : 1,
+    meanPlotFallM: fallCount > 0 ? fallSum / fallCount : Number.NaN,
+    meanRoadGrade: roadGradeCells > 0 ? roadGradeSum / roadGradeCells : 0,
+  };
+
+  const metrics = rasterMetrics(raster, sizing, split, input, accepted, roadCells, plotCells, openCells, candidate, hydro);
   return {
     candidate,
     accepted,
@@ -265,7 +367,7 @@ function evaluate(
     plotCells,
     openCells,
     metrics,
-    score: scoreLayout(metrics, split),
+    score: scoreLayout(metrics, split, goalOf(input)),
   };
 }
 
@@ -424,6 +526,11 @@ function buildOption(
     0,
   );
   const cornerPlots = plots.filter((p) => p.corner).length;
+  // How the layout sits on the hydrology. Without a water model the two figures
+  // are reported as unknown-but-neutral rather than silently as perfect.
+  const hydro = input.water
+    ? builtWaterMetrics(input.dem, input.water, input.zone, plots.map((p) => [[p.ring]] as MultiPoly))
+    : { wetShare: 0, channelsClear: 1 };
   const goodOrientationShare =
     plots.length > 0 ? plots.filter((p) => p.facing !== 'S').length / plots.length : 0;
 
@@ -436,6 +543,8 @@ function buildOption(
     retainingFaceM2,
     cornerPlots,
     goodOrientationShare,
+    wetPlotShare: hydro.wetShare,
+    channelsKeptClear: hydro.channelsClear,
     coveragePct: evaluation.metrics.saleableAreaM2 > 0 ? (footprintM2 / evaluation.metrics.saleableAreaM2) * 100 : 0,
   };
 
@@ -881,6 +990,7 @@ function rasterMetrics(
   plotCells: number,
   openCells: number,
   candidate: Candidate,
+  hydro: { wetPlotShare: number; channelsKeptClear: number; meanPlotFallM: number; meanRoadGrade: number },
 ): LayoutMetrics {
   const cellArea = raster.cellAreaM2;
   const zoneAreaM2 = raster.zoneAreaM2;
@@ -923,6 +1033,10 @@ function rasterMetrics(
     cutM3: 0,
     fillM3: 0,
     retainingFaceM2: 0,
+    meanPlotFallM: hydro.meanPlotFallM,
+    meanRoadGrade: hydro.meanRoadGrade,
+    wetPlotShare: hydro.wetPlotShare,
+    channelsKeptClear: hydro.channelsKeptClear,
     cornerPlots: 0,
     goodOrientationShare: goodShare,
     populationCapacity: units * input.householdSize,
@@ -930,13 +1044,42 @@ function rasterMetrics(
 }
 
 /** SPEC 6.1.10: yield, earthwork, orientation, road share, open space, corners. */
-export function scoreLayout(m: LayoutMetrics, split: ReturnType<typeof landSplit>): ScoreBreakdown {
+/**
+ * Scores one candidate layout against the super goal.
+ *
+ * The six original factors are unchanged; what the goal decides is how much
+ * each one counts, plus a seventh that only matters under a water objective.
+ * A space-led goal makes yield dominate, a terrain-led goal makes earthwork
+ * dominate, a water-led goal makes keeping off wet ground and leaving the
+ * channels open dominate. Same engine, same rules, different emphasis.
+ */
+export function scoreLayout(
+  m: LayoutMetrics,
+  split: ReturnType<typeof landSplit>,
+  goal: NormalGoal = normaliseGoal(BALANCED_GOAL),
+): ScoreBreakdown {
   const ratio = m.targetUnits > 0 ? m.unitCount / m.targetUnits : 0;
   // Going over the programme target is not allowed, so it is punished hard.
   const yieldScore = ratio > 1 ? Math.max(0, 100 - (ratio - 1) * 400) : ratio * 100;
 
-  const earthworkPerPlot = m.plotCount > 0 ? (m.cutM3 + m.fillM3) / m.plotCount : 0;
-  const earthwork = Math.max(0, 100 - earthworkPerPlot / 4);
+  /*
+   * Earthwork is scored on the fall across a plot, not on cut and fill.
+   * Cut and fill are only known once the plots have been placed, so a search
+   * scored on them scores every candidate identically and the terrain
+   * objective does nothing. Plot fall is available at every stage, and it is
+   * what the cut and fill follow from.
+   */
+  /*
+   * A linear score clipped at zero is no score at all once the site is past
+   * the clip: on this terrain the mean plot fall is over 3 m almost
+   * everywhere, so `100 - fall/3 × 100` gave every candidate zero and the
+   * objective could not tell them apart. These curves fall away but never
+   * saturate, so a flatter option always outranks a steeper one.
+   */
+  const fall = m.meanPlotFallM;
+  const earthwork = Number.isFinite(fall) ? 100 / (1 + fall / 1.5) : 50;
+  // 1:16 scores about 62, 1:12 about 55, 1:8 about 44.
+  const roadGrade = 100 / (1 + m.meanRoadGrade / 0.08);
 
   const orientation = m.goodOrientationShare * 100;
   const roadShare = Math.max(0, 100 - (Math.abs(m.shares.roads - split.roads) / SHARE_TOLERANCE) * 50);
@@ -946,15 +1089,21 @@ export function scoreLayout(m: LayoutMetrics, split: ReturnType<typeof landSplit
   );
   const corners = m.plotCount > 0 ? Math.min(100, (m.cornerPlots / m.plotCount) * 400) : 0;
 
-  const total =
-    yieldScore * 0.4 +
-    earthwork * 0.14 +
-    orientation * 0.14 +
-    roadShare * 0.16 +
-    openSpaceQuality * 0.14 +
-    corners * 0.02;
+  // Dry plots and open channels, the two things a water-led layout is judged on.
+  const water = (1 - m.wetPlotShare) * 60 + m.channelsKeptClear * 40;
 
-  return { yield: yieldScore, earthwork, orientation, roadShare, openSpaceQuality, corners, total };
+  const w = layoutWeightsFor(goal);
+  const total =
+    yieldScore * w.yield +
+    earthwork * w.earthwork +
+    orientation * w.orientation +
+    roadShare * w.roadShare +
+    openSpaceQuality * w.openSpaceQuality +
+    corners * w.corners +
+    roadGrade * w.roadGrade +
+    water * w.water;
+
+  return { yield: yieldScore, earthwork, orientation, roadShare, openSpaceQuality, corners, roadGrade, water, total };
 }
 
 function strategyLabel(
