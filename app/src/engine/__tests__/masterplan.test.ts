@@ -150,3 +150,44 @@ describe('master plan', () => {
     }
   });
 });
+
+describe('campus blocks', () => {
+  it('lays a use as several buildings, not one slab', async () => {
+    const p = await plan();
+    const campuses = p.zones.filter((z) => (z.options[z.chosenIndex]?.blocks.length ?? 0) > 0);
+    expect(campuses.length).toBeGreaterThan(2);
+    // At least one use must break into a real campus rather than a single mass.
+    expect(campuses.some((z) => (z.options[z.chosenIndex]?.blocks.length ?? 0) >= 3)).toBe(true);
+  });
+
+  it('holds every block to the KMBR depth and length rules', async () => {
+    const c = await config();
+    const p = await plan();
+    const daylight = c.kmbr.rule41_daylight_max_depth_from_opening_m as number;
+    const travel = (c.kmbr.rule36_travel_distance_m as Record<string, number>).other;
+    const corridor = c.assumptions.corridor_width_m as number;
+    const maxDepth = daylight * 2 + corridor;
+    for (const z of p.zones) {
+      for (const b of z.options[z.chosenIndex]?.blocks ?? []) {
+        // Ring is a rectangle: measure its two side lengths.
+        const [a, bb, cc] = [b.ring[0]!, b.ring[1]!, b.ring[2]!];
+        const s1 = Math.hypot(bb[0] - a[0], bb[1] - a[1]);
+        const s2 = Math.hypot(cc[0] - bb[0], cc[1] - bb[1]);
+        const depth = Math.min(s1, s2);
+        const length = Math.max(s1, s2);
+        expect(depth, `${z.zoneName} ${b.id} depth`).toBeLessThanOrEqual(maxDepth + 0.01);
+        expect(length, `${z.zoneName} ${b.id} length`).toBeLessThanOrEqual(travel * 2 + 0.01);
+      }
+    }
+  });
+
+  it('keeps the campus inside the coverage its occupancy allows', async () => {
+    const p = await plan();
+    for (const z of p.zones) {
+      const layout = z.options[z.chosenIndex];
+      if (!layout || layout.blocks.length === 0) continue;
+      const failures = layout.findings.filter((f) => f.id === 'block.coverage' && f.status === 'fail');
+      expect(failures, `${z.zoneName} coverage`).toHaveLength(0);
+    }
+  });
+});

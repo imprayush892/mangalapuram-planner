@@ -10,6 +10,9 @@ import { pick } from '../data/config';
 import {
   accessWidthM,
   coverageFsi,
+  daylightDepthM,
+  gapBetweenBuildingsM,
+  travelDistanceM,
   governingYardM,
   highRise,
   needsDtpApproval,
@@ -83,38 +86,56 @@ export function generateBlockLayout(input: BlockGeneratorInput): LayoutOption | 
     split_level: 3.0,
   });
 
-  // A block roughly 1:1.6, laid on the flattest ground the placeable area holds.
-  // An irregular zone rarely takes the full-size rectangle, so the block is
-  // shrunk until it fits and the area it loses is reported rather than the
-  // generator returning nothing.
+  /*
+   * A campus, not one slab. The use's plinth is laid as a set of bars whose
+   * depth comes from KMBR Rule 41 — habitable space within 7.5 m of an opening,
+   * so a double-loaded bar is twice that plus the corridor, exactly as the
+   * tower plate is derived — separated by the KMBR Rule 26 gap between
+   * buildings. Bars are placed one at a time on the flattest ground left, so a
+   * school reads as a school rather than as a single rectangle covering its
+   * whole site.
+   */
+  const corridorM = pick<number>(assumptions, 'corridor_width_m', 2);
+  const barDepth = daylightDepthM(kmbr) * 2 + corridorM;
+  const gap = gapBetweenBuildingsM(kmbr, wantedFloors * floorToFloor, false);
+  // A bar with a stair at each end can be no longer than twice the Rule 36
+  // travel distance, which is what stops a 11,000 m² plinth becoming one 650 m
+  // building. Sprinklers are not assumed.
+  const maxBarLength = travelDistanceM(kmbr, false) * 2;
   const rect = minAreaRect(placeable.flatMap((p) => p[0] ?? []));
-  let placed: Ring | null = null;
-  let footprintM2 = wantedFootprintM2;
-  let length = 0;
-  let depth = 0;
-  for (const scale of [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.12]) {
-    footprintM2 = wantedFootprintM2 * scale;
-    depth = Math.sqrt(footprintM2 / 1.6);
-    length = footprintM2 / depth;
-    placed = placeBlock(placeable, dem, length, depth, rect.angle);
-    if (placed) break;
-  }
-  if (!placed) return null;
+
+  const campus = placeCampus({
+    placeable,
+    dem,
+    angle: rect.angle,
+    barDepth,
+    gap,
+    maxBarLength,
+    wantedFootprintM2,
+  });
+
+  if (campus.rings.length === 0) return null;
+  const placed = campus.rings[0]!;
+  const footprintM2 = campus.footprintM2;
+  const length = campus.meanLengthM;
+  const depth = campus.depthM;
 
   // With a smaller footprint, more floors recover some of the area — up to what
   // the FSI tier allows, never past it.
-  const floorsByFsi = Math.max(1, Math.floor((fsi * zoneAreaM2) / footprintM2));
-  const floors = Math.max(1, Math.min(floorsByFsi, Math.ceil(builtUpM2 / footprintM2)));
+  const floorsByFsi = Math.max(1, Math.floor((fsi * zoneAreaM2) / Math.max(1, footprintM2)));
+  const floors = Math.max(1, Math.min(floorsByFsi, Math.ceil(builtUpM2 / Math.max(1, footprintM2))));
   const heightM = floors * floorToFloor;
 
   const terrain = blockTerrain(dem, placed, fallThresholds);
   const notes: string[] = [];
-  if (Number.isFinite(terrain.fall) && terrain.fall > 3) {
-    notes.push(`Ground falls ${terrain.fall.toFixed(1)} m across the block: step the platform or use a podium.`);
+  if (campus.rings.length > 1) {
+    notes.push(
+      `The plinth is laid as ${campus.rings.length} blocks ${campus.depthM.toFixed(0)} m deep and ${gap.toFixed(0)} m apart, not one slab: Rule 41 puts habitable space within ${daylightDepthM(kmbr)} m of an opening, and Rule 26 sets the gap.`,
+    );
   }
   if (footprintM2 < wantedFootprintM2 * 0.999) {
     notes.push(
-      `A ${Math.round(wantedFootprintM2).toLocaleString('en-IN')} m² footprint does not fit inside the ${yardM.toFixed(1)} m yard on this zone shape; the block is drawn at ${Math.round(footprintM2).toLocaleString('en-IN')} m². Splitting the use into several blocks would recover some of it.`,
+      `A ${Math.round(wantedFootprintM2).toLocaleString('en-IN')} m² footprint does not fit inside the ${yardM.toFixed(1)} m yard on this zone shape; ${campus.rings.length} block${campus.rings.length === 1 ? '' : 's'} totalling ${Math.round(footprintM2).toLocaleString('en-IN')} m² is what the ground takes.`,
     );
   }
   if (footprintM2 * floors < builtUpM2 * 0.999) {
@@ -123,22 +144,31 @@ export function generateBlockLayout(input: BlockGeneratorInput): LayoutOption | 
     );
   }
 
-  const block: BlockResult = {
-    id: 'B1',
-    use: input.useLabel,
-    ring: placed,
-    footprintM2,
-    floors,
-    heightM,
-    builtUpM2: footprintM2 * floors,
-    terrain,
-    notes,
-  };
+  const blocks: BlockResult[] = campus.rings.map((ring, i) => {
+    const area = campus.areas[i] ?? 0;
+    const t = blockTerrain(dem, ring, fallThresholds);
+    const barNotes: string[] = [];
+    if (Number.isFinite(t.fall) && t.fall > 3) {
+      barNotes.push(`Ground falls ${t.fall.toFixed(1)} m across this block: step the platform or use a podium.`);
+    }
+    return {
+      id: `B${i + 1}`,
+      use: input.useLabel,
+      ring,
+      footprintM2: area,
+      floors,
+      heightM,
+      builtUpM2: area * floors,
+      terrain: t,
+      notes: barNotes,
+    };
+  });
+  const builtTotalM2 = blocks.reduce((sum, b) => sum + b.builtUpM2, 0);
 
-  const openSpace = buildOpenSpace(buildable, [[placed]], zone);
+  const openSpace = buildOpenSpace(buildable, blocks.map((b) => [b.ring]), zone);
   const grossPerCar = pick<number>(assumptions, 'parking_gross_m2_per_car', 30);
-  const parking = parkingForOther(kmbr, input.occupancy, block.builtUpM2, grossPerCar);
-  const access = accessWidthM(kmbr, input.occupancy, block.builtUpM2);
+  const parking = parkingForOther(kmbr, input.occupancy, builtTotalM2, grossPerCar);
+  const access = accessWidthM(kmbr, input.occupancy, builtTotalM2);
 
   const metrics: LayoutMetrics = {
     zoneAreaM2,
@@ -158,9 +188,9 @@ export function generateBlockLayout(input: BlockGeneratorInput): LayoutOption | 
     unitCount: 0,
     targetUnits: 0,
     towerCount: 0,
-    totalFloorAreaM2: block.builtUpM2,
+    totalFloorAreaM2: builtTotalM2,
     footprintM2,
-    fsiUsed: zoneAreaM2 > 0 ? block.builtUpM2 / zoneAreaM2 : 0,
+    fsiUsed: zoneAreaM2 > 0 ? builtTotalM2 / zoneAreaM2 : 0,
     coveragePct: zoneAreaM2 > 0 ? (footprintM2 / zoneAreaM2) * 100 : 0,
     cutM3: Number.isFinite(terrain.cutM3) ? terrain.cutM3 : 0,
     fillM3: Number.isFinite(terrain.fillM3) ? terrain.fillM3 : 0,
@@ -175,16 +205,16 @@ export function generateBlockLayout(input: BlockGeneratorInput): LayoutOption | 
     zoneId: input.zoneId,
     zoneName: input.zoneName,
     kind: 'block',
-    strategy: `${input.useLabel}: one block of ${Math.round(m2ToSft(block.builtUpM2)).toLocaleString('en-IN')} sft over ${floors} floors, ${length.toFixed(0)} × ${depth.toFixed(0)} m footprint inside the ${yardM.toFixed(1)} m yard`,
+    strategy: `${input.useLabel}: ${blocks.length} block${blocks.length === 1 ? '' : 's'} of ${Math.round(m2ToSft(builtTotalM2)).toLocaleString('en-IN')} sft over ${floors} floors, ${depth.toFixed(0)} m deep and up to ${length.toFixed(0)} m long (KMBR Rules 41 and 36), ${gap.toFixed(0)} m apart, inside the ${yardM.toFixed(1)} m yard`,
     plots: [],
     roads: [],
     openSpace,
     towers: [],
-    blocks: [block],
+    blocks,
     buildable,
     metrics,
     score: {
-      yield: builtUpM2 > 0 ? Math.min(100, (block.builtUpM2 / builtUpM2) * 100) : 100,
+      yield: builtUpM2 > 0 ? Math.min(100, (builtTotalM2 / builtUpM2) * 100) : 100,
       earthwork: Math.max(0, 100 - (Number.isFinite(terrain.fall) ? terrain.fall * 10 : 0)),
       orientation: 100,
       roadShare: 100,
@@ -210,9 +240,107 @@ export function generateBlockLayout(input: BlockGeneratorInput): LayoutOption | 
     heightM,
     floors,
     maxSlopeDeg: input.maxSlopeDeg,
-    meanSlopeDeg: dem.terrainIn([[placed]]).meanSlopeDeg,
+    meanSlopeDeg: dem.terrainIn(blocks.map((b) => [b.ring])).meanSlopeDeg,
   });
   return option;
+}
+
+interface CampusInput {
+  placeable: MultiPoly;
+  dem: Dem;
+  angle: number;
+  barDepth: number;
+  gap: number;
+  /** KMBR Rule 36: a bar with a stair at each end reaches twice this. */
+  maxBarLength: number;
+  wantedFootprintM2: number;
+}
+
+interface CampusResult {
+  rings: Ring[];
+  areas: number[];
+  footprintM2: number;
+  depthM: number;
+  meanLengthM: number;
+}
+
+/**
+ * Lays the use's plinth as a set of bars rather than one slab.
+ *
+ * Each bar is `barDepth` deep — the Rule 41 daylight depth on both sides plus
+ * the corridor — and as long as the ground left will take. After a bar is
+ * placed, the bar plus the Rule 26 gap is cut out of the placeable area, so the
+ * next one cannot crowd it. Bars stop when the wanted footprint is met or
+ * nothing more fits, and the shortfall is reported by the caller.
+ *
+ * A zone too small or too broken for a full-depth bar falls back to the largest
+ * single block that fits, so the generator never returns nothing where the
+ * programme asks for something.
+ */
+function placeCampus(input: CampusInput): CampusResult {
+  const { dem, angle, gap } = input;
+  const rings: Ring[] = [];
+  const areas: number[] = [];
+  let remaining = input.placeable;
+  let placedArea = 0;
+  let lengthSum = 0;
+
+  // A bar shorter than this is a shed, not a building; stop rather than
+  // scatter fragments over the site.
+  const minBarLength = input.barDepth * 1.5;
+
+  for (let n = 0; n < 24 && placedArea < input.wantedFootprintM2 * 0.999; n += 1) {
+    const wanted = input.wantedFootprintM2 - placedArea;
+    const depth = input.barDepth;
+    let placedRing: Ring | null = null;
+    let barLength = 0;
+
+    // Longest bar first: a campus of a few long buildings reads better, and
+    // costs less envelope, than many short ones.
+    const maxLength = Math.max(minBarLength, Math.min(input.maxBarLength, wanted / depth));
+    for (const scale of [1, 0.85, 0.7, 0.55, 0.45, 0.35, 0.28, 0.2, 0.15, 0.1]) {
+      const length = Math.max(minBarLength, maxLength * scale);
+      if (length < minBarLength) break;
+      const ring = placeBlock(remaining, dem, length, depth, angle);
+      if (ring) {
+        placedRing = ring;
+        barLength = length;
+        break;
+      }
+    }
+
+    if (!placedRing) break;
+
+    rings.push(placedRing);
+    const area = barLength * depth;
+    areas.push(area);
+    placedArea += area;
+    lengthSum += barLength;
+    remaining = difference(remaining, insetMulti([[placedRing]], -gap));
+    if (remaining.length === 0) break;
+  }
+
+  if (rings.length === 0) {
+    // Nothing takes a full-depth bar: fall back to the biggest block that fits.
+    for (const scale of [1, 0.8, 0.6, 0.45, 0.3, 0.2, 0.12]) {
+      const area = input.wantedFootprintM2 * scale;
+      const depth = Math.sqrt(area / 1.6);
+      const length = area / depth;
+      const ring = placeBlock(input.placeable, dem, length, depth, angle);
+      if (ring) {
+        return { rings: [ring], areas: [area], footprintM2: area, depthM: depth, meanLengthM: length };
+      }
+    }
+    return { rings: [], areas: [], footprintM2: 0, depthM: input.barDepth, meanLengthM: 0 };
+  }
+
+  return {
+    rings,
+    areas,
+    footprintM2: placedArea,
+    depthM: input.barDepth,
+    meanLengthM: lengthSum / rings.length,
+  };
 }
 
 /** Slides a block over the placeable area and keeps the flattest valid spot. */
@@ -340,7 +468,19 @@ interface BlockCheckContext {
 function checkBlock(layout: LayoutOption, input: BlockGeneratorInput, ctx: BlockCheckContext): Finding[] {
   const out: Finding[] = [];
   const m = layout.metrics;
-  const block = layout.blocks[0]!;
+  // The campus is checked as a whole: coverage, FSI and yield are the sum of
+  // its blocks, and the floors and depth are common to all of them.
+  const worstFall = layout.blocks.reduce(
+    (worst, b) => (Number.isFinite(b.terrain.fall) && b.terrain.fall > worst.fall ? b.terrain : worst),
+    layout.blocks[0]!.terrain,
+  );
+  const block = {
+    footprintM2: layout.blocks.reduce((sum, b) => sum + b.footprintM2, 0),
+    builtUpM2: layout.blocks.reduce((sum, b) => sum + b.builtUpM2, 0),
+    floors: layout.blocks[0]?.floors ?? 1,
+    /** The worst bar decides: a campus is only as buildable as its hardest block. */
+    terrain: worstFall,
+  };
 
   out.push(
     (m.coveragePct <= ctx.cover.coveragePct ? pass : fail)({
