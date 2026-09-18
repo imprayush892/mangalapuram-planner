@@ -4,6 +4,8 @@ import type { GeoJsonFeatureCollection } from '../data/geojson';
 import { Dem, demFromBuffer } from '../terrain/dem';
 import type { DemMeta } from '../terrain/dem';
 import { Tin, parseObj } from '../terrain/tin';
+import { fillDem } from '../terrain/fill';
+import type { FilledDem } from '../terrain/fill';
 import { intersect, union } from '../geom/boolean';
 import { multiPolyArea } from '../geom/planar';
 import { m2ToAcres } from '../units';
@@ -32,6 +34,13 @@ export interface SiteModel {
   dem: Dem;
   /** Present when the TIN has been loaded; the DEM alone is enough to plan. */
   tin: Tin | null;
+  /**
+   * The survey's holes closed, so the mesh is continuous. Present only when
+   * asked for. The measured `dem` above is untouched: this carries, per cell,
+   * whether the level was surveyed, harvested from a spot level or contour, or
+   * interpolated, and how far it sits from real data.
+   */
+  filled: FilledDem | null;
 }
 
 interface ParcelProps {
@@ -63,6 +72,14 @@ interface ContourProps {
 export interface LoadSiteOptions {
   /** The TIN is ~420 kB; skip it where only the DEM is needed. */
   withTin?: boolean;
+  /**
+   * Close the survey's holes so the mesh is continuous. The measured DEM is
+   * left exactly as delivered; the filled surface is a companion that records
+   * where every level came from.
+   */
+  withFill?: boolean;
+  /** Metres to fill beyond the parcel, so the mesh edge is not ragged. */
+  fillMarginM?: number;
 }
 
 export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Promise<SiteModel> {
@@ -81,6 +98,13 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
 
   let tin: Tin | null = null;
   if (opts.withTin) tin = parseObj(await src.text('terrain/terrain_tin.obj'));
+
+  // The spot level survey is only read when the holes are being closed: 7,488
+  // readings, several hundred of which sit on ground the TIN never carried.
+  let spotLevels: [number, number, number][] | undefined;
+  if (opts.withFill) {
+    spotLevels = parseSpotLevels(await src.text('processed/spot_levels.csv'));
+  }
 
   const parcelParts: ParcelPart[] = parcelFc.features.map((f) => ({
     id: f.properties.id,
@@ -125,6 +149,17 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
     })),
   );
 
+  const filled =
+    opts.withFill
+      ? fillDem({
+          dem,
+          within: parcel,
+          marginM: opts.fillMarginM ?? 20,
+          contours,
+          spotLevels,
+        })
+      : null;
+
   return {
     origin,
     registration,
@@ -137,7 +172,33 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
     contours,
     dem,
     tin,
+    filled,
   };
+}
+
+/**
+ * The spot level survey: 7,488 readings in local metres. Rows the preprocessing
+ * could not resolve are skipped rather than read as zero, which would put a
+ * hole in the ground at RL 0.
+ */
+function parseSpotLevels(csv: string): [number, number, number][] {
+  const lines = csv.split(/\r?\n/);
+  const header = (lines[0] ?? '').split(',').map((h) => h.trim());
+  const xi = header.indexOf('x_local');
+  const yi = header.indexOf('y_local');
+  const zi = header.indexOf('rl');
+  if (xi < 0 || yi < 0 || zi < 0) return [];
+  const out: [number, number, number][] = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const row = lines[i];
+    if (!row) continue;
+    const parts = row.split(',');
+    const x = Number(parts[xi]);
+    const y = Number(parts[yi]);
+    const rl = Number(parts[zi]);
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(rl)) out.push([x, y, rl]);
+  }
+  return out;
 }
 
 function slug(name: string, index: number): string {

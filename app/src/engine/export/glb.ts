@@ -4,6 +4,8 @@ import type { Dem } from '../terrain/dem';
 import type { LayoutOption } from '../generators/types';
 import type { MultiPoly, Ring } from '../geom/types';
 import { ringSignedArea } from '../geom/planar';
+import { confidenceAt } from '../terrain/fill';
+import type { FilledDem } from '../terrain/fill';
 
 /**
  * GLB massing: the terrain mesh plus extruded plots, towers and blocks, in
@@ -18,10 +20,14 @@ export interface GlbOptions {
   /** Clip the terrain to this bounding box, in local metres. Defaults to the parcel. */
   terrainStep?: number;
   villaHeightM?: number;
+  /** Levels with the survey's holes closed, so the mesh is continuous. */
+  filled?: FilledDem;
 }
 
 const COLOURS = {
   terrain: 0x6f7f74,
+  /** Ground whose level was interpolated, not measured. */
+  inferredTerrain: 0x8a97a8,
   plot: 0x6fd3c7,
   villa: 0xdfe7ea,
   tower: 0xe0a3d6,
@@ -33,7 +39,7 @@ export function buildMassingScene(opts: GlbOptions): THREE.Scene {
   const scene = new THREE.Scene();
   scene.name = 'Mangalapuram massing';
 
-  const terrain = buildTerrainMesh(opts.dem, opts.terrainStep ?? 2);
+  const terrain = buildTerrainMesh(opts.dem, opts.terrainStep ?? 2, opts.filled);
   if (terrain) {
     terrain.name = 'Terrain';
     scene.add(terrain);
@@ -67,25 +73,45 @@ export function buildMassingScene(opts: GlbOptions): THREE.Scene {
 }
 
 /** Terrain mesh from the DEM. NaN cells are left out rather than filled. */
-export function buildTerrainMesh(dem: Dem, step = 2): THREE.Mesh | null {
+/**
+ * The terrain mesh.
+ *
+ * Given a filled surface the mesh is continuous, and every vertex is tinted by
+ * where its level came from: surveyed ground keeps the terrain colour,
+ * interpolated ground fades towards a paler, bluer grey the further it sits
+ * from a real measurement. A continuous mesh that does not say which parts are
+ * measured would be the whole point of the fill thrown away.
+ */
+export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem): THREE.Mesh | null {
   const { nx, ny, x0, y0, cell_m } = dem.meta;
   const stride = Math.max(1, Math.round(step / cell_m));
   const cols = Math.floor((nx - 1) / stride) + 1;
   const rows = Math.floor((ny - 1) / stride) + 1;
 
   const positions: number[] = [];
+  const colours: number[] = [];
   const indices: number[] = [];
   const index = new Int32Array(cols * rows).fill(-1);
+
+  const surveyed = new THREE.Color(COLOURS.terrain);
+  const inferred = new THREE.Color(COLOURS.inferredTerrain);
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const i = c * stride;
       const j = r * stride;
-      const z = dem.at(i, j);
+      const k = j * nx + i;
+      const z = filled ? filled.values[k]! : dem.at(i, j);
       if (!Number.isFinite(z)) continue;
       index[r * cols + c] = positions.length / 3;
       // three.js is Y-up: local x -> x, RL -> y, local y -> -z.
       positions.push(x0 + cell_m * (i + 0.5), z, -(y0 + cell_m * (j + 0.5)));
+
+      if (filled) {
+        const conf = confidenceAt(filled.distanceToMeasuredM[k] ?? 0);
+        const tint = surveyed.clone().lerp(inferred, 1 - conf);
+        colours.push(tint.r, tint.g, tint.b);
+      }
     }
   }
   if (positions.length === 0) return null;
@@ -104,11 +130,20 @@ export function buildTerrainMesh(dem: Dem, step = 2): THREE.Mesh | null {
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  if (colours.length > 0) {
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  }
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return new THREE.Mesh(
     geometry,
-    new THREE.MeshStandardMaterial({ color: COLOURS.terrain, roughness: 0.95, metalness: 0, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({
+      color: colours.length > 0 ? 0xffffff : COLOURS.terrain,
+      vertexColors: colours.length > 0,
+      roughness: 0.95,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    }),
   );
 }
 

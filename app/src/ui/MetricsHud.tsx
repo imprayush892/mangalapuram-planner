@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveMetrics } from '../state/useLiveMetrics';
 import { useMasterPlan } from '../state/masterPlanStore';
 import { builtMetrics } from '../engine/metrics/live';
-import { m2ToSft } from '../engine/units';
+import { m2ToAcres, m2ToSft } from '../engine/units';
+import { useEditedSite } from '../state/useEditedSite';
 import { useUi } from '../state/uiStore';
 
 const fmt = (n: number | undefined, d = 0): string =>
@@ -78,6 +79,14 @@ export default function MetricsHud(): React.ReactElement {
   const plan = useMasterPlan((s) => s.plan);
   const status = useMasterPlan((s) => s.status);
   const hovered = useUi((s) => s.hoveredConstraint);
+  const site = useEditedSite();
+  const fill = site?.filled ?? null;
+  // Unmeasured ground inside the parcel, which is what the plan is built on.
+  const unsurveyedAc = useMemo(() => {
+    if (!site) return 0;
+    const t = site.dem.terrainIn(site.parcel);
+    return m2ToAcres(t.nanCount * site.dem.cell * site.dem.cell);
+  }, [site]);
   const built = builtMetrics(plan);
 
   if (!live) return <div className="px-3 pb-3 text-[11px] text-muted">Waiting for the site to load…</div>;
@@ -139,6 +148,17 @@ export default function MetricsHud(): React.ReactElement {
               <span className="text-bad">{c.label}</span> — {c.message}
             </div>
           ))}
+        </div>
+      )}
+
+      {fill && fill.interpolatedCells > 0 && (
+        <div className="mt-2 rounded border border-warn/40 bg-warn/10 px-2 py-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-warn">Levels partly inferred</div>
+          <div className="mt-0.5 text-[10px] leading-snug text-muted">
+            The survey left {unsurveyedAc.toFixed(1)} ac of the parcel unmeasured. Those levels are interpolated so
+            the mesh is continuous; the 3D view shades them paler the further they sit from a reading. Every figure
+            above that depends on ground level carries that uncertainty.
+          </div>
         </div>
       )}
 

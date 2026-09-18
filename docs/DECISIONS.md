@@ -215,3 +215,32 @@ Each of these is a switch or an editable assumption, not a silent decision.
 38. **Water-led means water comes out first.** The buffer and the ponding ground
     are removed from the buildable area BEFORE anything is laid out, not drawn
     over the plan afterwards.
+
+### Added while closing the survey holes (18 Sep 2026)
+
+39. **The survey's holes are filled, and never silently.** 13.47 ac of the
+    73.54 ac parcel — 275 separate holes, the largest 4.6 ac and 137 m across —
+    carried no level, so the mesh broke and the 3D view showed an island. The
+    measured DEM is left byte-identical; the filled surface is a companion that
+    records per cell whether the level was surveyed, harvested or interpolated,
+    and how far it sits from real data. Every figure that depends on ground
+    level still reports it.
+40. **Real data first.** 913 cells that the TIN never covered do have a spot
+    level or a contour vertex on them. Those are measurements the DEM was
+    throwing away; they are harvested before anything is interpolated, and they
+    count as measured ground.
+41. **Laplace on the residual over a fitted trend, not on the levels.** A plain
+    Laplace membrane is right for a hole ringed by measured ground and wrong for
+    one that runs out to the edge of the survey: with no boundary on the open
+    side it goes flat, and it did — **12,126 cells of dead level ground at
+    0.00°, against 12.09° in the measured terrain.** Each hole now gets a plane
+    fitted by least squares to the ground around it, carrying the hillside's own
+    slope across the gap, and the membrane solves only what is left over. Deep
+    fill now reads 10.77°: gentler than measured, as an interpolation should be,
+    but still a hillside.
+42. **A plane needs more than three points.** Fewer than eight, or points lying
+    on a line, fall back to a flat trend — a line of readings fixes no slope
+    across itself and guessing one would be inventing terrain.
+43. **Interpolated ground is shaded.** The 3D mesh tints each vertex by its
+    distance from a real reading, so a continuous mesh cannot be mistaken for a
+    complete survey.

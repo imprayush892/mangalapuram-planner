@@ -40,6 +40,8 @@ export default function SitePanel(): React.ReactElement {
   if (!site || !terrain) return <div className="p-3 text-muted">Loading site…</div>;
 
   const meshedAc = tinOrDemAc(terrain);
+  const fill = site.filled;
+  const fillAc = fill ? m2ToAcres(fill.interpolatedCells * site.dem.cell * site.dem.cell) : 0;
   const unsurveyedAc = Math.max(0, site.parcelAreaAc - meshedAc);
 
   return (
@@ -61,6 +63,25 @@ export default function SitePanel(): React.ReactElement {
           value={`${unsurveyedAc.toFixed(2)} ac`}
           hint="NaN in dem_2m.f32 — allowed but flagged low-confidence"
         />
+        {fill && (
+          <>
+            <Row
+              label="Levels recovered"
+              value={`${fill.harvestedCells} cells`}
+              hint="spot levels and contour vertices on ground the TIN never carried"
+            />
+            <Row
+              label="Levels interpolated"
+              value={`${fillAc.toFixed(2)} ac`}
+              hint={`Laplace on the residual over a plane fitted to the ground around each hole; converged in ${fill.iterations} passes to ${fill.residualM.toFixed(3)} m`}
+            />
+            <Row
+              label="Furthest from a reading"
+              value={`${fill.maxFillDistanceM.toFixed(0)} m`}
+              hint="the middle of the largest hole; confidence falls with this distance"
+            />
+          </>
+        )}
         <Row
           label="Relief"
           value={`RL ${terrain.demStats.rlMin.toFixed(1)} – ${terrain.demStats.rlMax.toFixed(1)}`}

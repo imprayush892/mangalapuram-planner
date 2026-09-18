@@ -33,7 +33,13 @@ export default function ThreeView(): React.ReactElement {
           .map((options) => options[Math.min(activeIndex, options.length - 1)])
           .filter((o): o is NonNullable<typeof o> => Boolean(o));
 
-    const scene = buildMassingScene({ dem: site.dem, layouts, parcel: site.parcel, terrainStep: 4 });
+    const scene = buildMassingScene({
+      dem: site.dem,
+      filled: site.filled ?? undefined,
+      layouts,
+      parcel: site.parcel,
+      terrainStep: 4,
+    });
     scene.background = new THREE.Color(0x0f1518);
     scene.fog = new THREE.Fog(0x0f1518, 900, 2400);
 

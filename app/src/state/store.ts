@@ -67,7 +67,12 @@ export const useSite = create<SiteState>((set, get) => ({
     if (get().status === 'loading') return;
     set({ status: 'loading', error: null });
     try {
-      const [site, config] = await Promise.all([loadSite(src, { withTin: true }), loadConfig(src)]);
+      const [site, config] = await Promise.all([
+        // The fill closes the survey's holes so the mesh is continuous; the
+        // measured DEM is untouched and every filled cell stays labelled.
+        loadSite(src, { withTin: true, withFill: true }),
+        loadConfig(src),
+      ]);
       set({ site, config, status: 'ready' });
     } catch (err) {
       set({ status: 'error', error: err instanceof Error ? err.message : String(err) });

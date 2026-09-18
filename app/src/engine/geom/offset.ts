@@ -2,6 +2,7 @@ import { Clipper, EndType, FillRule, JoinType, Path64, Paths64, Point64 } from '
 import type { MultiPoly, Pt, Ring } from './types';
 import { openRing, polyArea } from './planar';
 import { intersect as intersectMulti } from './boolean';
+import { union } from './boolean';
 
 /**
  * Clipper2 works on integers. Local metres scaled by 1000 gives millimetre
@@ -109,6 +110,23 @@ export function bufferPolyline(line: readonly Pt[], width: number, square = true
 }
 
 /** Union via Clipper (used where polygon-clipping's robustness is not enough). */
+/**
+ * Outward offset of an irregular boundary, such as the parcel.
+ *
+ * The twin of `insetMulti`, and it fails the same way: a miter join at a sharp
+ * reflex corner runs out to the miter limit and can throw a spike hundreds of
+ * metres clear of the shape. Offsetting the parcel by 20 m this way gave 43
+ * pieces reaching x = 93,031 on a site 850 m wide. Squaring the joins and
+ * taking the union with the original keeps the result a sane collar that
+ * always contains what it grew from.
+ */
+export function growMulti(mp: MultiPoly, distance: number): MultiPoly {
+  if (mp.length === 0 || distance <= 0) return mp;
+  const grown = offsetMulti(mp, distance, JoinType.Square);
+  if (grown.length === 0) return mp;
+  return union(grown, mp);
+}
+
 export function unionStrict(mp: MultiPoly): MultiPoly {
   if (mp.length === 0) return [];
   return fromPaths(Clipper.Union(toPaths(mp), undefined, FillRule.NonZero));
