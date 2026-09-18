@@ -5,6 +5,7 @@ import { loadConfig } from '../engine/data/config';
 import type { ConfigBundle } from '../engine/data/config';
 import { loadSite } from '../engine/site/loadSite';
 import type { SiteModel } from '../engine/site/loadSite';
+import { dataBaseUrl } from './appBase';
 
 export type RasterMode = 'none' | 'rl' | 'slope' | 'fall' | 'buildable';
 
@@ -57,7 +58,7 @@ export const useSite = create<SiteState>((set, get) => ({
   raster: 'none',
   selectedZoneId: null,
 
-  load: async (src = fetchSource(`${import.meta.env.BASE_URL}data`)) => {
+  load: async (src = fetchSource(dataBaseUrl())) => {
     if (get().status === 'loading') return;
     set({ status: 'loading', error: null });
     try {

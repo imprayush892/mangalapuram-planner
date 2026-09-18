@@ -1,4 +1,5 @@
 import { useLayout } from './layoutStore';
+import { dataBaseUrl } from './appBase';
 import type { GenerateRequest, GenerateResponse } from '../engine/runGeneration';
 import type { LayoutOption } from '../engine/generators/types';
 
@@ -24,8 +25,6 @@ function ensureWorker(): Worker | null {
   }
 }
 
-/** Resolved on the main thread: the worker bundle lives under /assets, so a relative base URL would resolve against the wrong directory there. */
-const dataBaseUrl = (): string => new URL(`${import.meta.env.BASE_URL}data`, window.location.href).href;
 
 /**
  * Runs one generation and files the result in the layout store. A newer request
