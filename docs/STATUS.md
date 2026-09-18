@@ -1,23 +1,25 @@
 # Build status against the PRD
 
-As of 18 Sep 2026, after milestones M1–M6 of `docs/SPEC.md` and Phase 7 (the
-siting engine).
+As of 18 Sep 2026, after milestones M1–M6 of `docs/SPEC.md`, Phase 7 (the
+siting engine) and Phase 8 (the master plan).
 Assessed against the PRD (rev 45), not against SPEC, because SPEC deliberately
 narrowed the PRD for the first build. Where the two differ, the PRD item is
 listed here as outstanding even when SPEC considers it out of scope.
 
-**Headline.** The two priority engines are built and working: villa/senior plot
-layouts and apartment tower layouts, both generating three options per zone on
-the real terrain with full compliance reporting. The KMBR and client rule
-engines are complete for everything those two use. **Phase 7 added the siting
-engine**: every zone is measured, hard constraints veto uses that cannot go
-there, a weighted 0–100 score with editable weights ranks the rest, and four
-whole-site alternatives are produced with a per-zone rationale. What is missing
-is now mostly *around* the engines: four of the nine outputs, map editing, and
-the finance link.
+**Headline.** The app now generates a **master plan**: one button lays out
+every zone with the generator its use calls for, traces the roads between them
+in the client's own three tiers, and draws the result in 2D and 3D. Over the
+real site that is 381 villa plots, 762 villa units, 8 towers, 440 flats, 32
+other buildings, a 594 m main spine and about 7.4 km of road, in around 12 s.
+The siting engine (Phase 7) decides what goes where; the layout engines decide
+what it looks like; changing a rule, an assumption or a switch and running it
+again gives a different plan, and the panel names what changed.
 
-Roughly: **layout engines ~90%, rule engine ~80%, Level 1 siting ~80%,
-outputs ~55%, editing and finance ~5%.**
+What is missing is now mostly *around* the plan: four of the nine outputs, map
+editing, and the finance link.
+
+Roughly: **layout engines ~90%, rule engine ~80%, siting ~80%, master plan
+~75%, outputs ~55%, editing and finance ~5%.**
 
 ---
 
@@ -33,6 +35,7 @@ outputs ~55%, editing and finance ~5%.**
 | M6 | KMBR rule engine | **Mostly done** | `engine/rules/kmbr.ts`. See §5 for the table-by-table position. |
 | M7 | Scenario and finance | **Partial** | Scenarios save/load with a full input snapshot; area statement and shortfall are complete. No cost, no revenue, no cashflow linkage, no scenario comparison. |
 | **M8** | **Intra-zone layout engine (priority)** | **Mostly done** | `engine/generators/villa.ts`, `tower.ts`, `block.ts`. See §6. |
+| — | **Master plan assembly (Phase 8)** | **Built** | `engine/masterplan/` — brief per zone from the siting use, circulation in three tiers, whole-site run. See §4A. |
 
 ---
 
@@ -41,7 +44,7 @@ outputs ~55%, editing and finance ~5%.**
 | # | Requirement | Status | Note |
 | --- | --- | --- | --- |
 | 1 | Parcel in scope vs deferred shown separately; nothing on deferred land except the reserved hospital zone | **Done** | Deferred land is excluded from every calculation and carries a standing note on the plan. Hospital zone reserved, nothing placed on it. |
-| 2 | Draw, split and merge parcels on the map; re-run in under 10 s | **Not built** | The 10 s budget is met (about 1 s per zone), but zones cannot be edited. Zones come from the registered client plan and cannot be redrawn, split, merged or reassigned. |
+| 2 | Draw, split and merge parcels on the map; re-run in under 10 s | **Partly** | The whole 13-zone site regenerates in about 12 s, one zone in about 1 s. Zones still cannot be **drawn, split or merged** — but a zone's use can now be reassigned by pinning it in the Siting tab, and the master plan follows. |
 | 3 | Report per parcel: use, gross/net area, platform level, cut/fill, median slope, BUA, FSI, coverage, units, parking, access width, pass/fail per rule | **Mostly done** | All present except **median slope per parcel** (computed internally, never surfaced) and **net area**, which is implied by the share split rather than reported as a field. |
 | 4 | Warn on client-vs-KMBR conflicts, showing both values | **Done** | `engine/rules/conflicts.ts` plus per-layout conflict findings. Six conflicts listed with both values and which one is applied. |
 | 5 | 3D massing on terrain, heights checked against a user-entered AAI limit | **Done** | `ui/ThreeView.tsx`; AAI cap is an editable assumption and towers are checked against it once entered. |
@@ -147,6 +150,60 @@ client zones in about a second and produces four whole-site alternatives.
 
 ---
 
+## 4A. Master plan assembly (Phase 8)
+
+`engine/masterplan/`, shown in the **Master plan** tab. This is what turns a
+set of zone layouts into a plan of the township.
+
+**brief.ts** — what to build in each zone, derived from the use the *siting
+engine* chose rather than from the zone's name. Move a use to another zone and
+its brief moves with it. A use spread over several zones splits its programme
+between them by area instead of each zone trying to carry the whole line.
+
+**circulation.ts** — the roads between the zones, in the three tiers the client
+had already specified and the app had never drawn:
+
+| Tier | Width | Where it comes from |
+| --- | --- | --- |
+| Main spine | 18 m | client `roads.main_spine`, strictly north–south, no angular tolerance. Placed at the easting whose longest usable north–south run serves the most zone land. |
+| Public | 10 m | existing road edges retained and widened, client `roads.public` |
+| Collector | KMBR access width | the Table 7/8 access width the zone's occupancy requires — a rule, not a guess |
+
+Collectors are **routed over the terrain**: a Dijkstra whose step cost is the
+step length plus a penalty on the climb (`route_grade_penalty_m`, a new
+assumption), with Rule 22 ground impassable, so a collector contours around a
+slope the way a built road would. A traced collector becomes a source for the
+next zone, so the network branches instead of every zone running its own line
+back to the highway.
+
+**run.ts** — lays the circulation **first** and hands it to every zone as no-go
+before laying the zones out. A spine drawn after the plots runs through them.
+
+**Campus blocks.** The uses that get a massing block — school, club, hotel,
+commercial, business hub — are laid as a set of bars rather than one slab, with
+every dimension read from a rule: depth is Rule 41 daylight on both sides plus
+the corridor assumption (17 m), length is twice the Rule 36 travel distance
+(110 m unsprinklered), and the gap is the Rule 26 gap between buildings. The
+site went from 5 other buildings to 32.
+
+**What it reports.** Villa plots and units, towers and flats, other buildings,
+dwellings, population, built floor area and footprint, road length by tier,
+road and open-space land, and land planned — plus, per zone, the option drawn,
+the basis for its numbers and any shortfall, and per run a list of what the
+plan could not do.
+
+**Still missing from the master plan**
+
+| Item | Note |
+| --- | --- |
+| **Few collectors are traced** | Most zones already front a retained road, so they take a direct gate. The engine is right, but the main-road-to-internal-road story is thinner on this site than it would be on a greenfield one. |
+| **Internal roads do not meet the spine at designed junctions** | Each zone lays its own grid and the spine is kept out of it; there is no junction geometry, no splay (KMBR Rule 31 is in config and unused) and no road-gradient check. |
+| **Parking is counted, never drawn** | Bay counts and areas are computed for every use; no bays, aisles or ramps are laid out. |
+| **The spine is a straight line** | The client fixed the alignment as strictly north–south, so this is the rule, not a simplification — but it means the spine does not respond to terrain the way a collector does. |
+| **One run, one plan** | Alternatives exist at the zone level (three options each) and at the siting level (four alternatives); there is no whole-plan A/B stored side by side. That is the scenario comparison output in Phase 9. |
+
+---
+
 ## 5. KMBR coverage (PRD M6 asks for Tables 4, 6, 7, 8, 9, 10, 10A, 11, 12 and Ch. XVII)
 
 | Item | Encoded in `kmbr_rules.yaml` | Applied by an engine |
@@ -240,12 +297,19 @@ See §4 for what it does and what is still missing from it. This is what turned
 "lay out this zone" into "here is what should go where, and why", and it is
 what makes user-drawn zones safe to accept in Phase 8.
 
-### Phase 8 — zone editing
+### Phase 8 — the master plan ✅ built
 
-Draw, split, merge and reassign zones on the plan, with the Phase 7 constraints
-vetoing invalid ones. Requirement §6.2, and the thing that makes the client's
-zoning plan a genuine *starting point* rather than a fixed input. The
-regeneration budget is already met, so this is UI and geometry, not engine work.
+Every zone laid out in one run, the circulation between them, and both views
+following it. See §4A for what it does and what is still missing from it.
+
+### Phase 8b — zone editing (next)
+
+Draw, split and merge zones on the plan, with the Phase 7 constraints vetoing
+invalid ones. Requirement §6.2, and the thing that makes the client's zoning
+plan a genuine *starting point* rather than a fixed input. Reassigning a use is
+already possible by pinning it in the Siting tab; what is missing is changing
+the zone **boundaries**. The regeneration budget is met, so this is UI and
+geometry, not engine work.
 
 ### Phase 9 — close the output set
 

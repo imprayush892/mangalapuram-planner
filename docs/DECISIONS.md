@@ -114,3 +114,35 @@ Each of these is a switch or an editable assumption, not a silent decision.
 17. **Adjacency is a straight-line distance with a detour factor**
     (`walk_detour_factor: 1.35`), not a routed walk. The PRD's 300 m
     senior–hospital rule is scored on that basis and the approximation is stated.
+
+### Added while building the master plan (18 Sep 2026)
+
+18. **Circulation is laid before the zones, not after.** The 18 m spine drawn
+    after the plots ran straight through them. The roads between the zones are
+    generated first and handed to every zone generator as no-go ground.
+19. **A collector's width is the KMBR access width its zone's occupancy
+    requires.** The client's road table fixes the spine at 18 m and the retained
+    public roads at 10 m but names no collector tier, and a width invented here
+    would be a magic number. The Table 7/8 access width is a rule and is
+    traceable.
+20. **Collectors are routed on terrain, not drawn straight.** The step cost is
+    the step length plus a penalty on the climb, so a collector contours around
+    a slope the way a built road would; Rule 22 ground is impassable. **New
+    assumption: `route_grade_penalty_m: 12`.** A traced collector becomes a
+    source for the next zone, so the network branches.
+21. **The spine's alignment is the client's, its position is ours.** The rule
+    gives north–south with zero angular tolerance, so the only free choice is
+    the easting; it is placed where the longest usable north–south run serves
+    the most zone land. A notch in the boundary up to 40 m is bridged, because
+    a road bridges a notch; a longer gap ends the line.
+22. **A block use is a campus, not a slab.** School, club, hotel, commercial and
+    business hub are laid as bars whose depth is Rule 41 daylight on both sides
+    plus the corridor, whose length is twice the Rule 36 travel distance (a bar
+    with a stair at each end), and whose spacing is the Rule 26 gap. Every
+    dimension is read from a rule rather than chosen.
+23. **A campus is checked as a whole, and its worst bar decides its terrain.**
+    Coverage, FSI and yield are summed over the campus; the hardest block sets
+    the fall finding, because a campus is only as buildable as its worst piece.
+24. **A use spread over several zones splits its programme by area.** Two villa
+    zones of 9 and 5 acres carry the unit counts their land supports, rather than
+    each trying to hold the whole programme line.
