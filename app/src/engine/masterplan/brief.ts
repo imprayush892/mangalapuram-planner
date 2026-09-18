@@ -26,6 +26,10 @@ export interface ZoneBrief {
   builtUpSft: number;
   useLabel: string;
   maxSlopeDeg?: number;
+  /** Plinth per dwelling the programme asks for, on a villa or senior zone. */
+  wantedPlinthSft?: number;
+  /** Client villa type that plinth belongs to. */
+  villaTypeName?: string;
   /** Why these numbers, for the report and the tooltip. */
   basis: string;
   /** Set when nothing is generated here, and why. */
@@ -139,6 +143,7 @@ export function briefForZone(input: BriefInput): ZoneBrief {
       targetUnits: Math.round(perAc * areaAc),
       occupancy: 'A2_senior',
       builtUpSft: 0,
+      wantedPlinthSft: weightedPlinthSft(lines),
       basis: `${perAc.toFixed(1)} units/ac from the senior programme lines × ${areaAc.toFixed(2)} ac`,
     };
   }
@@ -157,11 +162,24 @@ export function briefForZone(input: BriefInput): ZoneBrief {
     };
   }
 
+  const villaLines = programme.lines.filter((l) => l.use === 'villas');
   return {
     ...base,
     targetUnits: Math.round(areaAc * VILLA_UNITS_PER_AC),
     occupancy: 'A1',
     builtUpSft: 0,
+    wantedPlinthSft: weightedPlinthSft(villaLines),
+    villaTypeName: 'standard',
     basis: `${VILLA_UNITS_PER_AC} units/ac (cashflow sheet C17) × ${areaAc.toFixed(2)} ac`,
   };
+}
+
+/**
+ * Plinth per dwelling across a use's programme lines, weighted by unit count —
+ * the villa lines state 1,750 and 2,000 sft, and a zone carries a share of both.
+ */
+function weightedPlinthSft(lines: { units: number; plinthSftPerUnit: number }[]): number {
+  const units = sumBy(lines, (l) => l.units);
+  if (units <= 0) return 0;
+  return sumBy(lines, (l) => l.units * l.plinthSftPerUnit) / units;
 }

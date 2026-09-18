@@ -1,8 +1,17 @@
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
 import type { LayoutOption } from '../generators/types';
-import { clientSetbacks, landSplit, sizeVillaPlots, roadWidths } from './client';
-import { baseYards, subdivisionRules, villaGapM } from './kmbr';
+import {
+  aspectBand,
+  clientRecreation,
+  clientSetbacks,
+  landSplit,
+  preferredFacings,
+  roadWidths,
+  sizeVillaPlots,
+  villaDelivery,
+} from './client';
+import { baseYards, coverageFsi, subdivisionRules, villaGapM } from './kmbr';
 import type { Finding } from './findings';
 import { fail, info, pass, warn } from './findings';
 import { m2ToAcres } from '../units';
@@ -14,11 +23,19 @@ const SHARE_TOLERANCE_POINTS = 2;
  * KMBR on top, per SPEC section 5. Where the two differ, the finding carries
  * both values and the stricter one decides the status.
  */
+export interface VillaProgrammeContext {
+  /** Plinth per dwelling the programme asks for, where one applies. */
+  wantedPlinthSft: number | null;
+  /** The client villa type that plinth belongs to. */
+  villaTypeName: string | null;
+}
+
 export function checkVillaLayout(
   layout: LayoutOption,
   client: YamlDoc,
   kmbr: YamlDoc,
   assumptions: YamlDoc,
+  programme: VillaProgrammeContext = { wantedPlinthSft: null, villaTypeName: null },
 ): Finding[] {
   const out: Finding[] = [];
   const m = layout.metrics;
@@ -80,19 +97,20 @@ export function checkVillaLayout(
     }),
   );
 
-  const aspectMax = pick<number>(client, 'villa_plots.aspect_ratio.max', 2.5);
+  const band = aspectBand(client);
+  const aspectMax = band.max;
   const tolerance = pick<number>(client, 'villa_plots.aspect_tolerance', 0.03);
   const aspect = sizing.aspect;
-  const aspectOk = aspect <= aspectMax * (1 + tolerance);
+  const aspectOk = aspect <= aspectMax * (1 + tolerance) && aspect >= band.min * (1 - tolerance);
   out.push(
-    (aspect <= aspectMax ? pass : aspectOk ? warn : fail)({
+    (aspect <= aspectMax && aspect >= band.min ? pass : aspectOk ? warn : fail)({
       id: 'villa.aspect',
       source: 'CLIENT',
       reference: 'client_rules.villa_plots.aspect_ratio',
-      title: `Plot aspect 1:${aspect.toFixed(2)} against the 1:${aspectMax} rule`,
+      title: `Plot aspect 1:${aspect.toFixed(2)} against the 1:${band.min}–1:${band.max} range`,
       detail:
         aspect <= aspectMax
-          ? 'Within the 1:1 to 1:2.5 range.'
+          ? `Within the 1:${band.min} to 1:${band.max} range.`
           : aspectOk
             ? `Over the rule but inside the ${(tolerance * 100).toFixed(0)}% tolerance the client's own 126 m² example implies.`
             : 'Beyond the rule and the tolerance. Regroup the row housing or change the unit count.',
@@ -166,20 +184,6 @@ export function checkVillaLayout(
     }),
   );
 
-  /* -------------------------------------------------- recreation and open space */
-  const recreation = layout.openSpace.filter((o) => o.countsAsRecreation);
-  const recreationArea = recreation.reduce((s, o) => s + o.areaM2, 0);
-  const recreationTarget = m.zoneAreaM2 * pick<number>(client, 'recreational_area.share_of_development_or_cluster', 0.1);
-  out.push(
-    (recreationArea >= recreationTarget ? pass : warn)({
-      id: 'villa.recreation',
-      source: 'CLIENT',
-      reference: 'client_rules.recreational_area + KMBR Rule 31 recreation',
-      title: `Recreation ${m2ToAcres(recreationArea).toFixed(2)} ac against a ${m2ToAcres(recreationTarget).toFixed(2)} ac target`,
-      detail: `${recreation.length} pieces of at least ${sub.recreationMinAreaM2} m² and ${sub.recreationMinWidthM} m wide qualify, out of ${layout.openSpace.length} open-space pieces totalling ${m2ToAcres(m.openSpaceAreaM2).toFixed(2)} ac.`,
-    }),
-  );
-
   /* ------------------------------------------------------------- the terrain */
   const thresholds = pick<Record<string, number>>(assumptions, 'plot_fall_thresholds_m', {});
   const byClass = new Map<string, number>();
@@ -236,6 +240,57 @@ export function checkVillaLayout(
       reference: 'client_rules.plot_orientation.preferred_facing',
       title: `${(m.goodOrientationShare * 100).toFixed(0)}% of plots face E, W or N`,
       detail: `${m.cornerPlots} corner plots, which the client treats as premium.`,
+    }),
+  );
+
+  /* ------------------------------ the villa size the client actually confirmed */
+  const villaFloors = pick<number>(assumptions, 'villa_floors', 2);
+  const delivery = villaDelivery(sizing, villaFloors, programme.wantedPlinthSft, programme.villaTypeName);
+  if (delivery.wantedPlinthSft) {
+    const coverLimit = coverageFsi(kmbr, 'A1').coveragePct;
+    const needsOverCoverage = (delivery.coveragePctNeeded ?? 0) > coverLimit;
+    out.push(
+      (delivery.meetsType ? pass : fail)({
+        id: 'villa.type_plinth',
+        source: 'CLIENT',
+        reference: `client_rules.villa_plots.types${programme.villaTypeName ? `.${programme.villaTypeName}` : ''} + programme plinth_sft`,
+        title: `Villa delivers ${Math.round(delivery.deliveredPlinthSft).toLocaleString('en-IN')} sft against the ${Math.round(delivery.wantedPlinthSft).toLocaleString('en-IN')} sft asked for`,
+        detail: delivery.meetsType
+          ? `${delivery.footprintPerUnitSft.toFixed(0)} sft of footprint per dwelling over ${villaFloors} floors.`
+          : `The 20/30/50 split at this density gives each dwelling ${delivery.footprintPerUnitSft.toFixed(0)} sft of footprint (${(delivery.footprintPerUnitM2).toFixed(1)} m²), so ${Math.round(delivery.wantedPlinthSft).toLocaleString('en-IN')} sft needs ${delivery.floorsNeeded?.toFixed(1)} floors, not ${villaFloors}. At ${villaFloors} floors it needs ${((delivery.footprintShareNeeded ?? 0) * 100).toFixed(0)}% of the plot covered against the ${(pick<number>(client, 'villa_plots.footprint_placeholder.share_of_plot_area', 0.45) * 100).toFixed(0)}% the client's own placeholder assumes${needsOverCoverage ? `, and ${(delivery.coveragePctNeeded ?? 0).toFixed(0)}% breaches the KMBR A1 coverage limit of ${coverLimit}%` : ''}. The land split, the 20 units per acre density and the confirmed villa size cannot all hold: one of the three has to move.`,
+      }),
+    );
+  }
+
+  /* --------------------------------------------------- orientation and corners */
+  const preferred = preferredFacings(client);
+  const wellFaced = layout.plots.filter((p) => preferred.includes(p.facing));
+  const facedShare = layout.plots.length > 0 ? wellFaced.length / layout.plots.length : 0;
+  out.push(
+    (facedShare >= 0.5 ? pass : warn)({
+      id: 'villa.orientation',
+      source: 'CLIENT',
+      reference: 'client_rules.plot_orientation.preferred_facing',
+      title: `${(facedShare * 100).toFixed(0)}% of plots face ${preferred.join(', ')}`,
+      detail: `The client prefers ${preferred.join(', ')}. ${layout.plots.length - wellFaced.length} plot${layout.plots.length - wellFaced.length === 1 ? '' : 's'} face${layout.plots.length - wellFaced.length === 1 ? 's' : ''} otherwise; the road direction search trades this against yield and earthwork.`,
+    }),
+  );
+
+  /* ------------------------ recreational area: client rule against the KMBR one */
+  const rec = clientRecreation(client);
+  const recPieces = layout.openSpace.filter((o) => o.countsAsRecreation);
+  const recAreaM2 = recPieces.reduce((s2, o) => s2 + o.areaM2, 0);
+  const recShare = m.zoneAreaM2 > 0 ? recAreaM2 / m.zoneAreaM2 : 0;
+  // Client rules govern the first cut, KMBR is checked on top, the stricter decides.
+  const strictestWidth = Math.max(rec.minWidthM, sub.recreationMinWidthM);
+  const narrow = recPieces.filter((o) => o.minWidthM < strictestWidth);
+  out.push(
+    (recShare >= rec.share && narrow.length === 0 ? pass : warn)({
+      id: 'villa.recreation',
+      source: rec.minWidthM >= sub.recreationMinWidthM ? 'CLIENT' : 'KMBR',
+      reference: `client_rules.recreational_area (${rec.minWidthM} m) vs KMBR Rule 31 (${sub.recreationMinWidthM} m)`,
+      title: `Recreational area ${(recShare * 100).toFixed(1)}% (${m2ToAcres(recAreaM2).toFixed(2)} ac) against the client's ${(rec.share * 100).toFixed(0)}% (${m2ToAcres(m.zoneAreaM2 * rec.share).toFixed(2)} ac)`,
+      detail: `${recPieces.length} qualifying piece${recPieces.length === 1 ? '' : 's'} of at least ${sub.recreationMinAreaM2} m², out of ${layout.openSpace.length} open-space pieces totalling ${m2ToAcres(m.openSpaceAreaM2).toFixed(2)} ac. Minimum width applied is ${strictestWidth} m, the stricter of the client's ${rec.minWidthM} m and KMBR's ${sub.recreationMinWidthM} m.${narrow.length > 0 ? ` ${narrow.length} piece${narrow.length === 1 ? ' is' : 's are'} narrower than that.` : ''}`,
     }),
   );
 

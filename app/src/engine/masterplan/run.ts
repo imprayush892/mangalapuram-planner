@@ -165,6 +165,8 @@ export function runMasterPlan(
           minSideApplies: opts.minSideApplies,
           directions: opts.directions,
           senior: brief.senior,
+          wantedPlinthSft: brief.wantedPlinthSft,
+          villaTypeName: brief.villaTypeName,
         });
       } else if (brief.kind === 'tower' && brief.targetUnits > 0) {
         options = generateTowerLayouts({

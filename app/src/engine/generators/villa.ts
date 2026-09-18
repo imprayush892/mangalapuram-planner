@@ -7,7 +7,7 @@ import { classifyFall, dominantAspectDeg, drainageChannels, flowAccumulation } f
 import type { FallThresholds } from '../terrain/analysis';
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
-import { clientSetbacks, landSplit, roadWidths, sizeVillaPlots } from '../rules/client';
+import { aspectBand, clientSetbacks, cornerPlotsArePremium, landSplit, roadWidths, sizeVillaPlots } from '../rules/client';
 import type { MinSideApplies, PlotSizing } from '../rules/client';
 import { subdivisionRules, unbuildableSlopeDeg } from '../rules/kmbr';
 import { toRad } from '../units';
@@ -45,6 +45,13 @@ export interface VillaGeneratorInput {
   keep?: number;
   /** Set for senior-living zones; changes labels only, the rules are the same. */
   senior?: boolean;
+  /**
+   * Plinth per dwelling the programme asks for, and the client villa type it
+   * belongs to. Without these the layout cannot be checked against the size the
+   * client confirmed, only against the plot rules.
+   */
+  wantedPlinthSft?: number;
+  villaTypeName?: string;
 }
 
 const SHARE_TOLERANCE = 0.02;
@@ -330,19 +337,56 @@ function buildOption(
   const footprintShare = pick<number>(input.client, 'villa_plots.footprint_placeholder.share_of_plot_area', 0.45);
 
   /* plots ------------------------------------------------------------------ */
+  // The client asks for corner plots to be premium — "larger/optimised, never
+  // at the cost of road widths or setbacks". A corner plot is at the end of a
+  // run, so the frontage beyond it carries no other plot: it can grow into that
+  // land without taking anything from a neighbour, a road or a setback. The
+  // ceiling is the client's own aspect band, since a plot at 1:1 is as square
+  // as their rule allows.
+  const premiumCorners = cornerPlotsArePremium(input.client);
+  const band = aspectBand(input.client);
+  const maxCornerWidth = premiumCorners ? Math.min(depth / band.min, depth) : width;
+  const cornerFlags = cornerFlagsFor(accepted);
+  // Which columns each run already holds, so a corner never grows into a
+  // neighbour. A corner at the START of a run has its free side below it, not
+  // above, and testing the ground alone would not notice the difference.
+  // A column a corner grows into is claimed, so two corners either side of a
+  // gap in a run cannot both take it.
+  const claimed = new Set(accepted.map((cp) => `${cp.row}:${cp.side}:${cp.col}`));
+  const cornerGrowth = cornerFlags.map((flag, i) => {
+    if (!flag || !premiumCorners || maxCornerWidth <= width) return { width, uShift: 0 };
+    const cp = accepted[i]!;
+    const grown = growCorner(
+      raster,
+      frame,
+      cp,
+      candidate.pitch,
+      candidate.crossPitch,
+      road,
+      depth,
+      width,
+      maxCornerWidth,
+      claimed,
+    );
+    for (const col of grown.columns) claimed.add(`${cp.row}:${cp.side}:${col}`);
+    return grown;
+  });
+
   const plots: PlotResult[] = accepted.map((cp, index) => {
-    const ring = plotRing(frame, cp, candidate.pitch, road, depth, width);
-    const terrain = plotTerrain(raster, frame, cp, candidate.pitch, road, depth, width, fallThresholds);
-    const fpArea = width * depth * footprintShare;
+    const grown = cornerGrowth[index] ?? { width, uShift: 0 };
+    const w = grown.width;
+    const ring = plotRing(frame, cp, candidate.pitch, road, depth, width, w, grown.uShift);
+    const terrain = plotTerrain(raster, frame, cp, candidate.pitch, road, depth, w, fallThresholds);
+    const fpArea = w * depth * footprintShare;
     const fpWidth = Math.sqrt(fpArea / footprintAspect);
     const footprint = placeFootprint(ring, fpWidth, fpWidth * footprintAspect, setbacks);
     return {
       id: `p${index + 1}`,
       ring,
-      areaM2: width * depth,
-      widthM: width,
+      areaM2: w * depth,
+      widthM: w,
       depthM: depth,
-      corner: false,
+      corner: cornerFlags[index] ?? false,
       facing: facingOf(candidate.angle, cp.side),
       unitsOnPlot: sizing.grouping,
       terrain,
@@ -350,10 +394,14 @@ function buildOption(
       footprint,
       footprintAreaM2: fpArea,
       kmbrYardOk: footprint !== null,
-      notes: terrain.unsurveyedShare > 0.25 ? ['Mostly unsurveyed ground: levels are low-confidence.'] : [],
+      notes: [
+        ...(terrain.unsurveyedShare > 0.25 ? ['Mostly unsurveyed ground: levels are low-confidence.'] : []),
+        ...(w > width + 1e-6
+          ? [`Corner plot widened from ${width.toFixed(2)} m to ${w.toFixed(2)} m (client premium corners, inside the 1:${band.min}–1:${band.max} aspect band).`]
+          : []),
+      ],
     };
   });
-  tagCornerPlots(plots, accepted);
 
   /* roads ------------------------------------------------------------------ */
   const roads = buildRoads(frame, candidate, input, widths, accepted, width, road);
@@ -407,7 +455,10 @@ function buildOption(
     findings: [],
     warnings: [],
   };
-  option.findings = checkVillaLayout(option, input.client, input.kmbr, input.assumptions);
+  option.findings = checkVillaLayout(option, input.client, input.kmbr, input.assumptions, {
+    wantedPlinthSft: input.wantedPlinthSft ?? null,
+    villaTypeName: input.villaTypeName ?? null,
+  });
   return option;
 }
 
@@ -417,14 +468,16 @@ function plotRing(
   pitch: number,
   road: number,
   depth: number,
-  width: number,
+  moduleWidth: number,
+  plotWidth = moduleWidth,
+  uShift = 0,
 ): Ring {
   const vBase = cp.row * pitch + road + cp.side * depth;
-  const u0 = cp.col * width;
+  const u0 = cp.col * moduleWidth + uShift;
   return [
     frame.toWorld([u0, vBase]),
-    frame.toWorld([u0 + width, vBase]),
-    frame.toWorld([u0 + width, vBase + depth]),
+    frame.toWorld([u0 + plotWidth, vBase]),
+    frame.toWorld([u0 + plotWidth, vBase + depth]),
     frame.toWorld([u0, vBase + depth]),
   ];
 }
@@ -711,7 +764,12 @@ function facingOf(angle: number, side: 0 | 1): Facing {
 }
 
 /** The ends of each run of plots are corner plots, which the client prices up. */
-function tagCornerPlots(plots: PlotResult[], accepted: CellPlot[]): void {
+/**
+ * Which accepted plots sit at the end of a run. A run is one side of one strip
+ * road; any break in the column sequence is also an end.
+ */
+function cornerFlagsFor(accepted: CellPlot[]): boolean[] {
+  const flags = new Array<boolean>(accepted.length).fill(false);
   const byRun = new Map<string, number[]>();
   accepted.forEach((cp, i) => {
     const runKey = `${cp.row}:${cp.side}`;
@@ -727,10 +785,80 @@ function tagCornerPlots(plots: PlotResult[], accepted: CellPlot[]): void {
       const next = n < sorted.length - 1 ? accepted[sorted[n + 1]!]!.col : null;
       const col = accepted[sorted[n]!]!.col;
       if (prev === null || prev !== col - 1 || next === null || next !== col + 1) {
-        plots[sorted[n]!]!.corner = true;
+        flags[sorted[n]!] = true;
       }
     }
   }
+  return flags;
+}
+
+/**
+ * Widens one corner plot into the frontage beyond the end of its run.
+ *
+ * The plot keeps its depth and its road frontage line; only the far side moves
+ * outward, into land no other plot occupies. Three things stop it:
+ *
+ *  - a cell that is not usable, so a widened plot still cannot overhang the
+ *    zone boundary or Rule 22 ground;
+ *  - a cross road, which the plot may not sit on;
+ *  - a column another plot holds, or that another corner has already claimed —
+ *    checked for every column the growth crosses, not just the first, because a
+ *    narrow module against an 18 m depth can grow past more than one.
+ *
+ * The ceiling is `maxWidth`, the widest the client's own aspect band allows.
+ */
+function growCorner(
+  raster: ZoneRaster,
+  frame: GridFrame,
+  cp: CellPlot,
+  pitch: number,
+  crossPitch: number,
+  road: number,
+  depth: number,
+  width: number,
+  maxWidth: number,
+  claimed: Set<string>,
+): { width: number; uShift: number; columns: number[] } {
+  const vBase = cp.row * pitch + road + cp.side * depth;
+  const u0 = cp.col * width;
+  const step = Math.min(raster.cell / 2, width / 4);
+
+  /** Usable ground, clear of any cross road, across the plot's whole depth. */
+  const clearAt = (u: number): boolean => {
+    if (mod(u, crossPitch) < road) return false;
+    for (let v = vBase + step / 2; v < vBase + depth; v += step) {
+      if (!raster.isUsableAt(frame.toWorld([u, v]))) return false;
+    }
+    return true;
+  };
+
+  const columnOf = (u: number): number => Math.floor(u / width);
+  const free = (col: number): boolean => !claimed.has(`${cp.row}:${cp.side}:${col}`);
+
+  let best = { width, uShift: 0, columns: [] as number[] };
+  for (const direction of [1, -1] as const) {
+    if (!free(cp.col + direction)) continue;
+    let extra = 0;
+    const entered = new Set<number>();
+    for (;;) {
+      const next = extra + step;
+      if (width + next > maxWidth + 1e-9) break;
+      const edge = direction === 1 ? u0 + width + next : u0 - next;
+      const col = columnOf(direction === 1 ? edge - 1e-9 : edge + 1e-9);
+      if (col !== cp.col && !free(col)) break;
+      if (!clearAt(direction === 1 ? edge - step / 2 : edge + step / 2)) break;
+      if (col !== cp.col) entered.add(col);
+      extra = next;
+    }
+    if (extra > 0 && width + extra > best.width) {
+      best = {
+        width: width + extra,
+        uShift: direction === 1 ? 0 : -extra,
+        columns: [...entered],
+      };
+    }
+  }
+  return best;
 }
 
 /* -------------------------------------------------------------- the metrics */

@@ -32,6 +32,8 @@ export interface GenerateRequest {
   targetUnits: number;
   householdSize: number;
   senior?: boolean;
+  wantedPlinthSft?: number;
+  villaTypeName?: string;
   minSideApplies?: MinSideApplies;
   directions?: RoadDirection[];
   /** Tower options. */
@@ -149,5 +151,7 @@ export async function runGeneration(
     minSideApplies: req.minSideApplies,
     directions: req.directions,
     senior: req.senior,
+    wantedPlinthSft: req.wantedPlinthSft,
+    villaTypeName: req.villaTypeName,
   });
 }

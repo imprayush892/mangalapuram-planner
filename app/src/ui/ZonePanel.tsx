@@ -117,6 +117,13 @@ export default function ZonePanel(): React.ReactElement {
     isSenior ? 1.6 : 3.5,
   );
 
+  // Plinth per dwelling the programme asks for, so the layout can be checked
+  // against the villa size the client confirmed and not just the plot rules.
+  const villaLines = programme?.lines.filter((l) => l.use === (isSenior ? 'senior' : 'villas')) ?? [];
+  const villaUnits = villaLines.reduce((s2, l) => s2 + l.units, 0);
+  const villaPlinthSft =
+    villaUnits > 0 ? villaLines.reduce((s2, l) => s2 + l.units * l.plinthSftPerUnit, 0) / villaUnits : undefined;
+
   const fsiTiers = coverageFsi(rules.kmbr, 'A1').fsiTiers;
   const fsi = fsiTiers[switches.fsiTierIndex] ?? fsiTiers[0] ?? 3;
 
@@ -158,6 +165,8 @@ export default function ZonePanel(): React.ReactElement {
       senior: isSenior,
       minSideApplies: switches.minSideApplies,
       directions: switches.roadAngleCandidates,
+      wantedPlinthSft: villaPlinthSft,
+      villaTypeName: isSenior ? undefined : 'standard',
     });
   };
 

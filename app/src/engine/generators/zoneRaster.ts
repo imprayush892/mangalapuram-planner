@@ -111,6 +111,13 @@ export class ZoneRaster {
     return this.usable[j * this.nx + i] === 1;
   }
 
+  /** True where the cell containing this world point is usable. */
+  isUsableAt(p: Pt): boolean {
+    const c = this.dem.cellAt(p);
+    if (!c) return false;
+    return this.isUsable(c.i - this.i0, c.j - this.j0);
+  }
+
   centre(i: number, j: number): Pt {
     return this.dem.cellCentre(this.i0 + i, this.j0 + j);
   }

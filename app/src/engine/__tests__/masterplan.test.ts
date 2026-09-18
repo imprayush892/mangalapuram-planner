@@ -191,3 +191,79 @@ describe('campus blocks', () => {
     }
   });
 });
+
+describe('client rules the code had not been reading', () => {
+  it('widens corner plots and keeps them inside the client aspect band', async () => {
+    const c = await config();
+    const p = await plan();
+    const band = (c.client.villa_plots as Record<string, { min: number; max: number }>).aspect_ratio!;
+    let widened = 0;
+    for (const z of p.zones) {
+      const layout = z.options[z.chosenIndex];
+      if (!layout || layout.plots.length === 0) continue;
+      const module = Math.min(...layout.plots.map((pl) => pl.widthM));
+      for (const plot of layout.plots) {
+        if (plot.widthM > module + 1e-6) {
+          expect(plot.corner, `${plot.id} widened but is not a corner`).toBe(true);
+          widened += 1;
+        }
+        const aspect = plot.depthM / plot.widthM;
+        expect(aspect, `${plot.id} aspect`).toBeGreaterThanOrEqual(band.min - 1e-6);
+      }
+    }
+    expect(widened, 'no corner plot was widened').toBeGreaterThan(0);
+  });
+
+  it('never lets a widened corner overlap its neighbour', async () => {
+    const p = await plan();
+    for (const z of p.zones) {
+      const layout = z.options[z.chosenIndex];
+      if (!layout || layout.plots.length < 2) continue;
+      // Only the widened plots can overlap, so test each against every other.
+      const module = Math.min(...layout.plots.map((pl) => pl.widthM));
+      const grown = layout.plots.filter((pl) => pl.widthM > module + 1e-6);
+      for (const a of grown) {
+        for (const b of layout.plots) {
+          if (a.id === b.id) continue;
+          const overlap = multiPolyArea(intersect([[a.ring]], [[b.ring]]));
+          expect(overlap, `${a.id} overlaps ${b.id}`).toBeLessThan(0.5);
+        }
+      }
+    }
+  });
+
+  it('checks the villa against the size the client confirmed', async () => {
+    const p = await plan();
+    const villaZones = p.zones.filter((z) => z.use === 'villas' && z.options.length > 0);
+    expect(villaZones.length).toBeGreaterThan(0);
+    for (const z of villaZones) {
+      const finding = z.options[z.chosenIndex]!.findings.find((f) => f.id === 'villa.type_plinth');
+      expect(finding, `${z.zoneName} has no villa size finding`).toBeDefined();
+      // On this programme the three client rules cannot all hold, and the tool
+      // must say so rather than draw a placeholder and report success.
+      expect(finding!.status).toBe('fail');
+      expect(finding!.detail).toMatch(/floors, not|% of the plot covered/);
+    }
+  });
+
+  it('scores orientation against the client preferred facings, not a hard-coded rule', async () => {
+    const c = await config();
+    const p = await plan();
+    const preferred = (c.client.plot_orientation as Record<string, string[]>).preferred_facing!;
+    const z = p.zones.find((x) => x.use === 'villas' && (x.options[x.chosenIndex]?.plots.length ?? 0) > 0)!;
+    const finding = z.options[z.chosenIndex]!.findings.find((f) => f.id === 'villa.orientation');
+    expect(finding).toBeDefined();
+    for (const face of preferred) expect(finding!.title).toContain(face);
+  });
+
+  it('applies the stricter of the client and KMBR recreation width', async () => {
+    const c = await config();
+    const p = await plan();
+    const clientWidth = (c.client.recreational_area as Record<string, number>).min_width_m;
+    const z = p.zones.find((x) => x.use === 'villas' && x.options.length > 0)!;
+    const finding = z.options[z.chosenIndex]!.findings.find((f) => f.id === 'villa.recreation');
+    expect(finding).toBeDefined();
+    expect(finding!.reference).toContain(String(clientWidth));
+    expect(finding!.detail).toMatch(/stricter of/);
+  });
+});
