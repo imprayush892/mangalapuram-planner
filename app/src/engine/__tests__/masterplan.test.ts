@@ -164,7 +164,7 @@ describe('campus blocks', () => {
     const c = await config();
     const p = await plan();
     const daylight = c.kmbr.rule41_daylight_max_depth_from_opening_m as number;
-    const travel = (c.kmbr.rule36_travel_distance_m as Record<string, number>).other;
+    const travel = (c.kmbr.rule36_travel_distance_m as Record<string, number>).other!;
     const corridor = c.assumptions.corridor_width_m as number;
     const maxDepth = daylight * 2 + corridor;
     for (const z of p.zones) {
