@@ -7,10 +7,10 @@ import { create } from 'zustand';
  * them collapses, so the model is never permanently crushed by a sidebar.
  */
 export type Section =
+  | 'goal'
   | 'site'
   | 'zones'
   | 'siting'
-  | 'massing'
   | 'plan'
   | 'zone'
   | 'programme'
@@ -19,10 +19,10 @@ export type Section =
   | 'exports';
 
 export const SECTIONS: readonly { id: Section; label: string; hint: string }[] = [
+  { id: 'goal', label: 'Optimisation goal', hint: 'space, terrain and water, weighted' },
   { id: 'site', label: 'Site context', hint: 'terrain, layers, what the survey holds' },
   { id: 'zones', label: 'Zoning', hint: 'split, merge and draw the zones' },
   { id: 'siting', label: 'What goes where', hint: 'scores, vetoes, alternatives' },
-  { id: 'massing', label: 'Massing rules', hint: 'the levers that change the plan' },
   { id: 'plan', label: 'The plan', hint: 'what was drawn, road by road and zone by zone' },
   { id: 'zone', label: 'Selected zone', hint: 'three layout options for one zone' },
   { id: 'programme', label: 'Programme', hint: 'what the brief asks for' },
@@ -50,7 +50,7 @@ interface UiState {
 }
 
 export const useUi = create<UiState>((set) => ({
-  section: 'massing',
+  section: 'goal',
   leftOpen: true,
   rightOpen: true,
   dockOpen: true,

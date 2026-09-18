@@ -125,11 +125,11 @@ export function layoutWeightsFor(goal: NormalGoal): LayoutWeights {
   const { space, terrain, water } = goal;
   const w: LayoutWeights = {
     yield: 0.20 + 0.45 * space,
-    // Terrain response is two things in equal measure: how flat the plots sit,
-    // and how flat the roads run. Weighting only the first optimises platforms
-    // while letting the streets climb.
-    earthwork: 0.10 + 0.30 * terrain,
-    roadGrade: 0.04 + 0.26 * terrain,
+    // One terrain term, carrying both the plot platforms and the street
+    // grades. Split into two they compete for the same weight and the grid
+    // that wins is an artefact of the split rather than the least earthwork.
+    earthwork: 0.10 + 0.56 * terrain,
+    roadGrade: 0,
     orientation: 0.10,
     roadShare: 0.08,
     openSpaceQuality: 0.08 + 0.12 * water,

@@ -32,6 +32,8 @@ export default function PlanView(): React.ReactElement {
   const sitingResult = useSiting((s) => s.result);
   const sitingActive = useSiting((s) => s.activeIndex);
   const masterPlan = useMasterPlan((s) => s.plan);
+  const streaming = useMasterPlan((s) => s.streaming);
+  const planRunning = useMasterPlan((s) => s.status.running);
   const rightOpen = useUi((s) => s.rightOpen);
   const dockOpen = useUi((s) => s.dockOpen);
   const editTool = useZoneEdit((s) => s.tool);
@@ -72,13 +74,21 @@ export default function PlanView(): React.ReactElement {
    * zone last worked on.
    */
   const layouts = useMemo(() => {
+    // While a run is going the zones that have finished are drawn as they land,
+    // so the plan builds itself in front of the user instead of the screen
+    // sitting still behind a progress bar.
+    if (planRunning && streaming.length > 0) {
+      return streaming
+        .map((z) => z.options[z.chosenIndex])
+        .filter((l): l is NonNullable<typeof l> => Boolean(l));
+    }
     if (masterPlan) {
       return masterPlan.zones
         .map((z) => z.options[z.chosenIndex])
         .filter((l): l is NonNullable<typeof l> => Boolean(l));
     }
     return activeLayout ? [activeLayout] : [];
-  }, [masterPlan, activeLayout]);
+  }, [masterPlan, activeLayout, planRunning, streaming]);
 
   // Fit the parcel on first load and on resize.
   useEffect(() => {

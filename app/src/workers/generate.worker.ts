@@ -17,8 +17,10 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const started = Date.now();
   try {
     if (req.job === 'masterplan') {
-      const plan = await runMasterPlanJob(req, (message, done, total) =>
-        post({ id: req.id, status: 'progress', message, done, total }),
+      const plan = await runMasterPlanJob(
+        req,
+        (message, done, total) => post({ id: req.id, status: 'progress', message, done, total }),
+        (zone) => post({ id: req.id, status: 'zone', zone }),
       );
       post({ id: req.id, status: 'plan', plan, elapsedMs: Date.now() - started });
       return;

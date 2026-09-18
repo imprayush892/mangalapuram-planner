@@ -175,3 +175,43 @@ Each of these is a switch or an editable assumption, not a silent decision.
     client's zoning plan every run, so the worker and the main thread cannot
     disagree about what the plan is now, and any edit can be undone singly. A
     piece under 200 m² is a sliver from a bad cut, not a parcel.
+
+### Added while building the super goal (18 Sep 2026)
+
+31. **Three objectives, one engine.** Space, terrain and water are not modes.
+    Every place the engine chooses — which use goes in which zone, which road
+    grid to lay, where to route a collector, whether ground is buildable —
+    derives its weights from one normalised goal, so a slider re-aims the whole
+    plan coherently instead of switching it. Setting an objective to zero never
+    disables a rule; KMBR and the client rules still apply.
+32. **Earthwork is one objective, not two.** Contour-parallel roads give flat
+    streets and plots that run down the slope; fall-line roads give the
+    opposite. Scored separately they split the terrain weight and fight, and the
+    winning grid is an artefact of the split. Plot fall and street grade now go
+    into one number, because what is being minimised is the total cut and fill.
+33. **A score clipped at zero is no score.** Mean plot fall is over 3 m almost
+    everywhere here, so `100 − fall/3 × 100` gave every candidate zero and the
+    terrain objective could not tell them apart. The curves now fall away
+    without saturating.
+34. **Cut and fill cannot steer a search that has not placed anything yet.**
+    They are only known once the plots exist, so a search scored on them scores
+    every candidate the same. Earthwork is steered on mean plot fall and street
+    grade, both of which are measurable in the pass that already visits every
+    cell, and which the cut and fill follow from.
+35. **Which plots to keep follows the goal.** When a grid offers more plots than
+    the programme wants, space keeps the most complete, terrain the flattest,
+    water the driest. Before, completeness decided it and the goal could pick a
+    different grid but never a flatter plot within one.
+36. **A local minimum is not a pond.** A 2 m survey has 465 of them and almost
+    all are noise; treating each as standing water marked 58 of 73.5 ac as wet.
+    Ponding is now measured by depression DEPTH from a priority flood — how far
+    below its spill level the ground lies — which gives 1.35 ac.
+    **New assumption: `ponding_depth_m: 0.25`.**
+37. **A setback belongs to a watercourse, not to every rill.** Buffering each
+    1,000 m² flow path by 33 m would take most of a hilly site out of use. The
+    no-build buffer is measured from the major network only
+    (**`major_upslope_cells: 2000`**); minor rills still count towards wetness,
+    which is what scoring cares about.
+38. **Water-led means water comes out first.** The buffer and the ponding ground
+    are removed from the buildable area BEFORE anything is laid out, not drawn
+    over the plan afterwards.

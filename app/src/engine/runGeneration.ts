@@ -14,7 +14,7 @@ import type { BandName, MinSideApplies } from './rules/client';
 import type { Occupancy } from './rules/kmbr';
 import { runMasterPlan } from './masterplan/run';
 import type { MasterPlanOptions } from './masterplan/run';
-import type { MasterPlan } from './masterplan/types';
+import type { MasterPlan, MasterPlanZone } from './masterplan/types';
 import { applyZoneEdits } from './site/zoneEdit';
 import type { ZoneEdit } from './site/zoneEdit';
 
@@ -65,6 +65,7 @@ export type WorkerRequest = GenerateRequest | MasterPlanRequest;
 
 export type GenerateResponse =
   | { id: number; status: 'progress'; message: string; done?: number; total?: number }
+  | { id: number; status: 'zone'; zone: MasterPlanZone }
   | { id: number; status: 'done'; options: LayoutOption[]; elapsedMs: number }
   | { id: number; status: 'plan'; plan: MasterPlan; elapsedMs: number }
   | { id: number; status: 'error'; error: string };
@@ -104,6 +105,7 @@ async function loadContext(
 export async function runMasterPlanJob(
   req: MasterPlanRequest,
   onProgress: (message: string, done: number, total: number) => void = () => {},
+  onZone: (zone: MasterPlanZone) => void = () => {},
 ): Promise<MasterPlan> {
   const { site, config } = await loadContext(
     req.baseUrl,
@@ -111,7 +113,7 @@ export async function runMasterPlanJob(
     (m) => onProgress(m, 0, 0),
     req.zoneEdits ?? [],
   );
-  return runMasterPlan(site, config, req.options, onProgress);
+  return runMasterPlan(site, config, req.options, onProgress, onZone);
 }
 
 export async function runGeneration(

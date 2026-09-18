@@ -119,7 +119,7 @@ export interface JunctionInput {
    * villa, and a zone that cannot be reached without taking one is reported
    * instead.
    */
-  obstacles: MultiPoly;
+  obstacles: MultiPoly[];
 }
 
 export function buildJunctions(input: JunctionInput): JunctionResult {
@@ -161,7 +161,17 @@ export function buildJunctions(input: JunctionInput): JunctionResult {
       const corridor = bufferPolyline([end, best.point], line.widthM);
       const geom = intersect(corridor, input.parcel);
       if (geom.length === 0) continue;
-      const takes = multiPolyArea(intersect(geom, input.obstacles));
+      /*
+       * Tested one shape at a time. Folding four hundred plot rings into a
+       * single multipolygon and intersecting once is faster, and the clipper
+       * does not reliably give the right answer for it — a stub was laid over
+       * a plot because that intersection came back empty.
+       */
+      let takes = 0;
+      for (const obstacle of input.obstacles) {
+        takes += multiPolyArea(intersect(geom, obstacle));
+        if (takes > 1) break;
+      }
       if (takes > 1) {
         blocked.push({ zoneId: line.zoneId, takenM2: takes });
         continue;

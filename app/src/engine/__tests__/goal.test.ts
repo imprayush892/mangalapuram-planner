@@ -166,8 +166,13 @@ describe('the objectives change the plan', () => {
     expect(waterNote, 'a water-led plan must state the land its buffer costs').toBeTruthy();
     const acresIn = (n: string | undefined): number => (n ? Number(/([\d.]+) ac/.exec(n)?.[1] ?? 0) : 0);
     expect(acresIn(waterNote)).toBeGreaterThan(acresIn(spaceNote));
-    // And it must cost something, or the objective is not doing anything.
+    // And it must cost something, or the objective is not doing anything —
+    // but it must still leave a plan, not scrape the site bare.
     expect(waterRun.plan.totals.villaPlots).toBeLessThan(spaceRun.plan.totals.villaPlots);
+    expect(
+      waterRun.plan.totals.villaPlots,
+      'a water-led plan must still be a plan: buffering every rill is not water-led, it is unbuildable',
+    ).toBeGreaterThan(spaceRun.plan.totals.villaPlots * 0.3);
   });
 
   it('makes a terrain-led plan take flatter roads on the same allocation', async () => {
@@ -196,14 +201,26 @@ describe('the objectives change the plan', () => {
     expect(share(terrainPlan), 'terrain-led roads must not be steeper').toBeLessThanOrEqual(
       share(spacePlan) + 1e-9,
     );
-    // And the plots must sit flatter, which is the other half of the objective.
-    const meanFall = (p: typeof spacePlan): number => {
-      const falls = p.zones
-        .map((z) => z.options[z.chosenIndex]?.metrics.meanPlotFallM)
-        .filter((f): f is number => typeof f === 'number' && Number.isFinite(f));
-      return falls.length > 0 ? falls.reduce((a, b) => a + b, 0) / falls.length : Number.NaN;
+    /*
+     * And the earthwork itself must be lower, which is the objective as the
+     * brief states it. Per plot, not in total: a plan that simply cuts fewer
+     * plots moves less earth without having responded to anything.
+     */
+    const earthworkPerPlot = (p: typeof spacePlan): number => {
+      let moved = 0;
+      let plots = 0;
+      for (const z of p.zones) {
+        const m = z.options[z.chosenIndex]?.metrics;
+        if (!m || m.plotCount === 0) continue;
+        moved += m.cutM3 + m.fillM3;
+        plots += m.plotCount;
+      }
+      return plots > 0 ? moved / plots : Number.NaN;
     };
-    expect(meanFall(terrainPlan)).toBeLessThanOrEqual(meanFall(spacePlan) + 1e-9);
+    expect(
+      earthworkPerPlot(terrainPlan),
+      'terrain-led must move less earth per plot',
+    ).toBeLessThanOrEqual(earthworkPerPlot(spacePlan) + 1e-9);
   });
 
   it('states what each objective did, on every run', async () => {

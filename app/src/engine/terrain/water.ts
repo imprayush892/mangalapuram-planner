@@ -26,12 +26,21 @@ export interface WaterModel {
   /** Metres to the nearest water: a channel, a drain or a pond edge. NaN unknown. */
   distanceToWaterM: Float32Array;
   /**
+   * Metres to the nearest MAJOR watercourse, and to the survey's own drains
+   * and ponds. A minor rill still makes ground wet, which scoring cares about,
+   * but it is not something a plan keeps a 30 m strip clear of — that belongs
+   * to real watercourses, and this is the field the no-build buffer uses.
+   */
+  distanceToMajorWaterM: Float32Array;
+  /**
    * Topographic wetness index, ln(upslope area / tan slope). High means water
    * collects; low means it sheds. The standard measure of where ground is wet.
    */
   wetness: Float32Array;
-  /** Cells that drain into a hollow with no outlet below them. */
+  /** Cells that genuinely hold water: below the level their hollow spills at. */
   ponding: Uint8Array;
+  /** How deep the hollow is at each cell, metres. Zero on ground that drains. */
+  depressionDepthM: Float32Array;
   /** Flow accumulation, kept so callers need not recompute it. */
   accumulation: Float32Array;
   /** Cell index of each channel cell, for drawing and for distance. */
@@ -46,8 +55,19 @@ export interface WaterInput {
   dem: Dem;
   /** Cells with at least this much upslope area count as a channel. */
   minUpslopeCells: number;
+  /**
+   * Upslope area before a channel is a watercourse worth keeping a strip
+   * clear of, rather than a rill that merely makes the ground damp.
+   */
+  majorUpslopeCells?: number;
   /** Drains and pond edges from the survey, which are water whatever the DEM says. */
   features: SiteFeature[];
+  /**
+   * A hollow shallower than this is DEM noise, not a pond. A 2 m grid has
+   * hundreds of millimetre-deep local minima; treating each as standing water
+   * marks most of a hilly site as wet.
+   */
+  pondingDepthM?: number;
 }
 
 const NEIGHBOURS: readonly (readonly [number, number])[] = [
@@ -207,19 +227,119 @@ export function buildWaterModel(input: WaterInput): WaterModel {
   }
   const distanceToWaterM = distanceField(nx, ny, cell, waterSeeds);
 
+  // The major network: real watercourses plus the survey's own drains and
+  // ponds, which are watercourses whatever their upslope area says.
+  const majorThreshold = input.majorUpslopeCells ?? input.minUpslopeCells * 8;
+  const majorSeeds = new Set<number>();
+  for (const k of waterSeeds) {
+    if (accumulation[k]! >= majorThreshold || accumulation[k]! < input.minUpslopeCells) majorSeeds.add(k);
+  }
+  const distanceToMajorWaterM =
+    majorSeeds.size > 0 ? distanceField(nx, ny, cell, majorSeeds) : new Float32Array(n).fill(Number.POSITIVE_INFINITY);
+
   /* ------------------------------------------------------------- ponding */
-  // A hollow is a local minimum that is not on the parcel edge; the cells that
-  // drain into one will hold water before they drain anywhere else.
-  const ponding = new Uint8Array(n);
-  for (let c = 0; c < outlets.length; c += 1) {
-    const k = outlets[c]!;
+  /*
+   * Priority flood.
+   *
+   * A local minimum in the flow graph is not a pond: on a 2 m survey there are
+   * hundreds of them and almost all are noise. What ponds is ground lying
+   * BELOW the level its hollow spills at, so the depth is what must be
+   * measured. Flooding inward from the edges gives, for every cell, the lowest
+   * level at which water could still escape; the difference from the ground is
+   * how deep the water would stand.
+   */
+  const filled = new Float32Array(n).fill(Number.NaN);
+  const seen = new Uint8Array(n);
+  const heapK: number[] = [];
+  const heapV: number[] = [];
+  const push = (k: number, v: number): void => {
+    heapK.push(k);
+    heapV.push(v);
+    let i = heapK.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (heapV[parent]! <= heapV[i]!) break;
+      [heapK[parent], heapK[i]] = [heapK[i]!, heapK[parent]!];
+      [heapV[parent], heapV[i]] = [heapV[i]!, heapV[parent]!];
+      i = parent;
+    }
+  };
+  const pop = (): number => {
+    const k = heapK[0]!;
+    const lastK = heapK.pop()!;
+    const lastV = heapV.pop()!;
+    if (heapK.length > 0) {
+      heapK[0] = lastK;
+      heapV[0] = lastV;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let small = i;
+        if (l < heapK.length && heapV[l]! < heapV[small]!) small = l;
+        if (r < heapK.length && heapV[r]! < heapV[small]!) small = r;
+        if (small === i) break;
+        [heapK[small], heapK[i]] = [heapK[i]!, heapK[small]!];
+        [heapV[small], heapV[i]] = [heapV[i]!, heapV[small]!];
+        i = small;
+      }
+    }
+    return k;
+  };
+
+  // Water escapes at the grid edge, and at the edge of the surveyed ground:
+  // beyond the survey we do not know, so we do not dam it.
+  for (let j = 0; j < ny; j += 1) {
+    for (let i = 0; i < nx; i += 1) {
+      const k = j * nx + i;
+      const z = dem.values[k]!;
+      if (!Number.isFinite(z)) continue;
+      let outlet = i === 0 || j === 0 || i === nx - 1 || j === ny - 1;
+      if (!outlet) {
+        for (const [di, dj] of NEIGHBOURS) {
+          if (!Number.isFinite(dem.values[(j + dj) * nx + (i + di)]!)) {
+            outlet = true;
+            break;
+          }
+        }
+      }
+      if (outlet) {
+        filled[k] = z;
+        seen[k] = 1;
+        push(k, z);
+      }
+    }
+  }
+
+  while (heapK.length > 0) {
+    const k = pop();
+    const level = filled[k]!;
     const i = k % nx;
     const j = (k - i) / nx;
-    const onEdge = i === 0 || j === 0 || i === nx - 1 || j === ny - 1;
-    if (onEdge) continue;
-    // Only hollows big enough to matter: a single-cell pit is DEM noise.
-    if ((catchmentSizes[c] ?? 0) < 25) continue;
-    for (let m = 0; m < n; m += 1) if (catchment[m] === c) ponding[m] = 1;
+    for (const [di, dj] of NEIGHBOURS) {
+      const ni = i + di;
+      const nj = j + dj;
+      if (ni < 0 || nj < 0 || ni >= nx || nj >= ny) continue;
+      const nk = nj * nx + ni;
+      if (seen[nk] === 1) continue;
+      const nz = dem.values[nk]!;
+      if (!Number.isFinite(nz)) continue;
+      seen[nk] = 1;
+      filled[nk] = Math.max(nz, level);
+      push(nk, filled[nk]!);
+    }
+  }
+
+  const pondingDepthM = input.pondingDepthM ?? 0.25;
+  const ponding = new Uint8Array(n);
+  const depressionDepthM = new Float32Array(n);
+  for (let k = 0; k < n; k += 1) {
+    const z = dem.values[k]!;
+    const f = filled[k]!;
+    if (!Number.isFinite(z) || !Number.isFinite(f)) continue;
+    const depth = f - z;
+    depressionDepthM[k] = depth > 0 ? depth : 0;
+    if (depth >= pondingDepthM) ponding[k] = 1;
   }
 
   return {
@@ -227,8 +347,10 @@ export function buildWaterModel(input: WaterInput): WaterModel {
     catchmentSizes,
     outlets,
     distanceToWaterM,
+    distanceToMajorWaterM,
     wetness,
     ponding,
+    depressionDepthM,
     accumulation,
     channelCells: Int32Array.from(channelList),
     nx,
@@ -237,10 +359,16 @@ export function buildWaterModel(input: WaterInput): WaterModel {
   };
 }
 
-/** Land within `bufferM` of water: the strip a water-led plan keeps clear. */
+/**
+ * The strip a water-led plan keeps clear.
+ *
+ * Measured from the MAJOR watercourses, not from every rill: buffering a
+ * 1,000 m² flow path by 30 m would take most of a hilly site out of use and
+ * would not be what anyone means by a watercourse setback.
+ */
 export function waterBuffer(dem: Dem, water: WaterModel, within: MultiPoly, bufferM: number): MultiPoly {
   if (bufferM <= 0) return [];
-  return cellsToMulti(dem, within, (i, j) => water.distanceToWaterM[j * water.nx + i]! <= bufferM);
+  return cellsToMulti(dem, within, (i, j) => water.distanceToMajorWaterM[j * water.nx + i]! <= bufferM);
 }
 
 /** Ground that ponds, as polygons — the other half of a water no-build. */

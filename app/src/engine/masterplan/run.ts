@@ -18,6 +18,7 @@ import { buildWaterModel, pondingGround, waterBuffer } from '../terrain/water';
 import { BALANCED_GOAL, goalExplanation, normaliseGoal, settingsFor } from '../optimise/goal';
 import type { SuperGoal } from '../optimise/goal';
 import { union } from '../geom/boolean';
+import type { MultiPoly } from '../geom/types';
 import { buildJunctions } from './junctions';
 import { gradientLimits, measureGradient, summariseGradients } from '../rules/roadGradient';
 import { subdivisionRules } from '../rules/kmbr';
@@ -99,6 +100,12 @@ export function runMasterPlan(
   config: ConfigBundle,
   opts: MasterPlanOptions,
   onProgress: (message: string, done: number, total: number) => void = () => {},
+  /**
+   * Called as each zone finishes, so the plan can draw itself zone by zone
+   * rather than making the user watch a progress bar for twelve seconds. The
+   * work is genuinely heavy; what it must not be is invisible.
+   */
+  onZone: (zone: MasterPlanZone) => void = () => {},
 ): MasterPlan {
   const started = Date.now();
   const goal = normaliseGoal(opts.goal ?? BALANCED_GOAL);
@@ -111,6 +118,8 @@ export function runMasterPlan(
   const water = buildWaterModel({
     dem: site.dem,
     minUpslopeCells: pick<number>(config.siting, 'defaults.channel_upslope_cells', 250),
+    majorUpslopeCells: pick<number>(config.siting, 'defaults.major_upslope_cells', 2000),
+    pondingDepthM: pick<number>(config.siting, 'defaults.ponding_depth_m', 0.25),
     features: site.features,
   });
   const goalSettings = settingsFor(goal, {
@@ -249,7 +258,7 @@ export function runMasterPlan(
     const chosenRaw = opts.chosen?.[zone.id] ?? 0;
     const chosenIndex = options.length > 0 ? Math.min(Math.max(0, chosenRaw), options.length - 1) : 0;
 
-    zones.push({
+    const finished: MasterPlanZone = {
       zoneId: zone.id,
       zoneName: zone.name,
       use,
@@ -260,7 +269,9 @@ export function runMasterPlan(
       chosenIndex,
       empty,
       elapsedMs: Date.now() - zoneStarted,
-    });
+    };
+    zones.push(finished);
+    onZone(finished);
     done += 1;
   }
 
@@ -280,9 +291,9 @@ export function runMasterPlan(
       const layout = z.options[z.chosenIndex];
       if (!layout) return [];
       return [
-        ...layout.plots.map((pl) => [pl.ring]),
-        ...layout.towers.map((t) => [t.ring]),
-        ...layout.blocks.map((b) => [b.ring]),
+        ...layout.plots.map((pl): MultiPoly => [[pl.ring]]),
+        ...layout.towers.map((t): MultiPoly => [[t.ring]]),
+        ...layout.blocks.map((b): MultiPoly => [[b.ring]]),
       ];
     }),
   });

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { MasterPlan } from '../engine/masterplan/types';
+import type { MasterPlan, MasterPlanZone } from '../engine/masterplan/types';
 
 export interface MasterPlanStatus {
   running: boolean;
@@ -14,9 +14,16 @@ interface MasterPlanState {
   plan: MasterPlan | null;
   /** The run before this one, so a change can be shown as a difference. */
   previous: MasterPlan | null;
+  /**
+   * Zones that have finished in the run currently going, so the plan can draw
+   * itself as the work lands rather than appearing all at once at the end.
+   */
+  streaming: MasterPlanZone[];
   status: MasterPlanStatus;
   /** Layout option drawn per zone; the engine's best where unset. */
   chosen: Record<string, number>;
+  startRun: () => void;
+  pushZone: (zone: MasterPlanZone) => void;
   setPlan: (plan: MasterPlan) => void;
   setStatus: (status: Partial<MasterPlanStatus>) => void;
   chooseOption: (zoneId: string, index: number) => void;
@@ -28,19 +35,24 @@ const IDLE: MasterPlanStatus = { running: false, message: '', done: 0, total: 0,
 export const useMasterPlan = create<MasterPlanState>((set) => ({
   plan: null,
   previous: null,
+  streaming: [],
   status: IDLE,
   chosen: {},
+
+  startRun: () => set({ streaming: [] }),
+  pushZone: (zone) => set((s) => ({ streaming: [...s.streaming, zone] })),
 
   setPlan: (plan) =>
     set((s) => ({
       plan,
       previous: s.plan,
+      streaming: [],
       status: { ...IDLE, elapsedMs: plan.elapsedMs, message: `${plan.zones.length} zones in ${(plan.elapsedMs / 1000).toFixed(1)} s` },
     })),
 
   setStatus: (status) => set((s) => ({ status: { ...s.status, ...status } })),
   chooseOption: (zoneId, index) => set((s) => ({ chosen: { ...s.chosen, [zoneId]: index } })),
-  clear: () => set({ plan: null, previous: null, status: IDLE, chosen: {} }),
+  clear: () => set({ plan: null, previous: null, streaming: [], status: IDLE, chosen: {} }),
 }));
 
 /** What changed between two runs, for the line under the button. */

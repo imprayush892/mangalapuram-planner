@@ -75,7 +75,7 @@ export function runGenerate(request: Omit<GenerateRequest, 'id' | 'baseUrl'>): v
       setStatus({ message: msg.message, elapsedMs: Date.now() - started });
       return;
     }
-    if (msg.status === 'plan') return; // a master plan run, handled elsewhere
+    if (msg.status === 'plan' || msg.status === 'zone') return; // master plan run, handled elsewhere
     w.removeEventListener('message', onMessage);
     if (msg.status === 'error') fail(msg.error);
     else finish(msg.options, msg.elapsedMs);
@@ -111,6 +111,7 @@ export function runMasterPlanGeneration(
   const started = Date.now();
   const full: MasterPlanRequest = { job: 'masterplan', id, baseUrl: dataBaseUrl(), overrides, options, zoneEdits };
 
+  useMasterPlan.getState().startRun();
   setStatus({ running: true, message: 'starting…', done: 0, total: 0, elapsedMs: 0, error: null });
 
   const fail = (error: string): void => {
@@ -124,7 +125,11 @@ export function runMasterPlanGeneration(
     setTimeout(() => {
       void import('../engine/runGeneration')
         .then(({ runMasterPlanJob }) =>
-          runMasterPlanJob(full, (message, done, total) => setStatus({ message, done, total })),
+          runMasterPlanJob(
+            full,
+            (message, done, total) => setStatus({ message, done, total }),
+            (zone) => useMasterPlan.getState().pushZone(zone),
+          ),
         )
         .then((plan) => setPlan(plan))
         .catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
@@ -142,6 +147,11 @@ export function runMasterPlanGeneration(
         total: msg.total ?? 0,
         elapsedMs: Date.now() - started,
       });
+      return;
+    }
+    if (msg.status === 'zone') {
+      // Each zone lands as it finishes, so the plan draws itself.
+      useMasterPlan.getState().pushZone(msg.zone);
       return;
     }
     w.removeEventListener('message', onMessage);

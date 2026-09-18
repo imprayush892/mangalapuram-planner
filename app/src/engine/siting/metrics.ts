@@ -48,6 +48,8 @@ export function measureZones(
     buildWaterModel({
       dem: site.dem,
       minUpslopeCells: pick<number>(siting, 'defaults.channel_upslope_cells', 250),
+      majorUpslopeCells: pick<number>(siting, 'defaults.major_upslope_cells', 2000),
+      pondingDepthM: pick<number>(siting, 'defaults.ponding_depth_m', 0.25),
       features: site.features,
     });
   const accumulation = water.accumulation;

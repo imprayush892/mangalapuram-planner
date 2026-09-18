@@ -1076,10 +1076,23 @@ export function scoreLayout(
    * objective could not tell them apart. These curves fall away but never
    * saturate, so a flatter option always outranks a steeper one.
    */
+  /*
+   * Earthwork is ONE objective, not two.
+   *
+   * Contour-parallel roads give flat streets and plots that run down the
+   * slope; fall-line roads give the opposite. Scored as two separate terms
+   * they split the terrain weight and fight each other, and the grid that wins
+   * is whichever side of that trade-off the weights happen to favour. What is
+   * actually being minimised is the total cut and fill, so both costs go into
+   * one number: the fall a plot platform has to absorb, plus the grade the
+   * street has to climb.
+   */
   const fall = m.meanPlotFallM;
-  const earthwork = Number.isFinite(fall) ? 100 / (1 + fall / 1.5) : 50;
-  // 1:16 scores about 62, 1:12 about 55, 1:8 about 44.
-  const roadGrade = 100 / (1 + m.meanRoadGrade / 0.08);
+  const plotCost = Number.isFinite(fall) ? fall / 1.5 : 1;
+  const roadCost = m.meanRoadGrade / 0.08;
+  const earthwork = 100 / (1 + plotCost + roadCost);
+  // Reported on its own so the two halves can still be read apart.
+  const roadGrade = 100 / (1 + roadCost);
 
   const orientation = m.goodOrientationShare * 100;
   const roadShare = Math.max(0, 100 - (Math.abs(m.shares.roads - split.roads) / SHARE_TOLERANCE) * 50);

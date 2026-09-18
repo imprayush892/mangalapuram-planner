@@ -52,6 +52,8 @@ defaults:
   frontage_search_m: 60
   water_buffer_m: 15              # ASSUMPTION: strip either side of a watercourse counted as "near water"; the super goal scales it
   channel_upslope_cells: 250      # cells of upslope area before a flow path counts as a channel (2 m grid, so 1,000 m2)
+  major_upslope_cells: 2000       # upslope area before a channel is a watercourse worth a setback, not a rill that merely damps the ground
+  ponding_depth_m: 0.25           # ASSUMPTION: a hollow shallower than this is DEM noise, not standing water. A 2 m survey has hundreds of millimetre-deep local minima
   # Walk distance is measured centroid to centroid; a straight line understates
   # a real walk, so it is multiplied by this before testing `within_walk_m`.
   walk_detour_factor: 1.35

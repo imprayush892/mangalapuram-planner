@@ -14,6 +14,7 @@ import type { ZoneUse } from '../engine/site/level1';
 import type { ConstraintResult, ZoneAllocation } from '../engine/siting/types';
 import { zoneColour } from './draw';
 import { useEditedSite } from '../state/useEditedSite';
+import { useGoal } from '../state/goalStore';
 
 const WEIGHT_LABELS: Record<keyof ScoreWeights, string> = {
   buildable_area: 'Buildable area',
@@ -28,6 +29,7 @@ const WEIGHT_LABELS: Record<keyof ScoreWeights, string> = {
 
 export default function SitingPanel(): React.ReactElement {
   const site = useEditedSite();
+  const goal = useGoal((s) => s.goal);
   const selectZone = useSite((s) => s.selectZone);
   const selectedZoneId = useSite((s) => s.selectedZoneId);
   const rules = useRules();
@@ -57,6 +59,9 @@ export default function SitingPanel(): React.ReactElement {
           programme,
           metrics,
           locks,
+          // The same goal the layouts are optimised against, so what goes
+          // where and how it is laid out answer one question, not two.
+          goal,
         });
         setResult(out, Date.now() - started);
       } catch (err) {
