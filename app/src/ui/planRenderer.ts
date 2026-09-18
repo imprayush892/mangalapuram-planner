@@ -1,3 +1,4 @@
+import type { MultiPoly } from '../engine/geom/types';
 import type { SiteModel } from '../engine/site/loadSite';
 import type { LayoutOption } from '../engine/generators/types';
 import type { LayerFlags } from '../state/store';
@@ -24,6 +25,8 @@ export interface PlanScene {
    * layouts so an internal road meeting a collector reads as joining it.
    */
   circulation?: CirculationRoad[];
+  /** Junction splay land from the same run, drawn under the roads. */
+  splays?: MultiPoly;
   selectedZoneId: string | null;
   background: string;
   /**
@@ -97,7 +100,7 @@ export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanS
 
   if (layers.layout) {
     if (scene.circulation && scene.circulation.length > 0) {
-      drawCirculation(ctx, view, scene.circulation, pen);
+      drawCirculation(ctx, view, scene.circulation, pen, scene.splays);
     }
     for (const layout of scene.layouts) drawLayout(ctx, view, layout, pen);
   }

@@ -14,6 +14,9 @@ import { pick } from '../data/config';
 import { multiPolyArea } from '../geom/planar';
 import { briefForZone } from './brief';
 import { circulationFootprint, generateCirculation } from './circulation';
+import { buildJunctions } from './junctions';
+import { gradientLimits, measureGradient, summariseGradients } from '../rules/roadGradient';
+import { subdivisionRules } from '../rules/kmbr';
 import type { MasterPlan, MasterPlanZone, MasterPlanTotals } from './types';
 
 /**
@@ -40,7 +43,13 @@ export interface MasterPlanOptions {
   runId: number;
 }
 
-function totalsOf(zones: MasterPlanZone[], circulationLengthM: number, circulationAreaM2: number): MasterPlanTotals {
+function totalsOf(
+  zones: MasterPlanZone[],
+  circulationLengthM: number,
+  circulationAreaM2: number,
+  junctions: number,
+  splayAreaM2: number,
+): MasterPlanTotals {
   const t: MasterPlanTotals = {
     villaPlots: 0,
     villaUnits: 0,
@@ -54,6 +63,8 @@ function totalsOf(zones: MasterPlanZone[], circulationLengthM: number, circulati
     internalRoadLengthM: 0,
     circulationRoadLengthM: circulationLengthM,
     roadAreaM2: circulationAreaM2,
+    junctions,
+    splayAreaM2,
     openSpaceM2: 0,
     plannedAreaAc: 0,
   };
@@ -214,9 +225,48 @@ export function runMasterPlan(
     done += 1;
   }
 
+  /* ------------------------------------------------ junctions and gradients */
+  onProgress('splaying the junctions and checking road gradients', done, planned.length);
+  const sub = subdivisionRules(config.kmbr);
+  const junctions = buildJunctions({
+    zoneRoads: zones.map((z) => ({
+      zoneId: z.zoneId,
+      roads: z.options[z.chosenIndex]?.roads ?? [],
+    })),
+    circulation: circulation.roads,
+    splayRule: { roadsLe10M: sub.junctionSplay.roads_le_10m, roadsGt10M: sub.junctionSplay.roads_gt_10m },
+    stubReachM: pick<number>(config.assumptions, 'road_stub_reach_m', 60),
+    parcel: site.parcel,
+    obstacles: zones.flatMap((z) => {
+      const layout = z.options[z.chosenIndex];
+      if (!layout) return [];
+      return [
+        ...layout.plots.map((pl) => [pl.ring]),
+        ...layout.towers.map((t) => [t.ring]),
+        ...layout.blocks.map((b) => [b.ring]),
+      ];
+    }),
+  });
+  circulation.roads.push(...junctions.stubs);
+  circulation.notes.push(...junctions.notes);
+
+  const limits = gradientLimits(config.assumptions);
+  const gradients = summariseGradients(
+    [
+      ...circulation.roads.map((r) => measureGradient(site.dem, r.id, r.centreline, limits)),
+      ...zones.flatMap((z) =>
+        (z.options[z.chosenIndex]?.roads ?? [])
+          .filter((r) => r.centreline.length >= 2)
+          .map((r) => measureGradient(site.dem, `${z.zoneName}:${r.id}`, r.centreline, limits)),
+      ),
+    ],
+    limits,
+  );
+
   const circLength = circulation.roads.reduce((s, r) => s + r.lengthM, 0);
   const circArea = circulation.roads.reduce((s, r) => s + multiPolyArea(r.geom), 0);
-  const totals = totalsOf(zones, circLength, circArea);
+  const splayAreaM2 = multiPolyArea(junctions.splays);
+  const totals = totalsOf(zones, circLength, circArea, junctions.junctions.length, splayAreaM2);
 
   const notes: string[] = [...circulation.notes];
   const skipped = zones.filter((z) => z.empty);
@@ -226,12 +276,20 @@ export function runMasterPlan(
     notes.push(`${z?.zoneName ?? u.zoneId} has no road connection: ${u.reason}`);
   }
 
+  if (gradients.overMaxM > 0) {
+    notes.push(
+      `${Math.round(gradients.overMaxM)} m of road is steeper than the ${limits.maxShortLabel} absolute limit; the steepest stretch is ${gradients.steepestRoadId ?? '—'}.`,
+    );
+  }
+
   return {
     runId: opts.runId,
     generatedAt: Date.now(),
     sitingLabel: opts.sitingLabel,
     zones,
     circulation,
+    junctions,
+    gradients,
     totals,
     notes,
     elapsedMs: Date.now() - started,

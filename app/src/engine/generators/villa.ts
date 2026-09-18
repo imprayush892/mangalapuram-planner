@@ -10,6 +10,7 @@ import { pick } from '../data/config';
 import { aspectBand, clientSetbacks, cornerPlotsArePremium, landSplit, roadWidths, sizeVillaPlots } from '../rules/client';
 import type { MinSideApplies, PlotSizing } from '../rules/client';
 import { subdivisionRules, unbuildableSlopeDeg } from '../rules/kmbr';
+import { gradientLimits, measureGradient, summariseGradients } from '../rules/roadGradient';
 import { toRad } from '../units';
 import type {
   Facing,
@@ -455,9 +456,16 @@ function buildOption(
     findings: [],
     warnings: [],
   };
+    const gradLimits = gradientLimits(input.assumptions);
   option.findings = checkVillaLayout(option, input.client, input.kmbr, input.assumptions, {
     wantedPlinthSft: input.wantedPlinthSft ?? null,
     villaTypeName: input.villaTypeName ?? null,
+    gradients: summariseGradients(
+      roads
+        .filter((r) => r.centreline.length >= 2)
+        .map((r) => measureGradient(input.dem, r.id, r.centreline, gradLimits)),
+      gradLimits,
+    ),
   });
   return option;
 }

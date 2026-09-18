@@ -267,3 +267,54 @@ describe('client rules the code had not been reading', () => {
     expect(finding!.detail).toMatch(/stricter of/);
   });
 });
+
+describe('junctions, splays and gradients', () => {
+  it('finds junctions and splays them by the KMBR rule', async () => {
+    const c = await config();
+    const p = await plan();
+    const rule = (c.kmbr.rule31_subdivision as Record<string, Record<string, number>>).junction_splay_m!;
+    expect(p.junctions.junctions.length).toBeGreaterThan(20);
+    expect(p.totals.splayAreaM2).toBeGreaterThan(0);
+    for (const j of p.junctions.junctions) {
+      const expected = j.widthsM[0] > 10 ? rule.roads_gt_10m : rule.roads_le_10m;
+      expect(j.splayM, 'splay must come from the rule, not a chosen number').toBe(expected);
+    }
+  });
+
+  it('never lays a stub over a plot or a building', async () => {
+    const p = await plan();
+    for (const stub of p.junctions.stubs) {
+      for (const z of p.zones) {
+        const layout = z.options[z.chosenIndex];
+        if (!layout) continue;
+        for (const plot of layout.plots) {
+          const overlap = multiPolyArea(intersect(stub.geom, [[plot.ring]]));
+          expect(overlap, `${stub.id} runs over ${plot.id}`).toBeLessThan(1.01);
+        }
+      }
+    }
+  });
+
+  it('measures every road against the client gradient assumption', async () => {
+    const p = await plan();
+    expect(p.gradients.roads.length).toBeGreaterThan(10);
+    expect(p.gradients.totalLengthM).toBeGreaterThan(1000);
+    expect(p.gradients.limits.desirableLabel).toBe('1:12');
+    expect(p.gradients.limits.maxShortLabel).toBe('1:8');
+    // Unsurveyed ground must be excluded, never counted as level.
+    const unsurveyed = p.gradients.roads.filter((r) => r.unsurveyedShare > 0);
+    expect(unsurveyed.length).toBeGreaterThan(0);
+    for (const r of p.gradients.roads) {
+      expect(r.overMaxM).toBeLessThanOrEqual(r.overDesirableM + 1e-6);
+      expect(r.lengthM).toBeGreaterThanOrEqual(r.overDesirableM - 1e-6);
+    }
+  });
+
+  it('reports the gradient on each villa zone rather than staying silent', async () => {
+    const p = await plan();
+    const villa = p.zones.find((z) => (z.options[z.chosenIndex]?.plots.length ?? 0) > 0)!;
+    const finding = villa.options[villa.chosenIndex]!.findings.find((f) => f.id === 'villa.road_gradient');
+    expect(finding).toBeDefined();
+    expect(finding!.reference).toContain('1:12');
+  });
+});

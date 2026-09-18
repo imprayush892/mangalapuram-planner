@@ -15,6 +15,8 @@ import { baseYards, coverageFsi, subdivisionRules, villaGapM } from './kmbr';
 import type { Finding } from './findings';
 import { fail, info, pass, warn } from './findings';
 import { m2ToAcres } from '../units';
+import { asRatio } from './roadGradient';
+import type { GradientSummary } from './roadGradient';
 
 const SHARE_TOLERANCE_POINTS = 2;
 
@@ -28,6 +30,8 @@ export interface VillaProgrammeContext {
   wantedPlinthSft: number | null;
   /** The client villa type that plinth belongs to. */
   villaTypeName: string | null;
+  /** Internal roads measured on the DEM, where the generator supplied them. */
+  gradients?: GradientSummary;
 }
 
 export function checkVillaLayout(
@@ -293,6 +297,22 @@ export function checkVillaLayout(
       detail: `${recPieces.length} qualifying piece${recPieces.length === 1 ? '' : 's'} of at least ${sub.recreationMinAreaM2} m², out of ${layout.openSpace.length} open-space pieces totalling ${m2ToAcres(m.openSpaceAreaM2).toFixed(2)} ac. Minimum width applied is ${strictestWidth} m, the stricter of the client's ${rec.minWidthM} m and KMBR's ${sub.recreationMinWidthM} m.${narrow.length > 0 ? ` ${narrow.length} piece${narrow.length === 1 ? ' is' : 's are'} narrower than that.` : ''}`,
     }),
   );
+
+  /* ----------------------------------------------- internal road gradients */
+  const grad = programme.gradients;
+  if (grad && grad.totalLengthM > 0) {
+    const overMax = grad.overMaxM > 0;
+    const longRuns = grad.roads.filter((r) => r.longSteepRun).length;
+    out.push(
+      (!overMax && longRuns === 0 ? pass : overMax ? fail : warn)({
+        id: 'villa.road_gradient',
+        source: 'ASSUMPTION',
+        reference: `assumptions.road_gradient (${grad.limits.desirableLabel} desirable, ${grad.limits.maxShortLabel} over a short run)`,
+        title: `Steepest internal road ${asRatio(grad.steepestGrade)}`,
+        detail: `${Math.round(grad.overDesirableM)} m of ${Math.round(grad.totalLengthM)} m is steeper than ${grad.limits.desirableLabel}${overMax ? `, and ${Math.round(grad.overMaxM)} m is steeper than the ${grad.limits.maxShortLabel} absolute limit` : ''}.${longRuns > 0 ? ` ${longRuns} road${longRuns === 1 ? '' : 's'} hold the steeper figure for more than the ${grad.limits.shortRunM} m allowed.` : ''}${grad.unsurveyedShare > 0.01 ? ` ${(grad.unsurveyedShare * 100).toFixed(0)}% crosses unsurveyed ground and is excluded rather than counted as level.` : ''} The road direction search does not yet optimise for gradient; contour-parallel alignments are offered but chosen on yield, earthwork and orientation.`,
+      }),
+    );
+  }
 
   return out;
 }

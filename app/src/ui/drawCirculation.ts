@@ -1,4 +1,5 @@
 import type { CirculationRoad } from '../engine/masterplan/circulation';
+import type { MultiPoly } from '../engine/geom/types';
 import { fillMulti, label } from './draw';
 import type { View } from './view';
 
@@ -19,7 +20,13 @@ export function drawCirculation(
   view: View,
   roads: CirculationRoad[],
   pen = 1,
+  splays?: MultiPoly,
 ): void {
+  // Junction splays sit under the roads: the land the junction needs beyond the
+  // two carriageways, which is what KMBR Rule 31 asks to be kept clear.
+  if (splays && splays.length > 0) {
+    fillMulti(ctx, view, splays, 'rgba(226,214,186,0.28)', 'rgba(236,228,206,0.5)', 0.8 * pen);
+  }
   // Draw the widest tier last so junctions read as the bigger road running
   // through, the way a drawn master plan shows them.
   const order: CirculationRoad['tier'][] = ['collector', 'public', 'spine'];

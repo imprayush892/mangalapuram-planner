@@ -1,6 +1,8 @@
 import type { LayoutOption } from '../generators/types';
 import type { ZoneUse } from '../site/level1';
 import type { CirculationResult } from './circulation';
+import type { JunctionResult } from './junctions';
+import type { GradientSummary } from '../rules/roadGradient';
 import type { ZoneBrief } from './brief';
 
 /** One zone's place in the master plan. */
@@ -34,6 +36,8 @@ export interface MasterPlanTotals {
   internalRoadLengthM: number;
   circulationRoadLengthM: number;
   roadAreaM2: number;
+  junctions: number;
+  splayAreaM2: number;
   openSpaceM2: number;
   plannedAreaAc: number;
 }
@@ -46,6 +50,10 @@ export interface MasterPlan {
   sitingLabel: string;
   zones: MasterPlanZone[];
   circulation: CirculationResult;
+  /** Where the roads meet, and the Rule 31 splay land they need. */
+  junctions: JunctionResult;
+  /** Every road measured against the client's gradient assumption. */
+  gradients: GradientSummary;
   totals: MasterPlanTotals;
   /** Honest findings about the plan as a whole. */
   notes: string[];

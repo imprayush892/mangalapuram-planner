@@ -104,6 +104,7 @@ export default function PlanView(): React.ReactElement {
       raster,
       layouts,
       circulation: masterPlan?.circulation.roads,
+      splays: masterPlan?.junctions.splays,
       selectedZoneId,
       background: '#0f1518',
       zoneColours,

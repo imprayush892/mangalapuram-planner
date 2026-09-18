@@ -10,6 +10,8 @@ parking_gross_m2_per_car: 30
 road_gradient: {desirable: "1:12", max_short: "1:8"}     # confirm with civil engineer
 villa_floors: 2                # G+1 (PRD §5A.2). The client has not confirmed a villa section; this drives the
                               # plinth a generated plot can actually deliver against the programme's 1,750-2,000 sft
+road_stub_reach_m: 60        # a zone's internal road that stops this far short of the road network is joined to it by a stub
+road_gradient_short_run_m: 30  # how long a stretch may use the steeper "max_short" gradient before it counts as a long steep run
 route_grade_penalty_m: 12    # metres of detour a generated collector road will accept to avoid one metre of climb; 0 routes straight over anything passable
 retaining_cost_rs_per_m2: [2500, 6000]
 infrastructure_allowance_rs_per_acre: 7500000              # cashflow line 2

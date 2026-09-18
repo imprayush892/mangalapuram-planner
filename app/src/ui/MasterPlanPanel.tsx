@@ -10,6 +10,7 @@ import { coverageFsi } from '../engine/rules/kmbr';
 import { inferUse, USE_LABEL } from '../engine/site/level1';
 import type { ZoneUse } from '../engine/site/level1';
 import { M2_PER_ACRE, m2ToSft } from '../engine/units';
+import { asRatio } from '../engine/rules/roadGradient';
 
 const nf = (n: number, d = 0): string =>
   Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d }) : '—';
@@ -209,6 +210,52 @@ export default function MasterPlanPanel(): React.ReactElement {
                   {r.notes.join('. ')}.
                 </p>
               ))}
+          </Panel>
+
+          <Panel title="Junctions and gradients">
+            <Row
+              label="Junctions"
+              value={nf(plan.totals.junctions)}
+              hint="where any two roads meet, internal or between zones"
+            />
+            <Row
+              label="Splay land"
+              value={`${nf(plan.totals.splayAreaM2)} m²`}
+              hint="KMBR Rule 31: 4 m on roads up to 10 m, 10 m above"
+            />
+            <Row
+              label="Stubs added"
+              value={nf(plan.junctions.stubs.length)}
+              hint="internal roads that stopped short of the network and are now joined to it"
+            />
+            <Row
+              label="Steepest road"
+              value={asRatio(plan.gradients.steepestGrade)}
+              hint={plan.gradients.steepestRoadId ?? undefined}
+            />
+            <Row
+              label={`Over ${plan.gradients.limits.desirableLabel}`}
+              value={`${nf(plan.gradients.overDesirableM)} m`}
+              hint={`of ${nf(plan.gradients.totalLengthM)} m measured; the client's desirable maximum`}
+            />
+            <Row
+              label={`Over ${plan.gradients.limits.maxShortLabel}`}
+              value={`${nf(plan.gradients.overMaxM)} m`}
+              hint="the absolute maximum, allowed only over a short stretch"
+            />
+            {plan.gradients.unsurveyedShare > 0.01 && (
+              <p className="mt-1.5 text-[10px] leading-snug text-warn">
+                {(plan.gradients.unsurveyedShare * 100).toFixed(0)}% of the road length crosses unsurveyed ground and
+                carries no measured gradient. It is excluded, not counted as level.
+              </p>
+            )}
+            {plan.gradients.roads.filter((r) => r.longSteepRun).length > 0 && (
+              <p className="mt-1.5 text-[10px] leading-snug text-warn">
+                {plan.gradients.roads.filter((r) => r.longSteepRun).length} road
+                {plan.gradients.roads.filter((r) => r.longSteepRun).length === 1 ? '' : 's'} hold the steeper gradient
+                for longer than the {plan.gradients.limits.shortRunM} m the assumption allows.
+              </p>
+            )}
           </Panel>
 
           <Panel title="Zone by zone">
