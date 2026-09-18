@@ -32,6 +32,11 @@ export interface PlanScene {
   editTool?: string;
   /** Zones picked for a merge. */
   editSelected?: string[];
+  /**
+   * Pixels to keep clear on the right and bottom, where the shell's floating
+   * panels sit over the canvas. The sheet export leaves it at zero.
+   */
+  chromeInset?: { right: number; bottom: number };
   selectedZoneId: string | null;
   background: string;
   /**
@@ -165,8 +170,9 @@ export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanS
   }
 
   drawEdit(ctx, view, scene, pen);
-  drawScaleBar(ctx, view, pen);
-  drawNorthArrow(ctx, view, pen);
+  const inset = scene.chromeInset ?? { right: 0, bottom: 0 };
+  drawScaleBar(ctx, view, pen, inset);
+  drawNorthArrow(ctx, view, pen, inset);
 }
 
 /** The zone edit in progress: picked zones, the cut line, the ring being drawn. */
@@ -210,10 +216,15 @@ function drawEdit(ctx: CanvasRenderingContext2D, view: View, scene: PlanScene, p
   ctx.restore();
 }
 
-export function drawScaleBar(ctx: CanvasRenderingContext2D, view: View, scale = 1): void {
+export function drawScaleBar(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  scale = 1,
+  inset: { right: number; bottom: number } = { right: 0, bottom: 0 },
+): void {
   const { metres, px } = niceScaleBar(view, 120 * scale);
-  const x = view.width - px - 16 * scale;
-  const y = view.height - 48 * scale;
+  const x = view.width - px - 16 * scale - inset.right;
+  const y = view.height - 48 * scale - inset.bottom;
   ctx.strokeStyle = 'rgba(223,231,234,0.85)';
   ctx.lineWidth = 2 * scale;
   ctx.beginPath();
@@ -230,8 +241,13 @@ export function drawScaleBar(ctx: CanvasRenderingContext2D, view: View, scale = 
   ctx.fillText(`${metres} m`, x + px / 2, y - 8 * scale);
 }
 
-export function drawNorthArrow(ctx: CanvasRenderingContext2D, view: View, scale = 1): void {
-  const x = view.width - 28 * scale;
+export function drawNorthArrow(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  scale = 1,
+  inset: { right: number; bottom: number } = { right: 0, bottom: 0 },
+): void {
+  const x = view.width - 28 * scale - inset.right;
   const y = 92 * scale;
   ctx.strokeStyle = 'rgba(223,231,234,0.85)';
   ctx.fillStyle = 'rgba(223,231,234,0.85)';

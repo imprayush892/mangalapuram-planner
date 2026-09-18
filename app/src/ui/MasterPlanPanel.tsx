@@ -1,13 +1,9 @@
 import { useMemo } from 'react';
-import { Button, Check, NumberField, Panel, Row, Select } from './primitives';
+import { Button, Panel, Row } from './primitives';
 import { useRules } from '../state/useRules';
-import { useSettings } from '../state/settingsStore';
 import { useSiting, activeZoneUses } from '../state/sitingStore';
-import { useZoneEdit } from '../state/zoneEditStore';
 import { useMasterPlan, planDelta } from '../state/masterPlanStore';
-import { runMasterPlanGeneration } from '../state/generate';
-import { coverageFsi } from '../engine/rules/kmbr';
-import { inferUse, USE_LABEL } from '../engine/site/level1';
+import { inferUse } from '../engine/site/level1';
 import type { ZoneUse } from '../engine/site/level1';
 import { M2_PER_ACRE, m2ToSft } from '../engine/units';
 import { asRatio } from '../engine/rules/roadGradient';
@@ -19,14 +15,10 @@ const nf = (n: number, d = 0): string =>
 export default function MasterPlanPanel(): React.ReactElement {
   const site = useEditedSite();
   const rules = useRules();
-  const switches = useSettings((s) => s.switches);
-  const setSwitch = useSettings((s) => s.setSwitch);
-  const overrides = useSettings((s) => s.overrides);
   const sitingResult = useSiting((s) => s.result);
   const sitingActive = useSiting((s) => s.activeIndex);
   const sitingLocks = useSiting((s) => s.locks);
-  const zoneEdits = useZoneEdit((s) => s.edits);
-  const { plan, previous, status, chosen, chooseOption } = useMasterPlan();
+  const { plan, previous, status, chooseOption } = useMasterPlan();
 
   /**
    * The use per zone comes from the siting engine where it has run, and from
@@ -47,116 +39,51 @@ export default function MasterPlanPanel(): React.ReactElement {
 
   if (!site || !rules) return <div className="p-3 text-muted">Loading…</div>;
 
-  const fsiTiers = coverageFsi(rules.kmbr, 'A1').fsiTiers;
-  const fsi = fsiTiers[switches.fsiTierIndex] ?? fsiTiers[0] ?? 3;
-
-  const run = (): void => {
-    runMasterPlanGeneration(
-      overrides,
-      {
-      zoneUses,
-      sitingLabel,
-      chosen,
-      minSideApplies: switches.minSideApplies,
-      directions: switches.roadAngleCandidates,
-      fsi,
-      floorOptions: switches.towerFloorOptions,
-      apartmentMix: switches.apartmentMix,
-      flatsPerFloor: switches.flatsPerFloor,
-        runId: (plan?.runId ?? 0) + 1,
-      },
-      zoneEdits,
-    );
-  };
-
+  // What moved since the run before it, so a lever's effect is stated, not
+  // left for the eye to spot.
   const delta = plan ? planDelta(plan, previous) : [];
   const zoneCount = Object.keys(zoneUses).length;
 
+
   return (
     <>
-      <Panel
-        title="Master plan"
-        right={
-          <Button tone="primary" onClick={run} disabled={status.running}>
-            {status.running ? 'Generating…' : plan ? 'Regenerate' : 'Generate the master plan'}
-          </Button>
-        }
-      >
-        <p className="text-[11px] leading-snug text-muted">
-          Lays out every zone with the generator its use calls for, then traces the roads between them. Change a
-          rule, an assumption or a switch below and run it again: the plan that comes out is a different plan.
-        </p>
-        <div className="mt-2">
-          <Row label="Zones to plan" value={zoneCount} />
-          <Row label="Uses from" value={sitingLabel} hint="The siting alternative the plan follows" />
-        </div>
-        {status.running && (
-          <div className="mt-2 text-[11px] text-accent">
+      {!plan && !status.running && (
+        <Panel title="Nothing drawn yet">
+          <p className="text-[11px] leading-snug text-muted">
+            Move a lever under Massing rules and the plan draws itself. Until then these are the zones and the uses
+            it will use.
+          </p>
+          <div className="mt-2">
+            <Row label="Zones to plan" value={zoneCount} />
+            <Row label="Uses from" value={sitingLabel} />
+          </div>
+        </Panel>
+      )}
+
+      {status.running && (
+        <Panel title="Drawing the plan">
+          <div className="text-[11px] text-accent">
             {status.message}
             {status.total > 0 && ` · ${status.done}/${status.total}`}
           </div>
-        )}
-        {status.error && <div className="mt-2 text-[11px] text-bad">{status.error}</div>}
-        {!status.running && plan && (
-          <div className="mt-2 text-[11px] text-muted">
-            {plan.zones.length} zones in {(plan.elapsedMs / 1000).toFixed(1)} s
-          </div>
-        )}
-        {delta.length > 0 && (
-          <div className="mt-2 rounded border border-accent/40 bg-accent/10 px-2 py-1.5">
-            <div className="text-[10px] uppercase tracking-wider text-accent">Changed from the last run</div>
-            {delta.map((d) => (
-              <div key={d} className="text-[11px] text-fg">
-                {d}
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
+        </Panel>
+      )}
 
-      <Panel title="What to change, then run again">
-        <Select
-          label="FSI tier"
-          value={String(switches.fsiTierIndex)}
-          options={fsiTiers.map((t, i) => ({ value: String(i), label: `${t} (KMBR Table 6)` }))}
-          onChange={(v) => setSwitch('fsiTierIndex', Number(v))}
-        />
-        <Select
-          label="Plot minimum side"
-          value={switches.minSideApplies}
-          options={[
-            { value: 'long_side', label: 'long side ≥ 18 m' },
-            { value: 'both_sides', label: 'both sides ≥ 18 m' },
-          ]}
-          onChange={(v) => setSwitch('minSideApplies', v)}
-        />
-        <NumberField
-          label="Flats per floor"
-          value={switches.flatsPerFloor}
-          min={2}
-          max={12}
-          onChange={(v) => setSwitch('flatsPerFloor', Math.round(v))}
-        />
-        <div className="mt-1.5 text-[10px] uppercase tracking-wider text-muted">Road directions searched</div>
-        {(['contour', 'north_south', 'east_west'] as const).map((d) => (
-          <Check
-            key={d}
-            label={d === 'contour' ? 'contour-parallel' : d === 'north_south' ? 'north–south' : 'east–west'}
-            checked={switches.roadAngleCandidates.includes(d)}
-            onChange={(on) =>
-              setSwitch(
-                'roadAngleCandidates',
-                on
-                  ? [...switches.roadAngleCandidates, d]
-                  : switches.roadAngleCandidates.filter((x) => x !== d),
-              )
-            }
-          />
-        ))}
-        <p className="mt-1.5 text-[10px] leading-snug text-muted">
-          Every regulation and assumption is on the Rules tab; anything changed there feeds this run too.
-        </p>
-      </Panel>
+      {status.error && (
+        <Panel title="The plan could not be drawn">
+          <div className="text-[11px] text-bad">{status.error}</div>
+        </Panel>
+      )}
+
+      {plan && delta.length > 0 && (
+        <Panel title="Changed from the run before">
+          {delta.map((d) => (
+            <div key={d} className="py-0.5 text-[11px] text-fg">
+              {d}
+            </div>
+          ))}
+        </Panel>
+      )}
 
       {plan && (
         <>
@@ -326,14 +253,6 @@ export default function MasterPlanPanel(): React.ReactElement {
         </>
       )}
 
-      {!plan && !status.running && (
-        <Panel title="Uses each zone will take">
-          {Object.entries(zoneUses).map(([id, use]) => {
-            const zone = site.zones.find((z) => z.id === id);
-            return <Row key={id} label={zone?.name ?? id} value={USE_LABEL[use]} />;
-          })}
-        </Panel>
-      )}
     </>
   );
 }

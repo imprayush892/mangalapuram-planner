@@ -10,6 +10,7 @@ import { USE_COLOUR } from './draw';
 import { useSiting } from '../state/sitingStore';
 import { useMasterPlan } from '../state/masterPlanStore';
 import { useZoneEdit } from '../state/zoneEditStore';
+import { registerCanvas, useUi } from '../state/uiStore';
 import { USE_LABEL } from '../engine/site/level1';
 import { m2ToAcres } from '../engine/units';
 import { pick } from '../engine/data/config';
@@ -31,6 +32,8 @@ export default function PlanView(): React.ReactElement {
   const sitingResult = useSiting((s) => s.result);
   const sitingActive = useSiting((s) => s.activeIndex);
   const masterPlan = useMasterPlan((s) => s.plan);
+  const rightOpen = useUi((s) => s.rightOpen);
+  const dockOpen = useUi((s) => s.dockOpen);
   const editTool = useZoneEdit((s) => s.tool);
   const editPending = useZoneEdit((s) => s.pending);
   const editSelected = useZoneEdit((s) => s.selected);
@@ -119,6 +122,8 @@ export default function PlanView(): React.ReactElement {
       editPending: editTool === 'none' ? undefined : editPending,
       editTool,
       editSelected,
+      // Keep the scale bar and north arrow clear of the floating panels.
+      chromeInset: { right: rightOpen ? 280 : 48, bottom: dockOpen ? 150 : 40 },
     });
   }, [
     view,
@@ -133,11 +138,19 @@ export default function PlanView(): React.ReactElement {
     editTool,
     editPending,
     editSelected,
+    rightOpen,
+    dockOpen,
   ]);
 
   useEffect(() => {
     render();
   }, [render]);
+
+  // The scenario dock takes its thumbnail from whatever is on screen.
+  useEffect(() => {
+    registerCanvas(canvasRef.current);
+    return () => registerCanvas(null);
+  }, []);
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>): void => {
     if (!view) return;
@@ -220,32 +233,37 @@ export default function PlanView(): React.ReactElement {
         onPointerUp={onPointerUp}
         onPointerLeave={() => setCursor(null)}
       />
-      <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-2">
+      {/*
+        The shell floats its own panels over this canvas, so the plan's chrome
+        sits in the strip between them rather than underneath them.
+      */}
+      <div className="pointer-events-none absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center gap-2">
+        <div className="flex items-start gap-2">
+          <button
+            type="button"
+            onClick={zoomToParcel}
+            className="pointer-events-auto shrink-0 rounded border border-line bg-panel/85 px-2 py-1 text-[11px] text-fg backdrop-blur-md hover:bg-panel-2"
+          >
+            Fit parcel
+          </button>
+          {layers.deferredNote && (
+            <div className="max-w-md rounded border border-line bg-panel/85 px-2 py-1 text-[10px] leading-snug text-muted backdrop-blur-md">
+              26.4 ac deferred land is outside this survey and out of scope. The hospital waits for it.
+            </div>
+          )}
+        </div>
         {raster?.legend && <Legend legend={raster.legend} />}
-        {layers.deferredNote && (
-          <div className="pointer-events-none max-w-64 rounded border border-line bg-panel/90 px-2 py-1.5 text-[11px] text-muted">
-            26.4 ac deferred land is outside this survey and out of scope. The hospital waits for it.
-          </div>
-        )}
       </div>
-      <div className="absolute right-3 top-3 flex gap-2">
-        <button
-          type="button"
-          onClick={zoomToParcel}
-          className="rounded border border-line bg-panel/90 px-2 py-1 text-[11px] text-fg hover:bg-panel-2"
-        >
-          Fit parcel
-        </button>
-      </div>
+
       {cursor && (
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded border border-line bg-panel/90 px-2 py-1 text-[11px] num text-muted">
+        <div className="pointer-events-none absolute bottom-3 left-[360px] rounded border border-line bg-panel/85 px-2 py-1 text-[11px] num text-muted backdrop-blur-md">
           x {cursor.world[0].toFixed(1)} m · y {cursor.world[1].toFixed(1)} m ·{' '}
           {Number.isFinite(cursor.rl) ? `RL ${cursor.rl.toFixed(2)}` : 'RL — (unsurveyed)'} ·{' '}
           {Number.isFinite(cursor.slope) ? `${cursor.slope.toFixed(1)}°` : '—'}
         </div>
       )}
       {site && (
-        <div className="pointer-events-none absolute bottom-3 right-3 rounded border border-line bg-panel/90 px-2 py-1 text-[11px] num text-muted">
+        <div className="pointer-events-none absolute bottom-3 right-[290px] hidden rounded border border-line bg-panel/85 px-2 py-1 text-[11px] num text-muted backdrop-blur-md lg:block">
           parcel {m2ToAcres(site.parcelAreaM2).toFixed(2)} ac
         </div>
       )}

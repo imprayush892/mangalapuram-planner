@@ -39,6 +39,9 @@ interface SiteState {
   status: 'idle' | 'loading' | 'ready' | 'error';
   error: string | null;
   site: SiteModel | null;
+  /** Which view the shell shows; kept here so any panel can switch it. */
+  viewMode: '2d' | '3d';
+  setViewMode: (mode: '2d' | '3d') => void;
   config: ConfigBundle | null;
   layers: LayerFlags;
   raster: RasterMode;
@@ -54,6 +57,8 @@ export const useSite = create<SiteState>((set, get) => ({
   error: null,
   site: null,
   config: null,
+  viewMode: '2d',
+  setViewMode: (viewMode) => set({ viewMode }),
   layers: DEFAULT_LAYERS,
   raster: 'none',
   selectedZoneId: null,
