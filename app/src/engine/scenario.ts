@@ -104,7 +104,7 @@ export function parseScenario(text: string, currentVersions: Scenario['configVer
       client: String(s.configVersions?.client ?? ''),
       programme: String(s.configVersions?.programme ?? ''),
     },
-    overrides: s.overrides ?? { kmbr: {}, client: {}, programme: {}, assumptions: {} },
+    overrides: s.overrides ?? { kmbr: {}, client: {}, programme: {}, assumptions: {}, siting: {} },
     switches: s.switches ?? {},
     zoneUses: s.zoneUses ?? {},
     layouts: s.layouts ?? {},

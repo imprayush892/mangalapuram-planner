@@ -13,20 +13,23 @@ export interface ConfigBundle {
   client: YamlDoc;
   programme: YamlDoc;
   assumptions: YamlDoc;
+  siting: YamlDoc;
 }
 
 export async function loadConfig(src: AssetSource): Promise<ConfigBundle> {
-  const [kmbr, client, programme, assumptions] = await Promise.all([
+  const [kmbr, client, programme, assumptions, siting] = await Promise.all([
     src.text('config/kmbr_rules.yaml'),
     src.text('config/client_rules.yaml'),
     src.text('config/programme.yaml'),
     src.text('config/assumptions.yaml'),
+    src.text('config/siting_rules.yaml'),
   ]);
   return {
     kmbr: parseYaml(kmbr) as YamlDoc,
     client: parseYaml(client) as YamlDoc,
     programme: parseYaml(programme) as YamlDoc,
     assumptions: parseYaml(assumptions) as YamlDoc,
+    siting: parseYaml(siting) as YamlDoc,
   };
 }
 

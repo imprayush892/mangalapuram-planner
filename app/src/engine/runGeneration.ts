@@ -66,6 +66,7 @@ export async function runGeneration(
     client: applyOverrides(baseConfig.client, req.overrides.client),
     programme: applyOverrides(baseConfig.programme, req.overrides.programme),
     assumptions: applyOverrides(baseConfig.assumptions, req.overrides.assumptions),
+    siting: applyOverrides(baseConfig.siting, req.overrides.siting),
   };
 
   const zone = site.zones.find((z) => z.id === req.zoneId);

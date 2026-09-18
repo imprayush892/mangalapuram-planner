@@ -95,11 +95,15 @@ const USE_LINES: Record<ZoneUse, UseKind[]> = {
   unassigned: [],
 };
 
-export function assignZones(zones: Zone[], programme: ProgrammeSummary): ZoneAssignment[] {
+export function assignZones(
+  zones: Zone[],
+  programme: ProgrammeSummary,
+  zoneUses: Record<string, ZoneUse> = {},
+): ZoneAssignment[] {
   return zones
     .filter((z) => z.geom.length > 0)
     .map((z) => {
-      const use = inferUse(z.name);
+      const use = zoneUses[z.id] ?? inferUse(z.name);
       const uses = USE_LINES[use];
       return {
         zoneId: z.id,
@@ -152,6 +156,11 @@ export interface Level1Input {
   /** Best option per zone, from the Level 2 generators. */
   generated: Record<string, LayoutOption[]>;
   householdSizes: { family: number; senior: number };
+  /**
+   * Use per zone from the siting engine. Without it the use is inferred from
+   * the zone's name in the client zoning plan, which is a starting point only.
+   */
+  zoneUses?: Record<string, ZoneUse>;
 }
 
 /**
@@ -161,7 +170,7 @@ export interface Level1Input {
  */
 export function runLevel1(input: Level1Input): Level1Result {
   const { zones, parcel, programme, generated } = input;
-  const assignments = assignZones(zones, programme);
+  const assignments = assignZones(zones, programme, input.zoneUses);
 
   const zonedAreaM2 = zones.filter((z) => z.geom.length > 0).reduce((s, z) => s + multiPolyArea(z.geom), 0);
   const parcelAreaM2 = multiPolyArea(parcel);

@@ -1,6 +1,7 @@
 # Build status against the PRD
 
-As of 17 Sep 2026, after milestones M1–M6 of `docs/SPEC.md`.
+As of 18 Sep 2026, after milestones M1–M6 of `docs/SPEC.md` and Phase 7 (the
+siting engine).
 Assessed against the PRD (rev 45), not against SPEC, because SPEC deliberately
 narrowed the PRD for the first build. Where the two differ, the PRD item is
 listed here as outstanding even when SPEC considers it out of scope.
@@ -8,11 +9,14 @@ listed here as outstanding even when SPEC considers it out of scope.
 **Headline.** The two priority engines are built and working: villa/senior plot
 layouts and apartment tower layouts, both generating three options per zone on
 the real terrain with full compliance reporting. The KMBR and client rule
-engines are complete for everything those two use. What is missing is mostly
-*around* the layouts: the siting engine that chooses which use goes where, four
-of the nine outputs, map editing, and the finance link.
+engines are complete for everything those two use. **Phase 7 added the siting
+engine**: every zone is measured, hard constraints veto uses that cannot go
+there, a weighted 0–100 score with editable weights ranks the rest, and four
+whole-site alternatives are produced with a per-zone rationale. What is missing
+is now mostly *around* the engines: four of the nine outputs, map editing, and
+the finance link.
 
-Roughly: **layout engines ~90%, rule engine ~80%, Level 1 siting ~25%,
+Roughly: **layout engines ~90%, rule engine ~80%, Level 1 siting ~80%,
 outputs ~55%, editing and finance ~5%.**
 
 ---
@@ -25,7 +29,7 @@ outputs ~55%, editing and finance ~5%.**
 | M2 | Site model | **Done** | `engine/terrain/dem.ts`, `engine/terrain/tin.ts`, `engine/site/loadSite.ts`. Slope, aspect, plot-window fall, RL bands, unsurveyed cells flagged, TBM datum held, MSL offset held as an unset assumption. Google Earth level ingest not built. |
 | M3 | Buildability and drainage | **Partial** | Rule 22 exclusions, D8 flow accumulation, cut/fill per shape, retaining *face area*: all in `engine/terrain/analysis.ts`. Missing: catchments, outlets, retaining **cost**, drainage as a first-class product. |
 | M4 | Programme sizing | **Done** | `engine/rules/programme.ts`. Land, BUA, units, parking, SBUA per use, UDS in the XLSX, population. Missing: the 15 km catchment demand check. |
-| M5 | Siting engine | **Not built** | The biggest gap. See §4. |
+| M5 | Siting engine | **Built (Phase 7)** | `engine/siting/` — metrics, constraint vetoes, weighted score, allocation into four alternatives. See §4. |
 | M6 | KMBR rule engine | **Mostly done** | `engine/rules/kmbr.ts`. See §5 for the table-by-table position. |
 | M7 | Scenario and finance | **Partial** | Scenarios save/load with a full input snapshot; area statement and shortfall are complete. No cost, no revenue, no cashflow linkage, no scenario comparison. |
 | **M8** | **Intra-zone layout engine (priority)** | **Mostly done** | `engine/generators/villa.ts`, `tower.ts`, `block.ts`. See §6. |
@@ -61,7 +65,7 @@ outputs ~55%, editing and finance ~5%.**
 | Land-use master plan | DXF/DWG (client layer standard), PDF | **Done, with a caveat** — layered DXF and a PDF sheet. Layer names are our own: **no client layer standard was ever supplied**. DWG is not written (DXF only). |
 | Area statement | XLSX | **Done** — 8 sheets, per plot/tower/block/zone/total, with UDS, FSI, coverage, parking, population |
 | Compliance report | PDF, pass/fail per clause + conflicts + approvals triggered | **Partial** — every finding exists with its clause reference and is exported to the XLSX `Compliance` sheet and shown in the UI, but **there is no PDF compliance report**. Approvals cover DTP and AAI NOC; **CTP and environmental clearance are not modelled**. |
-| Rationale cards | PDF, one per use: why here, scores, alternatives rejected, market figure | **Not built** — depends on the siting engine (§4), which produces the scores and rejected alternatives these cards report |
+| Rationale cards | PDF, one per use: why here, scores, alternatives rejected, market figure | **Partial** — the content now exists and is shown per zone in the Siting tab (factors with their detail line, constraints with provenance, the runner-up use and why it lost, constraints that could not be tested). **It is not yet written to a PDF card**, and no market figure is held. |
 | Buildability and drainage maps | PNG/PDF: slope, plot fall, channels, outlets, no-build | **Partial** — slope, plot fall and buildability render on screen and export in the PNG/PDF sheet. **Drainage channels, outlets and a no-build overlay are not exportable map products.** |
 | 3D massing | OBJ/3DM/GLB on terrain | **Partial** — GLB only. OBJ and 3DM not written (Rhino opens GLB, so this is a convenience gap). |
 | Earthwork and retaining schedule | XLSX: platform levels, cut/fill, retaining length and cost by parcel | **Partial** — platform RL, cut and fill are per plot and per tower in the area statement; retaining is reported as **face area (m²), not length, and is never priced**, though `retaining_cost_rs_per_m2` sits unused in the assumptions |
@@ -70,39 +74,76 @@ outputs ~55%, editing and finance ~5%.**
 
 ---
 
-## 4. Siting engine — the largest gap (PRD §5.2, §5.3, module M5)
+## 4. Siting engine (PRD §5.2, §5.3, module M5) — built in Phase 7
 
-Nothing of this is built. It is the difference between a tool that lays out
-*a zone you point it at* and one that answers **"what should go where"** —
-which is the PRD's stated purpose.
+`engine/siting/`, driven by `config/siting_rules.yaml` and shown in the
+**Siting** tab. It answers the PRD's actual question — *what should go where,
+and why* — rather than laying out a zone you point it at. It runs over the 13
+client zones in about a second and produces four whole-site alternatives.
 
-What exists today: zones are read from the client zoning plan, a use is
-inferred from each zone's **name** (`inferUse` in `engine/site/level1.ts`), and
-the Level 1 loop compares yields to the programme. That is an accounting loop,
-not a siting engine.
+**How it works**
 
-Missing in full:
+1. `metrics.ts` measures every zone once, independent of any use: buildable
+   share against Rule 22, mean slope, median plot-window fall, min/mean/max RL
+   and an elevation rank across the site, distance to an existing road,
+   frontage length and share, distance to the parcel edge and an edge rank,
+   drainage-channel share, unsurveyed share, and the phase read from the zone
+   name.
+2. `constraints.ts` applies the per-use hard constraints as **vetoes** — slope
+   ceilings, minimum access width, public-road frontage — each carrying its
+   requirement, the zone's actual value and its provenance (PRD, KMBR, CLIENT
+   or ASSUMPTION).
+3. `score.ts` scores every surviving zone/use pair 0–100 over the PRD's seven
+   factors — buildable area, earthwork, access and frontage, adjacency, view
+   and elevation, drainage risk, phase order — with the weights editable in the
+   UI. Each factor carries a sentence saying what drove its number.
+4. `allocate.ts` allocates zones to uses against the programme's land demand,
+   tempering the score by how much land the use still needs and how well the
+   zone fits it, so a use that scores well everywhere cannot starve the others.
+   Deferred lines (the hospital) are pinned to their reserved zone and never
+   compete for in-scope land. It runs four weight tilts — balanced,
+   buildability, access, phasing — to give four alternatives.
 
-- **Hard constraints per use (§5.2), none implemented as vetoes.** Hospital
-  slope ≤10° + 8 m access + separate ambulance entry; senior living slope ≤5° +
-  step-free link to the hospital; school slope ≤8° + own gate on a public road
-  (the slope check exists for the school block *after* placement, but never
-  vetoes a zone); apartment AAI limit as a siting veto; villa plot fall ≤3 m;
-  commercial/hotel 8 m access and main-gate proximity; open space one piece
-  ≥2 ares ≥6 m wide with access; infrastructure transformer site above 2 ha and
-  STP at a low point.
-- **Weighted 0–100 score per use (§5.3)** over buildable area, earthwork,
-  access and frontage, adjacency, view and elevation, drainage risk and phase
-  order, with editable weights. The `ScoreBreakdown` type exists but scores
-  *layout options within a zone*, not *zones for a use*.
-- **Adjacency rules** — senior living within 300 m walk of hospital and club;
-  hotel next to club; hospital away from school traffic; club central to villas.
-- **Locks** for client-fixed parcels (school 3.0 ac, retained roads, main gate).
-- **3–5 alternative whole-site layouts.** Today: three options per zone, one
-  whole-site arrangement.
-- **Infrastructure uses entirely** — STP, WTP, substation are in neither the
-  programme nor any generator, yet Rule 31 requires a transformer site above 2 ha
-  and the PRD wants the STP at a low point.
+**What it reports**
+
+- Per zone: the chosen use, score and priority, every factor with its detail
+  line, every constraint with its status and provenance, the runner-up use and
+  whether it lost on score or on land need, and any surplus acreage.
+- Per use: land demanded, land allocated, shortfall.
+- Whole alternative: area-weighted score, total shortfall, unallocated zones.
+- **Constraints that could not be tested are listed, never silently passed.**
+  A veto engine that waves through what it cannot measure is worse than none.
+  Currently unevaluable: the step-free senior-living route to the hospital
+  (needs a designed footpath, not a centroid distance), the AAI height limit
+  (unknown until the NOC issues; checked at layout time once entered), the
+  hospital's separate ambulance entry (a layout decision), and the STP's true
+  low point (needs the MSL offset and the full catchment).
+
+**What it found, honestly**
+
+- It puts the school on PHASE 3 (8.55 ac, 6.2° mean slope, 664 m frontage)
+  rather than the client's SCHOOL zone (6.98 ac, 5.3°, 375 m). Both pass the 8°
+  veto; PHASE 3 wins on frontage and size. The client can pin the school back
+  to its own zone in one click, and the pin is reported as *locked* rather than
+  *chosen*.
+- It reports an **11.5 ac shortfall** against the programme. Part of that is
+  the 6.26 ac programme shortfall already known; the rest is structural — the
+  13 zones total 69.86 of the 73.54 ac in scope, leaving 3.68 ac unzoned, and
+  the client's two smallest zones are 1.51 and 0.42 ac while four uses need
+  1.5–4 ac each. The engine states this as a `structuralNote` rather than
+  quietly dropping a use.
+- Zones are allocated **whole**. A use smaller than its zone leaves reported
+  surplus; splitting a zone is Phase 8 (zone editing), not siting.
+
+**Still missing from M5**
+
+| PRD item | Note |
+| --- | --- |
+| **Infrastructure uses as programme lines** | STP, WTP and substation have siting rules and would be sited if asked for, but they are in neither the programme nor any generator, so no land is demanded for them. Rule 31's transformer site above 2 ha is still unchecked. |
+| **Locks from the client's own fixed list** | Pinning works from the UI, but the client's fixed items (3.0 ac school core, retained roads, main gate) are not zone ids, so none is pre-loaded. |
+| **Adjacency as a walked distance** | Adjacency and the 300 m senior–hospital rule are scored on centroid distance with a 1.35 detour factor (`walk_detour_factor`), not on a routed path. |
+| **Sub-zone allocation** | Splitting an oversized zone between two uses needs zone editing. |
+| **Rationale cards as a PDF** | The content exists (§3); the formatter does not. |
 
 ---
 
@@ -188,23 +229,16 @@ the tool can honestly say.
 
 ## 8. Recommended next phase
 
-Ordered by what unlocks the most. Phase 7 is the one that changes what the tool
-*is*; the rest make what exists usable by the client's own team.
+Ordered by what unlocks the most. **Phase 7 is now built** (§4); Phase 8 is the
+next one to take.
 
-### Phase 7 — the siting engine (the PRD's actual purpose)
+### Phase 7 — the siting engine ✅ built
 
-Build M5: hard constraints as vetoes, weighted 0–100 scores with editable
-weights, adjacency, locks, and 3–5 whole-site alternatives. This is what turns
-"lay out this zone" into "here is what should go where, and why". It also
-unlocks **rationale cards**, which cannot be written without scores and
-rejected alternatives.
-
-Do this first, and do it before map editing: constraint vetoes are what make
-user-drawn zones safe to accept.
-
-*Rough size: the largest remaining piece. The scoring inputs — buildable area,
-earthwork, slope, drainage — all already exist in `engine/terrain/analysis.ts`,
-so this is mostly new orchestration, not new geometry.*
+Hard constraints as vetoes, a weighted 0–100 score with editable weights,
+adjacency, pinning, and four whole-site alternatives with a per-zone rationale.
+See §4 for what it does and what is still missing from it. This is what turned
+"lay out this zone" into "here is what should go where, and why", and it is
+what makes user-drawn zones safe to accept in Phase 8.
 
 ### Phase 8 — zone editing
 
@@ -223,8 +257,9 @@ Four outputs, in value order:
 2. **Earthwork and retaining schedule** — convert retaining face area to
    length, price it with the assumption already sitting unused, and give it its
    own sheet.
-3. **Scenario comparison** — 3–5 whole-site scenarios side by side. Needs
-   Phase 7 to have something worth comparing.
+3. **Scenario comparison** — 3–5 whole-site scenarios side by side. Phase 7
+   now produces four alternatives worth comparing; what is missing is the
+   side-by-side sheet and the cost/revenue columns.
 4. **Drainage and buildability map exports** — channels, outlets and no-build
    as their own sheet. Honest caveat: outlets need the MSL offset.
 

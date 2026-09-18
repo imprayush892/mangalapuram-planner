@@ -81,3 +81,36 @@ Each of these is a switch or an editable assumption, not a silent decision.
 10. **Buildable ground is tested on a 2 m raster eroded by one cell**, so a plot
     or tower cannot overhang the zone boundary or a Rule 22 face by a
     rasterisation sliver.
+
+### Added while building the siting engine (18 Sep 2026)
+
+11. **An untestable constraint is reported, never passed.** Four PRD constraints
+    cannot be judged from the data held — the step-free senior route, the AAI
+    height limit, the hospital's ambulance entry, the STP's true low point. They
+    are carried through as `unevaluable` and printed in every rationale card. A
+    veto engine that quietly waves through what it cannot measure is worse than
+    no veto engine.
+12. **Allocation is score tempered by need and fit, not score alone.** Greedy
+    allocation on score gave villas everything and left apartments, school and
+    commercial with no land at all. The score is multiplied by how much land the
+    use still needs and how well the zone fits it, and a use with nothing yet
+    gets a 1.6× boost. **New file: `config/siting_rules.yaml`**, weights editable
+    in the UI.
+13. **A use can score higher and still lose**, because it needed less land or
+    fitted the zone worse. Both the score and the deciding priority are reported
+    on the allocation and on its runner-up, so the reversal is explained rather
+    than hidden.
+14. **Zones are allocated whole.** The client's zones are the unit of siting;
+    surplus land in an oversized zone is reported, not silently split. Splitting
+    is zone editing (Phase 8).
+15. **Deferred lines never compete for in-scope land.** The hospital is pinned to
+    its reserved zone by name match and removed from the demand the in-scope
+    zones are scored against.
+16. **Where the zoning itself cannot serve the programme, say so.** The 13 zones
+    total 69.86 of 73.54 ac and the two smallest are 1.51 and 0.42 ac, while four
+    uses need 1.5–4 ac each. That is a structural limit of the client's zoning
+    plan, not an engine failure, and is reported as a structural note on the
+    alternative.
+17. **Adjacency is a straight-line distance with a detour factor**
+    (`walk_detour_factor: 1.35`), not a routed walk. The PRD's 300 m
+    senior–hospital rule is scored on that basis and the approximation is stated.

@@ -211,7 +211,7 @@ describe('M5 scenarios', () => {
     const scenario = buildScenario({
       name: 'Test scenario',
       configVersions: versions,
-      overrides: { kmbr: {}, client: { 'villa_plots.min_side_m': 20 }, programme: {}, assumptions: {} },
+      overrides: { kmbr: {}, client: { 'villa_plots.min_side_m': 20 }, programme: {}, assumptions: {}, siting: {} },
       switches: { fsiTierIndex: 0 },
       zoneUses: { [zone.id]: 'apartments' },
       layouts: { [zone.id]: { options, chosen: 0 } },
@@ -236,7 +236,7 @@ describe('M5 scenarios', () => {
     const scenario = buildScenario({
       name: 'Old',
       configVersions: { ...versions, kmbr: '2019-01-01' },
-      overrides: { kmbr: {}, client: {}, programme: {}, assumptions: {} },
+      overrides: { kmbr: {}, client: {}, programme: {}, assumptions: {}, siting: {} },
       switches: {},
       zoneUses: {},
       layouts: {},

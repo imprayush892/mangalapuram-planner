@@ -81,6 +81,21 @@ export function label(
   ctx.fillText(text, x, y);
 }
 
+/** Colour per allocated use. The plan shows the use, not the zone's old name. */
+export const USE_COLOUR: Record<string, string> = {
+  villas: '#6fd3c7',
+  senior: '#9db6e6',
+  apartments: '#e0a3d6',
+  school: '#e6c55a',
+  hospital_reserved: '#e3735e',
+  club: '#8fc98a',
+  commercial: '#f0956b',
+  hotel: '#d9a3f0',
+  office: '#7fb2e6',
+  infrastructure: '#98a6ad',
+  unassigned: '#b9c6cc',
+};
+
 /** Stable, readable colour per zone use, derived from its name. */
 export function zoneColour(name: string): string {
   const n = name.toUpperCase();

@@ -26,6 +26,15 @@ export interface PlanScene {
   pen?: number;
   /** Sheets dim the raster so the linework on top of it still reads. */
   rasterOpacity?: number;
+  /**
+   * Colour per zone id, from the siting engine's allocation. Where a zone has
+   * one, the plan shows the use the engine chose rather than the colour its
+   * name in the client zoning plan implies — which is the whole point of
+   * running the engine.
+   */
+  zoneColours?: Record<string, string>;
+  /** Label per zone id, from the allocation. */
+  zoneLabels?: Record<string, string>;
 }
 
 export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanScene): void {
@@ -67,7 +76,7 @@ export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanS
     for (const zone of site.zones) {
       if (zone.geom.length === 0) continue;
       const selected = zone.id === scene.selectedZoneId;
-      const colour = zoneColour(zone.name);
+      const colour = scene.zoneColours?.[zone.id] ?? zoneColour(zone.name);
       fillMulti(
         ctx,
         view,
@@ -122,7 +131,9 @@ export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanS
     for (const zone of site.zones) {
       if (zone.geom.length === 0) continue;
       const c = multiCentroid(zone.geom);
-      label(ctx, view, c, zone.name, zoneColour(zone.name), '600 11px ui-sans-serif, system-ui, sans-serif', pen);
+      const colour = scene.zoneColours?.[zone.id] ?? zoneColour(zone.name);
+      const name = scene.zoneLabels?.[zone.id] ?? zone.name;
+      label(ctx, view, c, name, colour, '600 11px ui-sans-serif, system-ui, sans-serif', pen);
       label(
         ctx,
         view,

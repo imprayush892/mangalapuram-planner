@@ -1,0 +1,151 @@
+# SITING RULES — which use may go on which zone, and how good a fit it is.
+# PRD §5.2 (hard constraints) and §5.3 (weighted score). Editable in the UI.
+#
+# provenance on every entry:
+#   PRD        - stated in the PRD siting table
+#   KMBR       - derived from a rule in kmbr_rules.yaml (the rule is the source)
+#   CLIENT     - from client_rules.yaml or a client decision
+#   ASSUMPTION - ours, editable, and reported as an assumption
+#
+# A constraint we cannot test from the data we hold is listed under
+# `unevaluable`. Those are REPORTED, never silently passed: a veto engine that
+# quietly waves through what it cannot measure is worse than no veto engine.
+version: 2026-09-17
+
+# Weights for the 0-100 siting score (PRD §5.3). Relative, normalised at use.
+scoring_weights:
+  buildable_area: 25      # how much of the zone is usable at all
+  earthwork: 20           # how flat it is under a plot-sized window
+  access_frontage: 15     # reach to an existing public road
+  adjacency: 15           # near the uses it should be near, away from the rest
+  view_elevation: 10      # height above the site's own range
+  drainage_risk: 10       # share sitting on drainage channels
+  phase_order: 5          # matches the phase the zoning plan names
+  provenance: PRD
+
+defaults:
+  # A zone less than half buildable makes a poor host for anything that needs
+  # a contiguous footprint.
+  min_buildable_share: 0.5
+  # Zone counts as having road frontage when its boundary comes this close to
+  # an existing road edge.
+  frontage_search_m: 60
+  # Walk distance is measured centroid to centroid; a straight line understates
+  # a real walk, so it is multiplied by this before testing `within_walk_m`.
+  walk_detour_factor: 1.35
+  provenance: ASSUMPTION
+
+uses:
+  villas:
+    max_mean_slope_deg: 25        # ASSUMPTION: villas terrace, so only very steep ground is out
+    min_access_width_m: 6         # CLIENT client_rules.roads.internal
+    prefers:
+      elevation: high             # ridge plots are premium (PRD §5A.3)
+      adjacent_to: [club]
+      away_from: [commercial, infrastructure]
+    provenance: PRD
+
+  senior:
+    max_mean_slope_deg: 5         # PRD
+    min_access_width_m: 6
+    prefers:
+      elevation: low              # gentle ground, short walks
+      adjacent_to: [hospital_reserved, club]
+      within_walk_m: 300          # PRD
+      quiet: true
+      away_from: [commercial, school, infrastructure]
+    unevaluable:
+      - "Step-free route to the hospital: needs a designed footpath, not a centroid distance."
+    provenance: PRD
+
+  apartments:
+    max_mean_slope_deg: 20        # ASSUMPTION: podiums absorb fall, so towers tolerate more than senior living
+    min_access_width_m: 8         # KMBR Table 7, A1 above 24,000 m² total floor area
+    prefers:
+      elevation: high             # views (PRD)
+      adjacent_to: [commercial, club]
+    unevaluable:
+      - "AAI height limit: unknown until the NOC is issued; towers are checked against it at layout time once entered."
+    layout_checked:
+      - "5 m fire lane on two adjacent sides (KMBR Ch.XVII) - checked by the tower generator."
+      - "5 m between blocks (KMBR Ch.XVII) - checked by the tower generator."
+    provenance: PRD
+
+  school:
+    max_mean_slope_deg: 8         # PRD
+    min_access_width_m: 8         # KMBR Table 8
+    needs_public_road_frontage: true   # PRD: own gate on a public road
+    max_coverage_pct: 40          # KMBR Table 6 B_upto_higher_secondary
+    prefers:
+      edge: true                  # PRD: catchment need not enter the township
+      away_from: [hospital_reserved, senior]
+    provenance: PRD
+
+  hospital_reserved:
+    max_mean_slope_deg: 10        # PRD
+    min_access_width_m: 8         # PRD
+    needs_public_road_frontage: true
+    prefers:
+      edge: true                  # PRD
+      adjacent_to: [senior]
+      away_from: [school]
+    unevaluable:
+      - "Separate ambulance entry: a layout decision, not a siting one."
+    provenance: PRD
+
+  commercial:
+    max_mean_slope_deg: 15        # ASSUMPTION
+    min_access_width_m: 8         # PRD
+    needs_public_road_frontage: true
+    prefers:
+      edge: true                  # serves the outside catchment (PRD)
+      near_main_road: true
+      away_from: [senior, villas]
+    provenance: PRD
+
+  hotel:
+    max_mean_slope_deg: 15        # ASSUMPTION
+    min_access_width_m: 8         # PRD
+    prefers:
+      elevation: high             # ridge or view site (PRD)
+      near_main_road: true
+      adjacent_to: [club, commercial]
+    provenance: PRD
+
+  office:
+    max_mean_slope_deg: 15        # ASSUMPTION
+    min_access_width_m: 8         # PRD, commercial + business hub
+    needs_public_road_frontage: true
+    prefers:
+      edge: true
+      near_main_road: true
+      adjacent_to: [commercial, hotel]
+    provenance: PRD
+
+  club:
+    max_mean_slope_deg: 30        # PRD: none beyond Rule 22; moderate slopes are usable
+    min_access_width_m: 6
+    prefers:
+      central: true               # central to the villas (PRD)
+      adjacent_to: [villas, senior]
+      on_drainage: true           # pond or channel as a water feature (PRD)
+    provenance: PRD
+
+  infrastructure:
+    max_mean_slope_deg: 20        # ASSUMPTION
+    min_access_width_m: 6
+    prefers:
+      elevation: low              # STP at a low point (PRD)
+      edge: true                  # downstream edge, screened (PRD)
+      away_from: [senior, villas, hotel, school]
+    unevaluable:
+      - "STP at the true low point: needs the MSL offset and the full catchment, neither of which is available."
+    provenance: PRD
+
+# Zones the client has fixed. A locked zone keeps its use whatever the score
+# says, and is reported as locked rather than chosen.
+locks:
+  # Example: "school": SCHOOL
+  # Filled from the UI; the client has fixed the 3.0 ac school core campus,
+  # the retained roads and the main gate, but none of those is a zone id yet.
+  provenance: CLIENT

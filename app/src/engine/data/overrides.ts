@@ -12,9 +12,16 @@ export interface OverrideSet {
   client: Overrides;
   programme: Overrides;
   assumptions: Overrides;
+  siting: Overrides;
 }
 
-export const EMPTY_OVERRIDES: OverrideSet = { kmbr: {}, client: {}, programme: {}, assumptions: {} };
+export const EMPTY_OVERRIDES: OverrideSet = {
+  kmbr: {},
+  client: {},
+  programme: {},
+  assumptions: {},
+  siting: {},
+};
 
 function setPath(target: Record<string, unknown>, path: string, value: unknown): void {
   const keys = path.split('.');

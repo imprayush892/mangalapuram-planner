@@ -6,6 +6,9 @@ import { fitView, screenToWorld } from './view';
 import type { View } from './view';
 import { bboxOfMulti, pointInMulti } from '../engine/geom/planar';
 import { drawPlan } from './planRenderer';
+import { USE_COLOUR } from './draw';
+import { useSiting } from '../state/sitingStore';
+import { USE_LABEL } from '../engine/site/level1';
 import { m2ToAcres } from '../engine/units';
 import { pick } from '../engine/data/config';
 import type { Pt } from '../engine/geom/types';
@@ -22,6 +25,21 @@ export default function PlanView(): React.ReactElement {
   const selectZone = useSite((s) => s.selectZone);
   const options = useLayout((s) => s.options);
   const activeOptionIndex = useLayout((s) => s.activeOptionIndex);
+  const sitingResult = useSiting((s) => s.result);
+  const sitingActive = useSiting((s) => s.activeIndex);
+
+  // Where the siting engine has run, the plan shows what it decided.
+  const { zoneColours, zoneLabels } = useMemo(() => {
+    const alt = sitingResult?.alternatives[sitingActive];
+    if (!alt) return { zoneColours: undefined, zoneLabels: undefined };
+    const colours: Record<string, string> = {};
+    const labels: Record<string, string> = {};
+    for (const a of alt.allocations) {
+      colours[a.zoneId] = USE_COLOUR[a.use] ?? '#b9c6cc';
+      labels[a.zoneId] = USE_LABEL[a.use];
+    }
+    return { zoneColours: colours, zoneLabels: labels };
+  }, [sitingResult, sitingActive]);
 
   const [view, setView] = useState<View | null>(null);
   const [cursor, setCursor] = useState<{ world: Pt; rl: number; slope: number } | null>(null);
@@ -71,8 +89,10 @@ export default function PlanView(): React.ReactElement {
       layouts: activeLayout ? [activeLayout] : [],
       selectedZoneId,
       background: '#0f1518',
+      zoneColours,
+      zoneLabels,
     });
-  }, [view, site, raster, layers, selectedZoneId, activeLayout]);
+  }, [view, site, raster, layers, selectedZoneId, activeLayout, zoneColours, zoneLabels]);
 
   useEffect(() => {
     render();

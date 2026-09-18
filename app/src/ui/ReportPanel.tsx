@@ -10,6 +10,7 @@ import { runLevel1, USE_LABEL } from '../engine/site/level1';
 import type { UseBalance } from '../engine/site/level1';
 import { pick } from '../engine/data/config';
 import { buildScenario, parseScenario, scenarioFileName } from '../engine/scenario';
+import { activeZoneUses, useSiting } from '../state/sitingStore';
 import type { Scenario } from '../engine/scenario';
 
 const fmt = (n: number, dp = 0): string =>
@@ -19,6 +20,8 @@ export default function ReportPanel(): React.ReactElement {
   const site = useSite((s) => s.site);
   const rules = useRules();
   const { byZone, activeOptionIndex, setOptions } = useLayout();
+  const sitingResult = useSiting((s) => s.result);
+  const sitingActive = useSiting((s) => s.activeIndex);
   const { overrides, switches, loadSnapshot } = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
   const [scenarioName, setScenarioName] = useState('Scenario 1');
@@ -40,8 +43,11 @@ export default function ReportPanel(): React.ReactElement {
         family: pick<number>(rules.assumptions, 'household_size_family', 3.5),
         senior: pick<number>(rules.assumptions, 'household_size_senior', 1.6),
       },
+      // Follow the siting engine where it has run; otherwise the use is
+      // inferred from the client zoning plan's own zone names.
+      zoneUses: activeZoneUses({ result: sitingResult, activeIndex: sitingActive }),
     });
-  }, [site, programme, rules, byZone]);
+  }, [site, programme, rules, byZone, sitingResult, sitingActive]);
 
   if (!site || !rules || !programme || !level1) return <div className="p-3 text-muted">Loading…</div>;
 

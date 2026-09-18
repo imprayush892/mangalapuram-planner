@@ -15,6 +15,7 @@ export function useRules(): ConfigBundle | null {
       client: applyOverrides(config.client, overrides.client),
       programme: applyOverrides(config.programme, overrides.programme),
       assumptions: applyOverrides(config.assumptions, overrides.assumptions),
+      siting: applyOverrides(config.siting, overrides.siting),
     };
   }, [config, overrides]);
 }
