@@ -1,6 +1,7 @@
 import { useLayout } from './layoutStore';
 import { dataBaseUrl } from './appBase';
-import type { GenerateRequest, GenerateResponse } from '../engine/runGeneration';
+import { useMasterPlan } from './masterPlanStore';
+import type { GenerateRequest, GenerateResponse, MasterPlanRequest } from '../engine/runGeneration';
 import type { LayoutOption } from '../engine/generators/types';
 
 let worker: Worker | null = null;
@@ -74,6 +75,7 @@ export function runGenerate(request: Omit<GenerateRequest, 'id' | 'baseUrl'>): v
       setStatus({ message: msg.message, elapsedMs: Date.now() - started });
       return;
     }
+    if (msg.status === 'plan') return; // a master plan run, handled elsewhere
     w.removeEventListener('message', onMessage);
     if (msg.status === 'error') fail(msg.error);
     else finish(msg.options, msg.elapsedMs);
@@ -86,6 +88,71 @@ export function runGenerate(request: Omit<GenerateRequest, 'id' | 'baseUrl'>): v
     workerBlocked = true;
     worker = null;
     runGenerate(request);
+  };
+
+  w.addEventListener('message', onMessage);
+  w.addEventListener('error', onError, { once: true });
+  w.postMessage(full);
+}
+
+/**
+ * Runs the whole master plan: every zone, then the roads between them. Uses the
+ * same worker as a single zone, with the same main-thread fallback, so a host
+ * that blocks workers still produces a plan — it just pauses the tab while it
+ * does.
+ */
+export function runMasterPlanGeneration(
+  overrides: MasterPlanRequest['overrides'],
+  options: MasterPlanRequest['options'],
+): void {
+  const { setPlan, setStatus } = useMasterPlan.getState();
+  const id = nextId++;
+  const started = Date.now();
+  const full: MasterPlanRequest = { job: 'masterplan', id, baseUrl: dataBaseUrl(), overrides, options };
+
+  setStatus({ running: true, message: 'starting…', done: 0, total: 0, elapsedMs: 0, error: null });
+
+  const fail = (error: string): void => {
+    setStatus({ running: false, message: '', error, elapsedMs: Date.now() - started });
+  };
+
+  const w = ensureWorker();
+
+  if (!w) {
+    setStatus({ message: 'generating on the main thread (this tab will pause)' });
+    setTimeout(() => {
+      void import('../engine/runGeneration')
+        .then(({ runMasterPlanJob }) =>
+          runMasterPlanJob(full, (message, done, total) => setStatus({ message, done, total })),
+        )
+        .then((plan) => setPlan(plan))
+        .catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
+    }, 50);
+    return;
+  }
+
+  const onMessage = (event: MessageEvent<GenerateResponse>): void => {
+    const msg = event.data;
+    if (msg.id !== id) return;
+    if (msg.status === 'progress') {
+      setStatus({
+        message: msg.message,
+        done: msg.done ?? 0,
+        total: msg.total ?? 0,
+        elapsedMs: Date.now() - started,
+      });
+      return;
+    }
+    w.removeEventListener('message', onMessage);
+    if (msg.status === 'error') fail(msg.error);
+    else if (msg.status === 'plan') setPlan(msg.plan);
+  };
+
+  const onError = (): void => {
+    w.removeEventListener('message', onMessage);
+    workerBlocked = true;
+    worker = null;
+    runMasterPlanGeneration(overrides, options);
   };
 
   w.addEventListener('message', onMessage);

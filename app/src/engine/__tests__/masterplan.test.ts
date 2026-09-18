@@ -1,0 +1,152 @@
+import { describe, expect, it } from 'vitest';
+import { config, site } from './fixtures';
+import { loadProgramme } from '../rules/programme';
+import { runSiting } from '../siting/allocate';
+import { runMasterPlan } from '../masterplan/run';
+import { briefForZone, kindForUse } from '../masterplan/brief';
+import type { MasterPlan } from '../masterplan/types';
+import type { ZoneUse } from '../site/level1';
+import { pointInMulti } from '../geom/planar';
+import { intersect } from '../geom/boolean';
+import { multiPolyArea } from '../geom/planar';
+
+let cached: MasterPlan | null = null;
+
+async function plan(): Promise<MasterPlan> {
+  if (cached) return cached;
+  const s = await site();
+  const c = await config();
+  const programme = loadProgramme(c.programme, c.client, c.kmbr, c.assumptions);
+  const siting = runSiting({ site: s, kmbr: c.kmbr, siting: c.siting, programme });
+  const alt = siting.alternatives[0]!;
+  const zoneUses: Record<string, ZoneUse> = Object.fromEntries(
+    alt.allocations.map((a) => [a.zoneId, a.use]),
+  );
+  cached = runMasterPlan(s, c, {
+    zoneUses,
+    sitingLabel: alt.label,
+    fsi: 3,
+    floorOptions: [12, 15, 20],
+    apartmentMix: ['2BHK', '3BHK'],
+    flatsPerFloor: 4,
+    runId: 1,
+  });
+  return cached;
+}
+
+describe('master plan', () => {
+  it('lays out every zone the siting engine allocated', async () => {
+    const p = await plan();
+    expect(p.zones.length).toBeGreaterThanOrEqual(10);
+    // Most zones must actually produce something, or the plan is not a plan.
+    const built = p.zones.filter((z) => z.options.length > 0);
+    expect(built.length).toBeGreaterThanOrEqual(p.zones.length - 2);
+  });
+
+  it('produces buildings, not just zones', async () => {
+    const p = await plan();
+    expect(p.totals.villaPlots).toBeGreaterThan(200);
+    expect(p.totals.dwellings).toBeGreaterThan(800);
+    expect(p.totals.builtFootprintM2).toBeGreaterThan(20_000);
+    expect(p.totals.towers + p.totals.blocks).toBeGreaterThan(5);
+  });
+
+  it('keeps every plot, tower and block inside its own zone', async () => {
+    const s = await site();
+    const p = await plan();
+    for (const z of p.zones) {
+      const layout = z.options[z.chosenIndex];
+      if (!layout) continue;
+      const zone = s.zones.find((x) => x.id === z.zoneId)!;
+      for (const plot of layout.plots) {
+        for (const pt of plot.ring) {
+          expect(pointInMulti(pt, zone.geom), `${plot.id} corner outside ${z.zoneName}`).toBe(true);
+        }
+      }
+      for (const tower of layout.towers) {
+        for (const pt of tower.ring) {
+          expect(pointInMulti(pt, zone.geom), `${tower.id} corner outside ${z.zoneName}`).toBe(true);
+        }
+      }
+      for (const block of layout.blocks) {
+        for (const pt of block.ring) {
+          expect(pointInMulti(pt, zone.geom), `${block.id} corner outside ${z.zoneName}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('keeps buildings off the roads that run between the zones', async () => {
+    const p = await plan();
+    const roads = p.circulation.roads.map((r) => r.geom);
+    for (const z of p.zones) {
+      const layout = z.options[z.chosenIndex];
+      if (!layout) continue;
+      for (const plot of layout.plots) {
+        for (const road of roads) {
+          const overlap = multiPolyArea(intersect([[plot.ring]], road));
+          // A rasterised boundary can clip a corner; a real conflict is larger.
+          expect(overlap, `${plot.id} sits on a road`).toBeLessThan(plot.areaM2 * 0.05);
+        }
+      }
+    }
+  });
+
+  it('builds a road hierarchy, widest first', async () => {
+    const p = await plan();
+    const spine = p.circulation.roads.filter((r) => r.tier === 'spine');
+    const pub = p.circulation.roads.filter((r) => r.tier === 'public');
+    expect(spine.length).toBe(1);
+    expect(pub.length).toBeGreaterThan(0);
+    // The client fixes the spine at 18 m and the public roads at 10 m.
+    expect(spine[0]!.widthM).toBe(18);
+    expect(spine[0]!.lengthM).toBeGreaterThan(300);
+    for (const r of pub) expect(r.widthM).toBe(10);
+    // Strictly north-south: the client rule gives no angular tolerance.
+    const [a, b] = [spine[0]!.centreline[0]!, spine[0]!.centreline[1]!];
+    expect(Math.abs(a[0] - b[0])).toBeLessThan(1e-6);
+  });
+
+  it('gives every zone a way in', async () => {
+    const p = await plan();
+    const reached = new Set(p.circulation.gates.map((g) => g.zoneId));
+    for (const z of p.zones) {
+      expect(reached.has(z.zoneId) || p.circulation.unreachable.some((u) => u.zoneId === z.zoneId)).toBe(true);
+    }
+    // An unreachable zone is reported rather than quietly left off the plan.
+    for (const u of p.circulation.unreachable) {
+      expect(p.notes.some((n) => n.includes('no road connection'))).toBe(true);
+      expect(u.reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('splits a use between the zones that hold it instead of doubling it', async () => {
+    const c = await config();
+    const programme = loadProgramme(c.programme, c.client, c.kmbr, c.assumptions);
+    const one = briefForZone({
+      zoneId: 'a', zoneName: 'A', use: 'villas', areaAc: 10, useTotalAc: 10,
+      programme, householdSizeFamily: 3.5, householdSizeSenior: 1.6,
+    });
+    const half = briefForZone({
+      zoneId: 'b', zoneName: 'B', use: 'villas', areaAc: 5, useTotalAc: 10,
+      programme, householdSizeFamily: 3.5, householdSizeSenior: 1.6,
+    });
+    expect(half.targetUnits).toBe(Math.round(one.targetUnits / 2));
+    expect(half.shareOfUse).toBeCloseTo(0.5, 6);
+  });
+
+  it('follows the use it is given, not the zone name', async () => {
+    // A zone named for villas but allocated to a school is built as a school.
+    expect(kindForUse('school')).toBe('block');
+    expect(kindForUse('villas')).toBe('villa');
+    expect(kindForUse('apartments')).toBe('tower');
+    expect(kindForUse('hospital_reserved')).toBe('none');
+  });
+
+  it('states why a zone got nothing rather than dropping it', async () => {
+    const p = await plan();
+    for (const z of p.zones) {
+      if (z.options.length === 0) expect(z.empty && z.empty.length > 0).toBe(true);
+    }
+  });
+});

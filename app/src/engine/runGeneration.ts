@@ -12,6 +12,9 @@ import { generateBlockLayout } from './generators/block';
 import type { LayoutOption } from './generators/types';
 import type { BandName, MinSideApplies } from './rules/client';
 import type { Occupancy } from './rules/kmbr';
+import { runMasterPlan } from './masterplan/run';
+import type { MasterPlanOptions } from './masterplan/run';
+import type { MasterPlan } from './masterplan/types';
 
 /**
  * One generation run, with no DOM and no worker API in sight. The worker calls
@@ -20,6 +23,7 @@ import type { Occupancy } from './rules/kmbr';
  */
 
 export interface GenerateRequest {
+  job?: 'zone';
   id: number;
   baseUrl: string;
   overrides: OverrideSet;
@@ -42,32 +46,63 @@ export interface GenerateRequest {
   maxSlopeDeg?: number;
 }
 
+/** One run of the whole master plan: every zone, plus the roads between them. */
+export interface MasterPlanRequest {
+  job: 'masterplan';
+  id: number;
+  baseUrl: string;
+  overrides: OverrideSet;
+  options: MasterPlanOptions;
+}
+
+export type WorkerRequest = GenerateRequest | MasterPlanRequest;
+
 export type GenerateResponse =
-  | { id: number; status: 'progress'; message: string }
+  | { id: number; status: 'progress'; message: string; done?: number; total?: number }
   | { id: number; status: 'done'; options: LayoutOption[]; elapsedMs: number }
+  | { id: number; status: 'plan'; plan: MasterPlan; elapsedMs: number }
   | { id: number; status: 'error'; error: string };
 
 /** Site data is loaded once per context and kept for the session. */
 let sitePromise: Promise<SiteModel> | null = null;
 let configPromise: Promise<ConfigBundle> | null = null;
 
-export async function runGeneration(
-  req: GenerateRequest,
-  onProgress: (message: string) => void = () => {},
-): Promise<LayoutOption[]> {
-  const src = fetchSource(req.baseUrl);
+async function loadContext(
+  baseUrl: string,
+  overrides: OverrideSet,
+  onProgress: (message: string) => void,
+): Promise<{ site: SiteModel; config: ConfigBundle }> {
+  const src = fetchSource(baseUrl);
   onProgress('loading site data');
   sitePromise ??= loadSite(src);
   configPromise ??= loadConfig(src);
   const [site, baseConfig] = await Promise.all([sitePromise, configPromise]);
-
-  const config: ConfigBundle = {
-    kmbr: applyOverrides(baseConfig.kmbr, req.overrides.kmbr),
-    client: applyOverrides(baseConfig.client, req.overrides.client),
-    programme: applyOverrides(baseConfig.programme, req.overrides.programme),
-    assumptions: applyOverrides(baseConfig.assumptions, req.overrides.assumptions),
-    siting: applyOverrides(baseConfig.siting, req.overrides.siting),
+  return {
+    site,
+    config: {
+      kmbr: applyOverrides(baseConfig.kmbr, overrides.kmbr),
+      client: applyOverrides(baseConfig.client, overrides.client),
+      programme: applyOverrides(baseConfig.programme, overrides.programme),
+      assumptions: applyOverrides(baseConfig.assumptions, overrides.assumptions),
+      siting: applyOverrides(baseConfig.siting, overrides.siting),
+    },
   };
+}
+
+/** Runs the whole master plan, zone by zone, then the circulation. */
+export async function runMasterPlanJob(
+  req: MasterPlanRequest,
+  onProgress: (message: string, done: number, total: number) => void = () => {},
+): Promise<MasterPlan> {
+  const { site, config } = await loadContext(req.baseUrl, req.overrides, (m) => onProgress(m, 0, 0));
+  return runMasterPlan(site, config, req.options, onProgress);
+}
+
+export async function runGeneration(
+  req: GenerateRequest,
+  onProgress: (message: string) => void = () => {},
+): Promise<LayoutOption[]> {
+  const { site, config } = await loadContext(req.baseUrl, req.overrides, onProgress);
 
   const zone = site.zones.find((z) => z.id === req.zoneId);
   if (!zone) throw new Error(`zone '${req.zoneId}' not found`);

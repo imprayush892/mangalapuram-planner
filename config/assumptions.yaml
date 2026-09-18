@@ -8,6 +8,7 @@ floor_to_floor_m: {apartments: 3.0, max_for_70m_at_20_floors: 3.5}
 corridor_width_m: 2.0        # internal corridor is not habitable, so plate depth may exceed 2 x KMBR Rule 41 daylight depth by this much
 parking_gross_m2_per_car: 30
 road_gradient: {desirable: "1:12", max_short: "1:8"}     # confirm with civil engineer
+route_grade_penalty_m: 12    # metres of detour a generated collector road will accept to avoid one metre of climb; 0 routes straight over anything passable
 retaining_cost_rs_per_m2: [2500, 6000]
 infrastructure_allowance_rs_per_acre: 7500000              # cashflow line 2
 plot_fall_thresholds_m: {build_as_drawn: 0.5, absorb_in_plinth: 1.0, stepped_plinth: 2.0, split_level: 3.0}

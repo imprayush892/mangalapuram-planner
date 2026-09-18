@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
-import { runGeneration } from '../engine/runGeneration';
-import type { GenerateRequest, GenerateResponse } from '../engine/runGeneration';
+import { runGeneration, runMasterPlanJob } from '../engine/runGeneration';
+import type { GenerateResponse, WorkerRequest } from '../engine/runGeneration';
 
 /**
  * The generators run here so a regeneration never blocks the plan view. All the
@@ -12,10 +12,17 @@ const post = (message: GenerateResponse): void => {
   (self as unknown as DedicatedWorkerGlobalScope).postMessage(message);
 };
 
-self.onmessage = async (event: MessageEvent<GenerateRequest>) => {
+self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const req = event.data;
   const started = Date.now();
   try {
+    if (req.job === 'masterplan') {
+      const plan = await runMasterPlanJob(req, (message, done, total) =>
+        post({ id: req.id, status: 'progress', message, done, total }),
+      );
+      post({ id: req.id, status: 'plan', plan, elapsedMs: Date.now() - started });
+      return;
+    }
     const options = await runGeneration(req, (message) =>
       post({ id: req.id, status: 'progress', message }),
     );

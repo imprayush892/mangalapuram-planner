@@ -7,6 +7,8 @@ import { niceScaleBar, worldToScreen } from './view';
 import { fillMulti, label, strokePolyline, zoneColour } from './draw';
 import { multiCentroid } from '../engine/geom/planar';
 import { drawLayout } from './drawLayout';
+import { drawCirculation } from './drawCirculation';
+import type { CirculationRoad } from '../engine/masterplan/circulation';
 
 /**
  * One drawing path for the plan, used by the interactive canvas and by the
@@ -17,6 +19,11 @@ export interface PlanScene {
   layers: LayerFlags;
   raster: RasterLayer | null;
   layouts: LayoutOption[];
+  /**
+   * The roads between the zones, from a master plan run. Drawn under the zone
+   * layouts so an internal road meeting a collector reads as joining it.
+   */
+  circulation?: CirculationRoad[];
   selectedZoneId: string | null;
   background: string;
   /**
@@ -89,6 +96,9 @@ export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanS
   }
 
   if (layers.layout) {
+    if (scene.circulation && scene.circulation.length > 0) {
+      drawCirculation(ctx, view, scene.circulation, pen);
+    }
     for (const layout of scene.layouts) drawLayout(ctx, view, layout, pen);
   }
 

@@ -8,6 +8,7 @@ import { bboxOfMulti, pointInMulti } from '../engine/geom/planar';
 import { drawPlan } from './planRenderer';
 import { USE_COLOUR } from './draw';
 import { useSiting } from '../state/sitingStore';
+import { useMasterPlan } from '../state/masterPlanStore';
 import { USE_LABEL } from '../engine/site/level1';
 import { m2ToAcres } from '../engine/units';
 import { pick } from '../engine/data/config';
@@ -27,6 +28,7 @@ export default function PlanView(): React.ReactElement {
   const activeOptionIndex = useLayout((s) => s.activeOptionIndex);
   const sitingResult = useSiting((s) => s.result);
   const sitingActive = useSiting((s) => s.activeIndex);
+  const masterPlan = useMasterPlan((s) => s.plan);
 
   // Where the siting engine has run, the plan shows what it decided.
   const { zoneColours, zoneLabels } = useMemo(() => {
@@ -53,6 +55,20 @@ export default function PlanView(): React.ReactElement {
   );
 
   const activeLayout = options[activeOptionIndex] ?? null;
+
+  /**
+   * A master plan run supersedes the single-zone view: once the whole site has
+   * been generated, the plan shows every zone's chosen layout, not just the one
+   * zone last worked on.
+   */
+  const layouts = useMemo(() => {
+    if (masterPlan) {
+      return masterPlan.zones
+        .map((z) => z.options[z.chosenIndex])
+        .filter((l): l is NonNullable<typeof l> => Boolean(l));
+    }
+    return activeLayout ? [activeLayout] : [];
+  }, [masterPlan, activeLayout]);
 
   // Fit the parcel on first load and on resize.
   useEffect(() => {
@@ -86,13 +102,14 @@ export default function PlanView(): React.ReactElement {
       site,
       layers,
       raster,
-      layouts: activeLayout ? [activeLayout] : [],
+      layouts,
+      circulation: masterPlan?.circulation.roads,
       selectedZoneId,
       background: '#0f1518',
       zoneColours,
       zoneLabels,
     });
-  }, [view, site, raster, layers, selectedZoneId, activeLayout, zoneColours, zoneLabels]);
+  }, [view, site, raster, layers, selectedZoneId, layouts, masterPlan, zoneColours, zoneLabels]);
 
   useEffect(() => {
     render();
