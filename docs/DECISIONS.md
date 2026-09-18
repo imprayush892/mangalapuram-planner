@@ -146,3 +146,32 @@ Each of these is a switch or an editable assumption, not a silent decision.
 24. **A use spread over several zones splits its programme by area.** Two villa
     zones of 9 and 5 acres carry the unit counts their land supports, rather than
     each trying to hold the whole programme line.
+
+### Added while closing the gaps against the documentation (18 Sep 2026)
+
+25. **The client's three villa rules cannot all hold.** The 20/30/50 land split,
+    20 units per acre (cashflow C17) and a 1,750–2,000 sft villa are stated
+    independently and never checked against each other. At the client's own 45%
+    footprint placeholder each dwelling gets 491 sft of footprint, so a 2,000 sft
+    villa needs 4.1 floors, and at G+1 it needs 92% of the plot covered against
+    the KMBR A1 limit of 65%. The tool reports this as a failure with the
+    arithmetic rather than drawing the placeholder and reporting success. Which
+    of the three moves is the client's call. **New assumption: `villa_floors: 2`**
+    (G+1, PRD §5A.2), which is what makes the delivered plinth computable.
+26. **A premium corner plot grows to the widest the client's own aspect band
+    allows**, not to an invented factor. The band's minimum of 1:1 is the
+    ceiling; the ground, the cross roads and the neighbouring columns are the
+    limits.
+27. **Where the client and KMBR both set a recreation minimum width, the
+    stricter applies**, which is the project's standing rule and was not being
+    followed: the KMBR figure was used and the client's ignored.
+28. **A stub road may not be laid over a plot.** The road network is not
+    completed by driving over a villa. Where the only line to the network would
+    take one, no stub is laid and the zone is reported as unreached.
+29. **Unsurveyed ground carries no road gradient.** A NaN sample is counted and
+    reported, never treated as level: a road over unsurveyed land reporting 0%
+    would be the worst kind of false pass.
+30. **A zone edit is an operation, not edited geometry.** Edits replay on the
+    client's zoning plan every run, so the worker and the main thread cannot
+    disagree about what the plan is now, and any edit can be undone singly. A
+    piece under 200 m² is a sliver from a bad cut, not a parcel.

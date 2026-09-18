@@ -196,9 +196,9 @@ plan could not do.
 
 | Item | Note |
 | --- | --- |
-| **Few collectors are traced** | Most zones already front a retained road, so they take a direct gate. The engine is right, but the main-road-to-internal-road story is thinner on this site than it would be on a greenfield one. |
-| **Internal roads do not meet the spine at designed junctions** | Each zone lays its own grid and the spine is kept out of it; there is no junction geometry, no splay (KMBR Rule 31 is in config and unused) and no road-gradient check. |
-| **Parking is counted, never drawn** | Bay counts and areas are computed for every use; no bays, aisles or ramps are laid out. |
+| **Few collectors are traced** | Most zones already front a retained road, so they take a direct gate. 22 stubs now join the zone grids to the network, but the collector tier itself stays short on this site. |
+| **Parking is counted, never drawn** | Bay counts and areas are computed for every use; no bays, aisles or ramps are laid out. The one item deliberately left for later. |
+| **The road direction search does not optimise for gradient** | Gradients are now measured and reported per zone and site-wide, and they find real problems — 2,845 m of 7,400 m steeper than the 1:12 desirable limit. Contour-parallel alignments are offered, but the search still chooses on yield, earthwork and orientation. |
 | **The spine is a straight line** | The client fixed the alignment as strictly north–south, so this is the rule, not a simplification — but it means the spine does not respond to terrain the way a collector does. |
 | **One run, one plan** | Alternatives exist at the zone level (three options each) and at the siting level (four alternatives); there is no whole-plan A/B stored side by side. That is the scenario comparison output in Phase 9. |
 
@@ -302,14 +302,20 @@ what makes user-drawn zones safe to accept in Phase 8.
 Every zone laid out in one run, the circulation between them, and both views
 following it. See §4A for what it does and what is still missing from it.
 
-### Phase 8b — zone editing (next)
+### Phase 8b — zone editing ✅ built
 
-Draw, split and merge zones on the plan, with the Phase 7 constraints vetoing
-invalid ones. Requirement §6.2, and the thing that makes the client's zoning
-plan a genuine *starting point* rather than a fixed input. Reassigning a use is
-already possible by pinning it in the Siting tab; what is missing is changing
-the zone **boundaries**. The regeneration budget is met, so this is UI and
-geometry, not engine work.
+Split, merge, draw and delete zones on the plan; edits are kept as operations
+and replayed, so they reach the siting scores, the generators, the plan, the 3D
+view and the exports at once. `validateZones` vetoes a zone the way the siting
+engine vetoes a use on one, and already finds two problems in the client's own
+plan (HOSPITAL in three pieces, PHASE 4 with no in-scope land).
+
+### Phase 8c — junctions, splays and gradients ✅ built
+
+Stubs join each zone's grid to the road network but never run over a plot;
+junctions are splayed by KMBR Rule 31; every road is measured against the
+client's `road_gradient` assumption with unsurveyed ground excluded rather than
+counted as level.
 
 ### Phase 9 — close the output set
 

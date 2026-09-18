@@ -61,7 +61,9 @@ PDF sheets with a title block, and GLB massing.
 | --- | --- |
 | Site | Areas, terrain bands, layers, raster overlays, zone list |
 | Programme | Every cashflow line, sized, with the land shortfall |
+| Edit zones | Split, merge, draw and delete zones; every engine follows |
 | Siting | What goes where and why: scores, vetoes, four alternatives, land by use |
+| Master plan | One button: every zone laid out, the roads between them, junctions, splays and gradients |
 | Zone layout | Generate and compare three options for the selected zone |
 | Rules | Design switches, client rules and assumptions, all editable |
 | Compliance | Findings for the current layout, and client rules against KMBR |
