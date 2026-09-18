@@ -16,8 +16,15 @@ Node 20+ and npm. Python 3.11+ only if you want to re-run the preprocessing
 ```bash
 npm run test        # engine tests against tests/expected_values.yaml
 npm run build       # typecheck + production build
+npm run build:deploy  # production build + base64 siblings for static hosts
 npm run typecheck
 ```
+
+`dist/` is a static folder that runs from any path, so it can be dropped on any
+web host. Use `build:deploy` where the host will not serve the `.f32` DEM: it
+writes a base64 `.txt` sibling that the loader falls back to. Hosts that
+sandbox the page may also block the file downloads the Exports tab uses — run
+it locally to get the DXF, XLSX, PDF and GLB out.
 
 `npm run dev`, `build` and `test` all run `scripts/sync-data.mjs` first, which
 copies `data/processed/`, `config/` and `tests/` into `app/public/data/`. That
@@ -54,6 +61,7 @@ PDF sheets with a title block, and GLB massing.
 | --- | --- |
 | Site | Areas, terrain bands, layers, raster overlays, zone list |
 | Programme | Every cashflow line, sized, with the land shortfall |
+| Siting | What goes where and why: scores, vetoes, four alternatives, land by use |
 | Zone layout | Generate and compare three options for the selected zone |
 | Rules | Design switches, client rules and assumptions, all editable |
 | Compliance | Findings for the current layout, and client rules against KMBR |

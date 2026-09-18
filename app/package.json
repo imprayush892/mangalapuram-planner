@@ -12,7 +12,8 @@
     "pretest": "node scripts/sync-data.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --force"
+    "typecheck": "tsc -b --force",
+    "build:deploy": "npm run build && node scripts/base64-assets.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
