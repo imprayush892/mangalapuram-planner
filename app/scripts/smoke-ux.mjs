@@ -68,6 +68,14 @@ if (cardCount >= 2) {
 }
 
 await page.screenshot({ path: out });
+
+// The 3D view must live in the same shell, not a separate screen.
+if (process.env.SHOT_3D) {
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForTimeout(4500);
+  await page.screenshot({ path: process.env.SHOT_3D });
+}
+
 const hudText = await hud.innerText();
 await browser.close(); server.close();
 if (errors.length) { console.error('console errors:\n'+errors.join('\n')); process.exit(1); }
