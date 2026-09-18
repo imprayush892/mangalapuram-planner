@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react';
-import { useSite } from '../state/store';
 import { useLayout } from '../state/layoutStore';
 import { useSettings } from '../state/settingsStore';
 import { useRules } from '../state/useRules';
@@ -12,12 +11,13 @@ import { pick } from '../engine/data/config';
 import { buildScenario, parseScenario, scenarioFileName } from '../engine/scenario';
 import { activeZoneUses, useSiting } from '../state/sitingStore';
 import type { Scenario } from '../engine/scenario';
+import { useEditedSite } from '../state/useEditedSite';
 
 const fmt = (n: number, dp = 0): string =>
   n.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 export default function ReportPanel(): React.ReactElement {
-  const site = useSite((s) => s.site);
+  const site = useEditedSite();
   const rules = useRules();
   const { byZone, activeOptionIndex, setOptions } = useLayout();
   const sitingResult = useSiting((s) => s.result);

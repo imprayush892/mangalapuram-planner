@@ -9,16 +9,18 @@ import { drawPlan } from './planRenderer';
 import { USE_COLOUR } from './draw';
 import { useSiting } from '../state/sitingStore';
 import { useMasterPlan } from '../state/masterPlanStore';
+import { useZoneEdit } from '../state/zoneEditStore';
 import { USE_LABEL } from '../engine/site/level1';
 import { m2ToAcres } from '../engine/units';
 import { pick } from '../engine/data/config';
 import type { Pt } from '../engine/geom/types';
 import { useLayout } from '../state/layoutStore';
+import { useEditedSite } from '../state/useEditedSite';
 
 export default function PlanView(): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const site = useSite((s) => s.site);
+  const site = useEditedSite();
   const config = useSite((s) => s.config);
   const layers = useSite((s) => s.layers);
   const rasterMode = useSite((s) => s.raster);
@@ -29,6 +31,11 @@ export default function PlanView(): React.ReactElement {
   const sitingResult = useSiting((s) => s.result);
   const sitingActive = useSiting((s) => s.activeIndex);
   const masterPlan = useMasterPlan((s) => s.plan);
+  const editTool = useZoneEdit((s) => s.tool);
+  const editPending = useZoneEdit((s) => s.pending);
+  const editSelected = useZoneEdit((s) => s.selected);
+  const addEditPoint = useZoneEdit((s) => s.addPoint);
+  const toggleEditSelected = useZoneEdit((s) => s.toggleSelected);
 
   // Where the siting engine has run, the plan shows what it decided.
   const { zoneColours, zoneLabels } = useMemo(() => {
@@ -109,8 +116,24 @@ export default function PlanView(): React.ReactElement {
       background: '#0f1518',
       zoneColours,
       zoneLabels,
+      editPending: editTool === 'none' ? undefined : editPending,
+      editTool,
+      editSelected,
     });
-  }, [view, site, raster, layers, selectedZoneId, layouts, masterPlan, zoneColours, zoneLabels]);
+  }, [
+    view,
+    site,
+    raster,
+    layers,
+    selectedZoneId,
+    layouts,
+    masterPlan,
+    zoneColours,
+    zoneLabels,
+    editTool,
+    editPending,
+    editSelected,
+  ]);
 
   useEffect(() => {
     render();
@@ -161,6 +184,23 @@ export default function PlanView(): React.ReactElement {
     const rect = e.currentTarget.getBoundingClientRect();
     const world = screenToWorld(view, [e.clientX - rect.left, e.clientY - rect.top]);
     const hit = site.zones.find((z) => pointInMulti(world, z.geom));
+
+    // With an edit tool live, a click builds the edit. Splitting still needs a
+    // zone picked, so the first click inside one selects it as well.
+    if (editTool === 'split') {
+      if (!selectedZoneId && hit) selectZone(hit.id);
+      addEditPoint(world);
+      return;
+    }
+    if (editTool === 'draw') {
+      addEditPoint(world);
+      return;
+    }
+    if (editTool === 'merge') {
+      if (hit) toggleEditSelected(hit.id);
+      return;
+    }
+
     selectZone(hit ? hit.id : null);
   };
 

@@ -17,6 +17,7 @@ import { pick } from '../engine/data/config';
 import { countByStatus } from '../engine/rules/findings';
 import { FindingCard } from './CompliancePanel';
 import type { LayoutOption } from '../engine/generators/types';
+import { useEditedSite } from '../state/useEditedSite';
 
 /** Zones the villa generator applies to: villa projects, phases and senior living. */
 const VILLA_ZONE = /VILLA|PHASE|SENIOR/i;
@@ -36,7 +37,7 @@ const BLOCK_USES: Partial<Record<string, { occupancy: Occupancy; lineIds: string
 const VILLA_UNITS_PER_AC = 20;
 
 export default function ZonePanel(): React.ReactElement {
-  const site = useSite((s) => s.site);
+  const site = useEditedSite();
   const selectedZoneId = useSite((s) => s.selectedZoneId);
   const selectZone = useSite((s) => s.selectZone);
   const rules = useRules();

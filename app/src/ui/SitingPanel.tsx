@@ -13,6 +13,7 @@ import { USE_LABEL } from '../engine/site/level1';
 import type { ZoneUse } from '../engine/site/level1';
 import type { ConstraintResult, ZoneAllocation } from '../engine/siting/types';
 import { zoneColour } from './draw';
+import { useEditedSite } from '../state/useEditedSite';
 
 const WEIGHT_LABELS: Record<keyof ScoreWeights, string> = {
   buildable_area: 'Buildable area',
@@ -25,7 +26,7 @@ const WEIGHT_LABELS: Record<keyof ScoreWeights, string> = {
 };
 
 export default function SitingPanel(): React.ReactElement {
-  const site = useSite((s) => s.site);
+  const site = useEditedSite();
   const selectZone = useSite((s) => s.selectZone);
   const selectedZoneId = useSite((s) => s.selectedZoneId);
   const rules = useRules();

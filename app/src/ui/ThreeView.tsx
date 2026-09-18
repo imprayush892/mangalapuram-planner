@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { useSite } from '../state/store';
 import { useLayout } from '../state/layoutStore';
 import { useMasterPlan } from '../state/masterPlanStore';
 import { buildMassingScene } from '../engine/export/glb';
 import { bboxOfMulti, bboxUnion } from '../engine/geom/planar';
 import type { Bbox } from '../engine/geom/types';
+import { useEditedSite } from '../state/useEditedSite';
 
 /**
  * 3D terrain and massing. The same scene the GLB export writes, so what is on
@@ -14,7 +14,7 @@ import type { Bbox } from '../engine/geom/types';
  */
 export default function ThreeView(): React.ReactElement {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const site = useSite((s) => s.site);
+  const site = useEditedSite();
   const byZone = useLayout((s) => s.byZone);
   const activeIndex = useLayout((s) => s.activeOptionIndex);
   const plan = useMasterPlan((s) => s.plan);

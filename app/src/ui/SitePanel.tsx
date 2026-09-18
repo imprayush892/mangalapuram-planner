@@ -4,6 +4,7 @@ import { Check, Panel, Row, Select } from './primitives';
 import type { RasterMode } from '../state/store';
 import { m2ToAcres } from '../engine/units';
 import { zoneColour } from './draw';
+import { useEditedSite } from '../state/useEditedSite';
 
 const RASTERS: readonly { value: RasterMode; label: string }[] = [
   { value: 'none', label: 'None' },
@@ -19,7 +20,7 @@ const FALL_EDGES = [0, 0.5, 1, 2, 3, Infinity];
 const FALL_LABELS = ['under 0.5 m', '0.5–1 m', '1–2 m', '2–3 m', 'over 3 m'];
 
 export default function SitePanel(): React.ReactElement {
-  const site = useSite((s) => s.site);
+  const site = useEditedSite();
   const layers = useSite((s) => s.layers);
   const setLayer = useSite((s) => s.setLayer);
   const raster = useSite((s) => s.raster);

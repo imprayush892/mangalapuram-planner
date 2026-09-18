@@ -17,6 +17,7 @@ import { fitView } from './view';
 import { bboxOfMulti, multiPolyArea } from '../engine/geom/planar';
 import { m2ToAcres } from '../engine/units';
 import type { RasterMode } from '../state/store';
+import { useEditedSite } from '../state/useEditedSite';
 
 const SHEETS: readonly { value: SheetSize; label: string }[] = [
   { value: 'A3', label: 'A3 (420 × 297 mm)' },
@@ -44,7 +45,7 @@ function download(blob: Blob, filename: string): void {
 const stamp = (): string => new Date().toISOString().slice(0, 10);
 
 export default function ExportPanel(): React.ReactElement {
-  const site = useSite((s) => s.site);
+  const site = useEditedSite();
   const layers = useSite((s) => s.layers);
   const selectedZoneId = useSite((s) => s.selectedZoneId);
   const rules = useRules();

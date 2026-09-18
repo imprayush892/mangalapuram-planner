@@ -1,4 +1,4 @@
-import type { MultiPoly } from '../engine/geom/types';
+import type { MultiPoly, Pt } from '../engine/geom/types';
 import type { SiteModel } from '../engine/site/loadSite';
 import type { LayoutOption } from '../engine/generators/types';
 import type { LayerFlags } from '../state/store';
@@ -27,6 +27,11 @@ export interface PlanScene {
   circulation?: CirculationRoad[];
   /** Junction splay land from the same run, drawn under the roads. */
   splays?: MultiPoly;
+  /** Points collected for the zone edit in progress. */
+  editPending?: Pt[];
+  editTool?: string;
+  /** Zones picked for a merge. */
+  editSelected?: string[];
   selectedZoneId: string | null;
   background: string;
   /**
@@ -159,8 +164,50 @@ export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanS
     }
   }
 
+  drawEdit(ctx, view, scene, pen);
   drawScaleBar(ctx, view, pen);
   drawNorthArrow(ctx, view, pen);
+}
+
+/** The zone edit in progress: picked zones, the cut line, the ring being drawn. */
+function drawEdit(ctx: CanvasRenderingContext2D, view: View, scene: PlanScene, pen: number): void {
+  const accent = '#6fd3c7';
+
+  if (scene.editSelected && scene.editSelected.length > 0) {
+    for (const id of scene.editSelected) {
+      const zone = scene.site.zones.find((z) => z.id === id);
+      if (zone) fillMulti(ctx, view, zone.geom, 'rgba(111,211,199,0.22)', accent, 2 * pen);
+    }
+  }
+
+  const pts = scene.editPending;
+  if (!pts || pts.length === 0) return;
+
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.fillStyle = accent;
+  ctx.lineWidth = 1.5 * pen;
+  ctx.setLineDash([6 * pen, 4 * pen]);
+
+  if (pts.length >= 2) {
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      const [x, y] = worldToScreen(view, p);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    if (scene.editTool === 'draw' && pts.length >= 3) ctx.closePath();
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+  for (const p of pts) {
+    const [x, y] = worldToScreen(view, p);
+    ctx.beginPath();
+    ctx.arc(x, y, 4 * pen, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 export function drawScaleBar(ctx: CanvasRenderingContext2D, view: View, scale = 1): void {

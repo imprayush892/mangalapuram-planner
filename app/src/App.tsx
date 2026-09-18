@@ -8,18 +8,20 @@ import CompliancePanel from './ui/CompliancePanel';
 import ZonePanel from './ui/ZonePanel';
 import SitingPanel from './ui/SitingPanel';
 import MasterPlanPanel from './ui/MasterPlanPanel';
+import ZoneEditPanel from './ui/ZoneEditPanel';
 import ReportPanel from './ui/ReportPanel';
 // three.js, SheetJS and the DXF writer are only needed once the user asks for
 // 3D or an export, so they load on demand rather than in the first bundle.
 const ExportPanel = lazy(() => import('./ui/ExportPanel'));
 const ThreeView = lazy(() => import('./ui/ThreeView'));
 
-type Tab = 'site' | 'programme' | 'siting' | 'master' | 'zone' | 'rules' | 'compliance' | 'report' | 'exports';
+type Tab = 'site' | 'programme' | 'zones' | 'siting' | 'master' | 'zone' | 'rules' | 'compliance' | 'report' | 'exports';
 type ViewMode = '2d' | '3d';
 
 const TABS: readonly { id: Tab; label: string }[] = [
   { id: 'site', label: 'Site' },
   { id: 'programme', label: 'Programme' },
+  { id: 'zones', label: 'Edit zones' },
   { id: 'siting', label: 'Siting' },
   { id: 'master', label: 'Master plan' },
   { id: 'zone', label: 'Zone layout' },
@@ -123,6 +125,8 @@ function TabBody({ tab }: { tab: Tab }): React.ReactElement {
       return <SitePanel />;
     case 'programme':
       return <ProgrammePanel />;
+    case 'zones':
+      return <ZoneEditPanel />;
     case 'siting':
       return <SitingPanel />;
     case 'master':

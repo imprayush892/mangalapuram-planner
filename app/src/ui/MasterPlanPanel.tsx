@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { Button, Check, NumberField, Panel, Row, Select } from './primitives';
-import { useSite } from '../state/store';
 import { useRules } from '../state/useRules';
 import { useSettings } from '../state/settingsStore';
 import { useSiting, activeZoneUses } from '../state/sitingStore';
+import { useZoneEdit } from '../state/zoneEditStore';
 import { useMasterPlan, planDelta } from '../state/masterPlanStore';
 import { runMasterPlanGeneration } from '../state/generate';
 import { coverageFsi } from '../engine/rules/kmbr';
@@ -11,12 +11,13 @@ import { inferUse, USE_LABEL } from '../engine/site/level1';
 import type { ZoneUse } from '../engine/site/level1';
 import { M2_PER_ACRE, m2ToSft } from '../engine/units';
 import { asRatio } from '../engine/rules/roadGradient';
+import { useEditedSite } from '../state/useEditedSite';
 
 const nf = (n: number, d = 0): string =>
   Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d }) : '—';
 
 export default function MasterPlanPanel(): React.ReactElement {
-  const site = useSite((s) => s.site);
+  const site = useEditedSite();
   const rules = useRules();
   const switches = useSettings((s) => s.switches);
   const setSwitch = useSettings((s) => s.setSwitch);
@@ -24,6 +25,7 @@ export default function MasterPlanPanel(): React.ReactElement {
   const sitingResult = useSiting((s) => s.result);
   const sitingActive = useSiting((s) => s.activeIndex);
   const sitingLocks = useSiting((s) => s.locks);
+  const zoneEdits = useZoneEdit((s) => s.edits);
   const { plan, previous, status, chosen, chooseOption } = useMasterPlan();
 
   /**
@@ -49,7 +51,9 @@ export default function MasterPlanPanel(): React.ReactElement {
   const fsi = fsiTiers[switches.fsiTierIndex] ?? fsiTiers[0] ?? 3;
 
   const run = (): void => {
-    runMasterPlanGeneration(overrides, {
+    runMasterPlanGeneration(
+      overrides,
+      {
       zoneUses,
       sitingLabel,
       chosen,
@@ -59,8 +63,10 @@ export default function MasterPlanPanel(): React.ReactElement {
       floorOptions: switches.towerFloorOptions,
       apartmentMix: switches.apartmentMix,
       flatsPerFloor: switches.flatsPerFloor,
-      runId: (plan?.runId ?? 0) + 1,
-    });
+        runId: (plan?.runId ?? 0) + 1,
+      },
+      zoneEdits,
+    );
   };
 
   const delta = plan ? planDelta(plan, previous) : [];

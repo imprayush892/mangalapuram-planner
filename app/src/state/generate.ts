@@ -104,11 +104,12 @@ export function runGenerate(request: Omit<GenerateRequest, 'id' | 'baseUrl'>): v
 export function runMasterPlanGeneration(
   overrides: MasterPlanRequest['overrides'],
   options: MasterPlanRequest['options'],
+  zoneEdits: MasterPlanRequest['zoneEdits'] = [],
 ): void {
   const { setPlan, setStatus } = useMasterPlan.getState();
   const id = nextId++;
   const started = Date.now();
-  const full: MasterPlanRequest = { job: 'masterplan', id, baseUrl: dataBaseUrl(), overrides, options };
+  const full: MasterPlanRequest = { job: 'masterplan', id, baseUrl: dataBaseUrl(), overrides, options, zoneEdits };
 
   setStatus({ running: true, message: 'starting…', done: 0, total: 0, elapsedMs: 0, error: null });
 
@@ -152,7 +153,7 @@ export function runMasterPlanGeneration(
     w.removeEventListener('message', onMessage);
     workerBlocked = true;
     worker = null;
-    runMasterPlanGeneration(overrides, options);
+    runMasterPlanGeneration(overrides, options, zoneEdits);
   };
 
   w.addEventListener('message', onMessage);

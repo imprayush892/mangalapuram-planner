@@ -15,6 +15,8 @@ import type { Occupancy } from './rules/kmbr';
 import { runMasterPlan } from './masterplan/run';
 import type { MasterPlanOptions } from './masterplan/run';
 import type { MasterPlan } from './masterplan/types';
+import { applyZoneEdits } from './site/zoneEdit';
+import type { ZoneEdit } from './site/zoneEdit';
 
 /**
  * One generation run, with no DOM and no worker API in sight. The worker calls
@@ -46,6 +48,7 @@ export interface GenerateRequest {
   builtUpSft?: number;
   useLabel?: string;
   maxSlopeDeg?: number;
+  zoneEdits?: ZoneEdit[];
 }
 
 /** One run of the whole master plan: every zone, plus the roads between them. */
@@ -55,6 +58,7 @@ export interface MasterPlanRequest {
   baseUrl: string;
   overrides: OverrideSet;
   options: MasterPlanOptions;
+  zoneEdits?: ZoneEdit[];
 }
 
 export type WorkerRequest = GenerateRequest | MasterPlanRequest;
@@ -73,12 +77,17 @@ async function loadContext(
   baseUrl: string,
   overrides: OverrideSet,
   onProgress: (message: string) => void,
+  zoneEdits: readonly ZoneEdit[] = [],
 ): Promise<{ site: SiteModel; config: ConfigBundle }> {
   const src = fetchSource(baseUrl);
   onProgress('loading site data');
   sitePromise ??= loadSite(src);
   configPromise ??= loadConfig(src);
-  const [site, baseConfig] = await Promise.all([sitePromise, configPromise]);
+  const [loaded, baseConfig] = await Promise.all([sitePromise, configPromise]);
+  // Zone edits are replayed on every run rather than stored as geometry, so the
+  // worker and the main thread always agree on what the zoning plan is now.
+  const site: SiteModel =
+    zoneEdits.length > 0 ? { ...loaded, zones: applyZoneEdits(loaded.zones, zoneEdits).zones } : loaded;
   return {
     site,
     config: {
@@ -96,7 +105,12 @@ export async function runMasterPlanJob(
   req: MasterPlanRequest,
   onProgress: (message: string, done: number, total: number) => void = () => {},
 ): Promise<MasterPlan> {
-  const { site, config } = await loadContext(req.baseUrl, req.overrides, (m) => onProgress(m, 0, 0));
+  const { site, config } = await loadContext(
+    req.baseUrl,
+    req.overrides,
+    (m) => onProgress(m, 0, 0),
+    req.zoneEdits ?? [],
+  );
   return runMasterPlan(site, config, req.options, onProgress);
 }
 
@@ -104,7 +118,7 @@ export async function runGeneration(
   req: GenerateRequest,
   onProgress: (message: string) => void = () => {},
 ): Promise<LayoutOption[]> {
-  const { site, config } = await loadContext(req.baseUrl, req.overrides, onProgress);
+  const { site, config } = await loadContext(req.baseUrl, req.overrides, onProgress, req.zoneEdits ?? []);
 
   const zone = site.zones.find((z) => z.id === req.zoneId);
   if (!zone) throw new Error(`zone '${req.zoneId}' not found`);
