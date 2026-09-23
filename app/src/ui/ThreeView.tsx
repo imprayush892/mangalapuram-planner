@@ -7,6 +7,9 @@ import { buildMassingScene } from '../engine/export/glb';
 import { bboxOfMulti, bboxUnion } from '../engine/geom/planar';
 import type { Bbox } from '../engine/geom/types';
 import { useEditedSite } from '../state/useEditedSite';
+import { useSite } from '../state/store';
+import { useActiveHydrology } from '../state/hydrologyStore';
+import { channelThresholdCells, waterModelFor } from '../engine/terrain/hydrology';
 
 /**
  * 3D terrain and massing. The same scene the GLB export writes, so what is on
@@ -14,10 +17,14 @@ import { useEditedSite } from '../state/useEditedSite';
  */
 export default function ThreeView(): React.ReactElement {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const cameraStateRef = useRef<{ pos: THREE.Vector3; target: THREE.Vector3 } | null>(null);
   const site = useEditedSite();
   const byZone = useLayout((s) => s.byZone);
   const activeIndex = useLayout((s) => s.activeOptionIndex);
   const plan = useMasterPlan((s) => s.plan);
+  const rasterMode = useSite((s) => s.raster);
+  // The storm the water is drawn for, against the report's design storm.
+  const stormScale = useActiveHydrology()?.scale ?? 1;
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -39,6 +46,7 @@ export default function ThreeView(): React.ReactElement {
       layouts,
       parcel: site.parcel,
       terrainStep: 4,
+      water: rasterMode === 'hydrology' ? { features: site.features, stormScale } : undefined,
     });
     scene.background = new THREE.Color(0x0f1518);
     scene.fog = new THREE.Fog(0x0f1518, 900, 2400);
@@ -70,17 +78,109 @@ export default function ThreeView(): React.ReactElement {
       -(b.minY + b.maxY) / 2,
     );
     const span = Math.max(b.maxX - b.minX, b.maxY - b.minY);
-    camera.position.set(centre.x - span * 0.5, centre.y + span * 0.55, centre.z + span * 0.75);
-
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.copy(centre);
+    if (cameraStateRef.current) {
+      camera.position.copy(cameraStateRef.current.pos);
+      controls.target.copy(cameraStateRef.current.target);
+    } else {
+      camera.position.set(centre.x - span * 0.5, centre.y + span * 0.55, centre.z + span * 0.75);
+      controls.target.copy(centre);
+    }
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI / 2.05;
     controls.update();
 
+    // Water particles: drops that follow the same receivers, on the same
+    // filled surface, as the flow lines and the report. They start on the
+    // channel network the chosen storm fills and leave where it does.
+    let sim: {
+      receiver: Int32Array;
+      level: Float32Array;
+      spawn: number[];
+      particles: { k: number; progress: number; speed: number }[];
+      points: THREE.Points;
+    } | null = null;
+
+    if (rasterMode === 'hydrology') {
+      const waterModel = waterModelFor(site.dem, site.features);
+      const { nx, ny } = site.dem.meta;
+      const threshold = channelThresholdCells(stormScale);
+      const spawn: number[] = [];
+      for (let k = 0; k < nx * ny; k += 1) {
+        if ((waterModel.flowAccumulation[k] ?? 0) >= threshold && waterModel.receiver[k]! >= 0) spawn.push(k);
+      }
+      if (spawn.length > 0) {
+        const count = Math.min(15000, spawn.length * 8);
+        const positions = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+        const particles = [];
+        for (let p = 0; p < count; p += 1) {
+          particles.push({
+            k: spawn[Math.floor(Math.random() * spawn.length)]!,
+            progress: Math.random(),
+            speed: 0.015 + Math.random() * 0.04,
+          });
+          colors[p * 3] = 0.2;
+          colors[p * 3 + 1] = 0.75;
+          colors[p * 3 + 2] = 1.0;
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        const points = new THREE.Points(
+          geo,
+          new THREE.PointsMaterial({
+            size: Math.min(4.5, 2.0 + Math.sqrt(stormScale) * 0.8),
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.85,
+            sizeAttenuation: true,
+          }),
+        );
+        points.position.y = 1.0; // just above the surface
+        scene.add(points);
+        sim = { receiver: waterModel.receiver, level: waterModel.filledLevel, spawn, particles, points };
+      }
+    }
+
+    const { nx, x0, y0, cell_m } = site.dem.meta;
+    // A bigger storm moves water faster; the sqrt keeps it watchable.
+    const speedMultiplier = Math.min(8, Math.max(0.2, Math.sqrt(stormScale)));
+
     let frame = 0;
     const tick = (): void => {
       frame = requestAnimationFrame(tick);
+
+      if (sim) {
+        const positions = sim.points.geometry.attributes.position!.array as Float32Array;
+        for (let p = 0; p < sim.particles.length; p += 1) {
+          const d = sim.particles[p]!;
+          d.progress += d.speed * speedMultiplier;
+          if (d.progress >= 1) {
+            const next = sim.receiver[d.k]!;
+            d.progress -= 1;
+            // Water that reaches the survey edge has left: start a new drop.
+            d.k = next >= 0 ? next : sim.spawn[Math.floor(Math.random() * sim.spawn.length)]!;
+          }
+          const next = sim.receiver[d.k]!;
+          if (next < 0) continue;
+          const i1 = d.k % nx;
+          const j1 = (d.k - i1) / nx;
+          const i2 = next % nx;
+          const j2 = (next - i2) / nx;
+          const z1 = sim.level[d.k]!;
+          const z2 = sim.level[next]!;
+          const px1 = x0 + cell_m * (i1 + 0.5);
+          const pz1 = -(y0 + cell_m * (j1 + 0.5));
+          const px2 = x0 + cell_m * (i2 + 0.5);
+          const pz2 = -(y0 + cell_m * (j2 + 0.5));
+          positions[p * 3] = px1 + (px2 - px1) * d.progress;
+          positions[p * 3 + 1] = z1 + (z2 - z1) * d.progress;
+          positions[p * 3 + 2] = pz1 + (pz2 - pz1) * d.progress;
+        }
+        sim.points.geometry.attributes.position!.needsUpdate = true;
+      }
+
       controls.update();
       renderer.render(scene, camera);
     };
@@ -95,21 +195,34 @@ export default function ThreeView(): React.ReactElement {
     ro.observe(wrap);
 
     return () => {
+      cameraStateRef.current = {
+        pos: camera.position.clone(),
+        target: controls.target.clone(),
+      };
       cancelAnimationFrame(frame);
       ro.disconnect();
       controls.dispose();
       renderer.dispose();
       scene.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.LineSegments) {
           obj.geometry.dispose();
           const material = obj.material;
           if (Array.isArray(material)) material.forEach((m) => m.dispose());
           else material.dispose();
         }
       });
-      wrap.removeChild(renderer.domElement);
+      if (wrap.contains(renderer.domElement)) {
+        wrap.removeChild(renderer.domElement);
+      }
     };
-  }, [site, byZone, activeIndex, plan]);
+  }, [
+    site,
+    byZone,
+    activeIndex,
+    plan,
+    rasterMode,
+    stormScale,
+  ]);
 
   return (
     <div ref={wrapRef} className="relative h-full w-full bg-ink">

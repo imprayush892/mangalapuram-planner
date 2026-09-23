@@ -7,7 +7,7 @@ import { loadSite } from '../engine/site/loadSite';
 import type { SiteModel } from '../engine/site/loadSite';
 import { dataBaseUrl } from './appBase';
 
-export type RasterMode = 'none' | 'rl' | 'slope' | 'fall' | 'buildable';
+export type RasterMode = 'none' | 'rl' | 'slope' | 'fall' | 'buildable' | 'hydrology';
 
 export interface LayerFlags {
   parcel: boolean;

@@ -1,0 +1,137 @@
+{
+  "method": {
+    "flow_surface": "priority-flood filled DEM, flats drain to the cell that flooded them",
+    "ponding_depth_m": 0.25,
+    "balance": "runoff = area x rain x C; ponded = min(storage, runoff); outflow = runoff - ponded",
+    "climate_source": "fallback (Open-Meteo archive 2013-2023, fetched 2026-09-23)",
+    "min_catchment_area_ha": 0.5
+  },
+  "climate_params": {
+    "annual_rainfall_mm": 2497.0,
+    "peak_daily_rainfall_mm": 151.8,
+    "runoff_coeff_natural": 0.25,
+    "runoff_coeff_developed": 0.4
+  },
+  "site_totals": {
+    "total_area_ha": 24.556,
+    "total_sinks_m3": 3882.6,
+    "total_ponding_area_ha": 0.544,
+    "max_sink_depth_m": 1.938,
+    "ponding_depth_m": 0.25
+  },
+  "catchment_count": 130,
+  "catchments": [
+    {
+      "node_id": 0,
+      "name": "Basin 1 \u00b7 drains SW",
+      "outlet_xy_m": [
+        135.0,
+        105.0
+      ],
+      "catchment_area_ha": 11.24,
+      "water_surface_ha": 0.292,
+      "storage_capacity_m3": 2249.2,
+      "peak_runoff_m3": 4265.7,
+      "peak_ponded_m3": 2249.2,
+      "peak_outflow_m3": 2016.5,
+      "annual_runoff_m3": 70168.2,
+      "annual_outflow_m3": 67919.0
+    },
+    {
+      "node_id": 32,
+      "name": "Basin 2 \u00b7 drains N",
+      "outlet_xy_m": [
+        501.0,
+        465.0
+      ],
+      "catchment_area_ha": 1.666,
+      "water_surface_ha": 0.0,
+      "storage_capacity_m3": 1.0,
+      "peak_runoff_m3": 632.4,
+      "peak_ponded_m3": 1.0,
+      "peak_outflow_m3": 631.4,
+      "annual_runoff_m3": 10402.5,
+      "annual_outflow_m3": 10401.5
+    },
+    {
+      "node_id": 68,
+      "name": "Basin 3 \u00b7 drains E",
+      "outlet_xy_m": [
+        833.0,
+        329.0
+      ],
+      "catchment_area_ha": 1.639,
+      "water_surface_ha": 0.065,
+      "storage_capacity_m3": 452.3,
+      "peak_runoff_m3": 621.9,
+      "peak_ponded_m3": 452.3,
+      "peak_outflow_m3": 169.6,
+      "annual_runoff_m3": 10230.2,
+      "annual_outflow_m3": 9777.9
+    },
+    {
+      "node_id": 25,
+      "name": "Basin 4 \u00b7 drains S",
+      "outlet_xy_m": [
+        529.0,
+        23.0
+      ],
+      "catchment_area_ha": 1.476,
+      "water_surface_ha": 0.131,
+      "storage_capacity_m3": 702.8,
+      "peak_runoff_m3": 560.3,
+      "peak_ponded_m3": 560.3,
+      "peak_outflow_m3": 0.0,
+      "annual_runoff_m3": 9216.4,
+      "annual_outflow_m3": 8513.7
+    },
+    {
+      "node_id": 12,
+      "name": "Basin 5 \u00b7 drains S",
+      "outlet_xy_m": [
+        441.0,
+        31.0
+      ],
+      "catchment_area_ha": 1.344,
+      "water_surface_ha": 0.0,
+      "storage_capacity_m3": 7.2,
+      "peak_runoff_m3": 510.2,
+      "peak_ponded_m3": 7.2,
+      "peak_outflow_m3": 503.0,
+      "annual_runoff_m3": 8392.4,
+      "annual_outflow_m3": 8385.2
+    },
+    {
+      "node_id": 36,
+      "name": "Basin 6 \u00b7 drains SW",
+      "outlet_xy_m": [
+        341.0,
+        107.0
+      ],
+      "catchment_area_ha": 1.18,
+      "water_surface_ha": 0.05,
+      "storage_capacity_m3": 406.6,
+      "peak_runoff_m3": 448.0,
+      "peak_ponded_m3": 406.6,
+      "peak_outflow_m3": 41.3,
+      "annual_runoff_m3": 7368.6,
+      "annual_outflow_m3": 6962.0
+    },
+    {
+      "node_id": 28,
+      "name": "Basin 7 \u00b7 drains SE",
+      "outlet_xy_m": [
+        697.0,
+        87.0
+      ],
+      "catchment_area_ha": 0.944,
+      "water_surface_ha": 0.0,
+      "storage_capacity_m3": 1.3,
+      "peak_runoff_m3": 358.4,
+      "peak_ponded_m3": 1.3,
+      "peak_outflow_m3": 357.1,
+      "annual_runoff_m3": 5895.4,
+      "annual_outflow_m3": 5894.1
+    }
+  ]
+}

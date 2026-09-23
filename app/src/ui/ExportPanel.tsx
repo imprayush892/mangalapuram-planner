@@ -31,6 +31,7 @@ const RASTERS: readonly { value: RasterMode; label: string }[] = [
   { value: 'slope', label: 'Slope' },
   { value: 'fall', label: 'Fall across a plot window' },
   { value: 'buildable', label: 'Buildability (Rule 22)' },
+  { value: 'hydrology', label: 'Hydrology (Water & Ponding)' },
 ];
 
 function download(blob: Blob, filename: string): void {

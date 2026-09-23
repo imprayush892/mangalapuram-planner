@@ -21,6 +21,7 @@ import ReportPanel from './ui/ReportPanel';
 import MasterPlanPanel from './ui/MasterPlanPanel';
 import ZonePanel from './ui/ZonePanel';
 import GoalPanel from './ui/GoalPanel';
+import HydrologyPanel from './ui/HydrologyPanel';
 import MetricsHud from './ui/MetricsHud';
 import ScenarioDock from './ui/ScenarioDock';
 import LeverStrip from './ui/LeverStrip';
@@ -44,6 +45,7 @@ const RAIL: readonly RailItem[] = [
   { id: 'plan', glyph: '▦', label: 'The drawn plan', does: 'Reads back what was drawn: totals, roads by tier, junctions, gradients, and each zone in turn.' },
   { id: 'zone', glyph: '⬚', label: 'Selected zone', does: 'Three layout options for the one zone you picked on the plan, and what each holds.' },
   { id: 'programme', glyph: '≣', label: 'Programme', does: 'Shows what the brief asks for against the land in scope. Read-only.' },
+  { id: 'hydrology', glyph: '≈', label: 'Hydrology', does: 'Hydrological analysis: catchments, inflows, and storage capacities based on rainfall.' },
   { id: 'compliance', glyph: '✓', label: 'Compliance and rules', does: 'Findings against KMBR and the client rules, and every rule value you can override.' },
   { id: 'report', glyph: '▤', label: 'Report', does: 'Use by use, what has to give, and saved scenarios. Read-only.' },
   { id: 'exports', glyph: '↧', label: 'Export', does: 'Writes DXF, XLSX, PNG, PDF and GLB of the plan as drawn.' },
@@ -267,6 +269,8 @@ function SectionBody({ section }: { section: string }): React.ReactElement {
       return <ZonePanel />;
     case 'programme':
       return <ProgrammePanel />;
+    case 'hydrology':
+      return <HydrologyPanel />;
     case 'compliance':
       return (
         <>

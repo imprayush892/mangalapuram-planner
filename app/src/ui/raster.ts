@@ -1,5 +1,8 @@
 import type { Dem } from '../engine/terrain/dem';
 import type { RasterMode } from '../state/store';
+import { useSite } from '../state/store';
+import { channelThresholdCells, waterModelFor } from '../engine/terrain/hydrology';
+import type { WaterModel } from '../engine/terrain/water';
 
 export interface RasterLayer {
   canvas: HTMLCanvasElement;
@@ -52,7 +55,13 @@ const rgbCss = ([r, g, b]: [number, number, number]): string => `rgb(${r},${g},$
  * Builds a DEM-sized image for the chosen measure. DEM row 0 is the southern
  * row, so the image is written bottom-up to keep north at the top on screen.
  */
-export function buildRaster(dem: Dem, mode: RasterMode, unbuildableSlopeDeg: number): RasterLayer | null {
+export function buildRaster(
+  dem: Dem,
+  mode: RasterMode,
+  unbuildableSlopeDeg: number,
+  /** Storm being looked at against the report's design storm; 1 when unknown. */
+  stormScale = 1,
+): RasterLayer | null {
   if (mode === 'none') return null;
   const { nx, ny, x0, y0, cell_m } = dem.meta;
   const canvas = document.createElement('canvas');
@@ -65,6 +74,12 @@ export function buildRaster(dem: Dem, mode: RasterMode, unbuildableSlopeDeg: num
   const stats = dem.stats();
   const slope = mode === 'slope' || mode === 'buildable' ? dem.slopeGrid() : null;
   const fall = mode === 'fall' ? dem.windowFallGrid(11.4, 14.2, 0.75) : null;
+  let waterModel: WaterModel | null = null;
+  if (mode === 'hydrology') {
+    const site = useSite.getState().site;
+    if (site) waterModel = waterModelFor(dem, site.features);
+  }
+  const channelCells = channelThresholdCells(stormScale);
 
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
@@ -89,6 +104,17 @@ export function buildRaster(dem: Dem, mode: RasterMode, unbuildableSlopeDeg: num
       } else if (mode === 'fall' && fall) {
         const f = fall[k]!;
         if (Number.isFinite(f)) rgb = sample(SLOPE_RAMP, f / 4);
+      } else if (mode === 'hydrology' && waterModel) {
+        // The same two rules as the 3D view: a pond is a hollow at least the
+        // ponding depth deep; a channel carries the threshold's upslope cells.
+        const upslope = waterModel.flowAccumulation[k]!;
+        if (waterModel.ponding[k]) {
+          rgb = [64, 164, 223];
+          alpha = 180 + Math.min(75, waterModel.depressionDepthM[k]! * 50);
+        } else if (upslope >= channelCells) {
+          rgb = [20, 80, 150];
+          alpha = Math.min(255, 100 + (upslope / channelCells) * 20);
+        }
       }
 
       if (rgb) {
@@ -145,6 +171,16 @@ function buildLegend(
         { value: 0, colour: 'rgb(104,176,122)' },
         { value: 20, colour: 'rgb(223,180,90)' },
         { value: unbuildable, colour: 'rgb(200,74,62)' },
+      ],
+    };
+  }
+  if (mode === 'hydrology') {
+    return {
+      label: 'Water: channels at the chosen storm, ponds ≥ 0.25 m deep',
+      unit: '',
+      stops: [
+        { value: 0, colour: 'rgb(20,80,150)' },
+        { value: 1, colour: 'rgb(64,164,223)' },
       ],
     };
   }

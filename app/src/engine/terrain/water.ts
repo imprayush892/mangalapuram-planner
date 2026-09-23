@@ -49,6 +49,17 @@ export interface WaterModel {
   ny: number;
   /** Highest wetness found, so a score can be normalised against the site. */
   maxWetness: number;
+  /**
+   * Where each cell's water goes next, on the FILLED surface: steepest
+   * descent, or the cell that flooded it where it sits on a filled flat, so a
+   * hollow drains through its spill point rather than dead-ending. -1 where
+   * water leaves the survey. What the flow lines and particles follow.
+   */
+  receiver: Int32Array;
+  /** Upslope cells routed by `receiver`, so it matches the report's network. */
+  flowAccumulation: Float32Array;
+  /** The priority-flood level: ground, or the water surface over a hollow. */
+  filledLevel: Float32Array;
 }
 
 export interface WaterInput {
@@ -250,6 +261,11 @@ export function buildWaterModel(input: WaterInput): WaterModel {
    */
   const filled = new Float32Array(n).fill(Number.NaN);
   const seen = new Uint8Array(n);
+  // The cell each one was flooded from, and the order cells left the heap.
+  // Together they route water across the flats the flood creates: a cell is
+  // popped after the cell that flooded it and after every lower neighbour.
+  const parent = new Int32Array(n).fill(-1);
+  const popOrder: number[] = [];
   const heapK: number[] = [];
   const heapV: number[] = [];
   const push = (k: number, v: number): void => {
@@ -313,6 +329,7 @@ export function buildWaterModel(input: WaterInput): WaterModel {
 
   while (heapK.length > 0) {
     const k = pop();
+    popOrder.push(k);
     const level = filled[k]!;
     const i = k % nx;
     const j = (k - i) / nx;
@@ -326,8 +343,41 @@ export function buildWaterModel(input: WaterInput): WaterModel {
       if (!Number.isFinite(nz)) continue;
       seen[nk] = 1;
       filled[nk] = Math.max(nz, level);
+      parent[nk] = k;
       push(nk, filled[nk]!);
     }
+  }
+
+  /* ------------------------------------------ flow on the filled surface */
+  const flowReceiver = new Int32Array(n).fill(-1);
+  for (const k of popOrder) {
+    const i = k % nx;
+    const j = (k - i) / nx;
+    const z = filled[k]!;
+    let bestDrop = 0;
+    let best = -1;
+    for (const [di, dj] of NEIGHBOURS) {
+      const ni = i + di;
+      const nj = j + dj;
+      if (ni < 0 || nj < 0 || ni >= nx || nj >= ny) continue;
+      const nz = filled[nj * nx + ni]!;
+      if (!Number.isFinite(nz)) continue;
+      const drop = (z - nz) / Math.hypot(di, dj);
+      if (drop > bestDrop) {
+        bestDrop = drop;
+        best = nj * nx + ni;
+      }
+    }
+    // Nothing lower means a filled flat: drain to whoever flooded us, which
+    // leads to the spill. Only the outlet seeds have no parent.
+    flowReceiver[k] = best >= 0 ? best : parent[k]!;
+  }
+  const flowAccumulation = new Float32Array(n);
+  for (const k of popOrder) flowAccumulation[k] = 1;
+  for (let idx = popOrder.length - 1; idx >= 0; idx -= 1) {
+    const k = popOrder[idx]!;
+    const r = flowReceiver[k]!;
+    if (r >= 0) flowAccumulation[r]! += flowAccumulation[k]!;
   }
 
   const pondingDepthM = input.pondingDepthM ?? 0.25;
@@ -356,6 +406,9 @@ export function buildWaterModel(input: WaterInput): WaterModel {
     nx,
     ny,
     maxWetness,
+    receiver: flowReceiver,
+    flowAccumulation,
+    filledLevel: filled,
   };
 }
 
