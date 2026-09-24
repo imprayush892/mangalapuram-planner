@@ -33,3 +33,29 @@ export const LAYER_STYLE: Record<LayerId, LayerStyle> = {
 export const DEFAULT_VISIBLE: LayerId[] = ['waterlogging', 'nonBuildable', 'drains', 'plotable'];
 
 export const rgba = ([r, g, b]: [number, number, number], a: number): string => `rgba(${r},${g},${b},${a})`;
+
+/** Steps 8-16: block uses and road tiers. */
+export const TYPOLOGY_RGB: Record<import('../engine/pipeline/plan').Typology, [number, number, number]> = {
+  villas: [242, 206, 96],
+  senior: [190, 140, 220],
+  apartments: [225, 110, 105],
+  school: [110, 165, 225],
+  clubhouse: [120, 200, 125],
+  open: [150, 160, 165],
+};
+
+export const TYPOLOGY_LABEL: Record<import('../engine/pipeline/plan').Typology, string> = {
+  villas: 'Villas',
+  senior: 'Senior living',
+  apartments: 'Apartments',
+  school: 'School',
+  clubhouse: 'Clubhouse',
+  open: 'Open space (no plot fits)',
+};
+
+export const TIER_RGB: Record<import('../engine/pipeline/plan').RoadTier, [number, number, number]> = {
+  existing: [235, 235, 235],
+  primary: [230, 80, 60],
+  secondary: [240, 160, 60],
+  tertiary: [205, 205, 205],
+};

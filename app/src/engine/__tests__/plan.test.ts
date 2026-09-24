@@ -183,3 +183,26 @@ describe('steps 12-14 typologies, FSI and placement', () => {
     expect(p.fillM3).toBeGreaterThan(0);
   });
 });
+
+describe('the plan crosses to the page from the worker', () => {
+  it('holds nothing a structured clone cannot copy', async () => {
+    const { p } = await plan();
+    expect(() => structuredClone(p)).not.toThrow();
+  });
+});
+
+describe('step 15-16 massing', () => {
+  it('puts every villa (two storeys), building and podium into the 3D scene the GLB exports', async () => {
+    const { p, s } = await plan();
+    const { buildMassingScene } = await import('../export/glb');
+    const scene = buildMassingScene({ dem: s.dem, layouts: [], parcel: s.parcel, terrainStep: 8, plan: p });
+    const group = scene.getObjectByName('Masterplan');
+    expect(group).toBeDefined();
+    const villas = group!.getObjectByName('Villas')!;
+    const others = group!.getObjectByName('Buildings')!;
+    const finite = p.plots.filter((x) => Number.isFinite(x.baseRl)).length;
+    expect(villas.children.length).toBe(finite * 2);
+    const podiums = p.buildings.filter((b) => b.podium).length;
+    expect(others.children.length).toBe(p.buildings.length + podiums);
+  });
+});

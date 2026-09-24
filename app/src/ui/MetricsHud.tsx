@@ -5,6 +5,16 @@ import { builtMetrics } from '../engine/metrics/live';
 import { m2ToSft } from '../engine/units';
 import { useEditedSite } from '../state/useEditedSite';
 import { unmeasuredAcIn } from '../engine/terrain/fill';
+import { usePlanning } from '../state/planningStore';
+
+function PipelineRow({ label, value }: { label: string; value: string }): React.ReactElement {
+  return (
+    <div className="flex items-baseline justify-between py-0.5 text-[11px]">
+      <span className="text-muted">{label}</span>
+      <span className="font-mono text-fg">{value}</span>
+    </div>
+  );
+}
 import { useUi } from '../state/uiStore';
 
 const fmt = (n: number | undefined, d = 0): string =>
@@ -88,6 +98,7 @@ export default function MetricsHud(): React.ReactElement {
     [site],
   );
   const built = builtMetrics(plan);
+  const pipeline = usePlanning((s) => s.plan);
 
   if (!live) return <div className="px-3 pb-3 text-[11px] text-muted">Waiting for the site to load…</div>;
 
@@ -96,8 +107,38 @@ export default function MetricsHud(): React.ReactElement {
 
   return (
     <div className="px-3 pb-3">
+      {pipeline && (
+        <div className="mb-2 rounded border border-accent/40 bg-accent/5 px-2 py-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-accent">The plan · steps 8–16</div>
+          <PipelineRow label="Villa plots" value={pipeline.plots.length.toLocaleString()} />
+          <PipelineRow
+            label="Senior units"
+            value={pipeline.buildings.filter((b) => b.typology === 'senior').reduce((s, b) => s + b.units, 0).toLocaleString()}
+          />
+          <PipelineRow
+            label="Apartment flats"
+            value={pipeline.buildings.filter((b) => b.typology === 'apartments').reduce((s, b) => s + b.units, 0).toLocaleString()}
+          />
+          <PipelineRow
+            label="Dwellings"
+            value={(
+              pipeline.plots.length +
+              pipeline.buildings.reduce((s, b) => s + b.units, 0)
+            ).toLocaleString()}
+          />
+          <PipelineRow
+            label="Built-up area"
+            value={`${Math.round(
+              m2ToSft(pipeline.plots.reduce((s, p) => s + p.builtUpM2, 0) + pipeline.buildings.reduce((s, b) => s + b.builtUpM2, 0)),
+            ).toLocaleString('en-IN')} sft`}
+          />
+          <PipelineRow label="Cut / fill" value={`${Math.round(pipeline.cutM3).toLocaleString()} / ${Math.round(pipeline.fillM3).toLocaleString()} m³`} />
+        </div>
+      )}
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-muted">If it were built</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted">
+          {pipeline ? 'Earlier zone-by-zone engine' : 'If it were built'}
+        </span>
         <span className="text-[10px] text-muted">{live.elapsedMs.toFixed(1)} ms</span>
       </div>
 

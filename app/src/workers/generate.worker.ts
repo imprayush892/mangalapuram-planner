@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { runGeneration, runMasterPlanJob } from '../engine/runGeneration';
+import { runGeneration, runMasterPlanJob, runPipelineJob } from '../engine/runGeneration';
 import type { GenerateResponse, WorkerRequest } from '../engine/runGeneration';
 
 /**
@@ -16,6 +16,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const req = event.data;
   const started = Date.now();
   try {
+    if (req.job === 'pipeline') {
+      const { analysis, plan } = await runPipelineJob(req, (message) =>
+        post({ id: req.id, status: 'progress', message }),
+      );
+      post({ id: req.id, status: 'pipeline', analysis, plan, elapsedMs: Date.now() - started });
+      return;
+    }
     if (req.job === 'masterplan') {
       const plan = await runMasterPlanJob(
         req,

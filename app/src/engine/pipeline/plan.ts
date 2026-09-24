@@ -329,6 +329,17 @@ function platformFor(
   };
 }
 
+/** A platform's numbers without its level function, so the plan can cross to and from a worker. */
+const platformOnly = (p: Platform): Platform => ({
+  existingGrade: p.existingGrade,
+  designGrade: p.designGrade,
+  withinLimitAsIs: p.withinLimitAsIs,
+  cutM3: p.cutM3,
+  fillM3: p.fillM3,
+  maxCutM: p.maxCutM,
+  maxFillM: p.maxFillM,
+});
+
 /** Shortest distance between two convex rings (0 when they touch or overlap). */
 function ringGap(a: Ring, b: Ring): number {
   const segDist = (p: Pt, s: Pt, t: Pt): number => {
@@ -1344,7 +1355,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           baseRl: pf.level(0, 0),
           units: u,
           builtUpM2: senPlate * sen.floors,
-          platform: pf,
+          platform: platformOnly(pf),
           notes: [
             `${u} units: ${sen.upf} a floor × ${sen.floors} floors (G+${sen.floors - 1}); plate ${senPlate.toFixed(0)} m² = ${sen.upf} × ${(seniorPlinthM2 * 10.7639).toFixed(0)} sq ft ÷ ${sen.eff}`,
             `on a level pad; ${sen.clear} m clear of every other senior building`,
@@ -1403,7 +1414,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           baseRl: pf.level(0, 0),
           units: 0,
           builtUpM2: fit.wingPlate * fit.floors,
-          platform: pf,
+          platform: platformOnly(pf),
           notes: [
             `wing ${i + 1} of ${fit.wings.length}: ${(buaM2 * 10.7639).toFixed(0)} sq ft in all over ${fit.floors} floors`,
             `${fit.key}: coverage up to ${fit.coverage}%; wings ${wingGap} m apart (planning_rules.yaml amenities)`,

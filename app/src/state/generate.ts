@@ -1,7 +1,8 @@
 import { useLayout } from './layoutStore';
 import { dataBaseUrl } from './appBase';
 import { useMasterPlan } from './masterPlanStore';
-import type { GenerateRequest, GenerateResponse, MasterPlanRequest } from '../engine/runGeneration';
+import type { GenerateRequest, GenerateResponse, MasterPlanRequest, PipelineRequest } from '../engine/runGeneration';
+import { usePlanning } from './planningStore';
 import type { LayoutOption } from '../engine/generators/types';
 
 let worker: Worker | null = null;
@@ -75,7 +76,7 @@ export function runGenerate(request: Omit<GenerateRequest, 'id' | 'baseUrl'>): v
       setStatus({ message: msg.message, elapsedMs: Date.now() - started });
       return;
     }
-    if (msg.status === 'plan' || msg.status === 'zone') return; // master plan run, handled elsewhere
+    if (msg.status === 'plan' || msg.status === 'zone' || msg.status === 'pipeline') return; // other runs, handled elsewhere
     w.removeEventListener('message', onMessage);
     if (msg.status === 'error') fail(msg.error);
     else finish(msg.options, msg.elapsedMs);
@@ -166,6 +167,62 @@ export function runMasterPlanGeneration(
     runMasterPlanGeneration(overrides, options, zoneEdits);
   };
 
+  w.addEventListener('message', onMessage);
+  w.addEventListener('error', onError, { once: true });
+  w.postMessage(full);
+}
+
+/**
+ * Runs the planning pipeline (steps 1-16) on the rules as they stand. A newer
+ * run supersedes an older one: its reply is dropped. Same worker, same
+ * main-thread fallback as the generators.
+ */
+let latestPipeline = 0;
+export function runPipeline(overrides: PipelineRequest['overrides']): void {
+  const { setPlanStatus, setPlanResult } = usePlanning.getState();
+  const id = nextId++;
+  latestPipeline = id;
+  const started = Date.now();
+  const full: PipelineRequest = { job: 'pipeline', id, baseUrl: dataBaseUrl(), overrides };
+  setPlanStatus({ running: true, message: 'starting…', error: null });
+
+  const fail = (error: string): void => {
+    if (id !== latestPipeline) return;
+    setPlanStatus({ running: false, message: '', error });
+  };
+
+  const w = ensureWorker();
+  if (!w) {
+    setPlanStatus({ running: true, message: 'planning on the main thread (this tab will pause)', error: null });
+    setTimeout(() => {
+      void import('../engine/runGeneration')
+        .then(({ runPipelineJob }) => runPipelineJob(full, (message) => setPlanStatus({ running: true, message, error: null })))
+        .then(({ plan }) => {
+          if (id !== latestPipeline) return;
+          setPlanResult(plan, Date.now() - started);
+        })
+        .catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
+    }, 50);
+    return;
+  }
+
+  const onMessage = (event: MessageEvent<GenerateResponse>): void => {
+    const msg = event.data;
+    if (msg.id !== id) return;
+    if (msg.status === 'progress') {
+      if (id === latestPipeline) setPlanStatus({ running: true, message: msg.message, error: null });
+      return;
+    }
+    w.removeEventListener('message', onMessage);
+    if (msg.status === 'error') fail(msg.error);
+    else if (msg.status === 'pipeline' && id === latestPipeline) setPlanResult(msg.plan, msg.elapsedMs);
+  };
+  const onError = (): void => {
+    w.removeEventListener('message', onMessage);
+    workerBlocked = true;
+    worker = null;
+    runPipeline(overrides);
+  };
   w.addEventListener('message', onMessage);
   w.addEventListener('error', onError, { once: true });
   w.postMessage(full);

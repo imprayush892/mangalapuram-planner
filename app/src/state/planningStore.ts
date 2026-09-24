@@ -4,11 +4,28 @@ import { useSite } from './store';
 import { useRules } from './useRules';
 import { runAnalysis } from '../engine/pipeline/analysis';
 import type { AnalysisResult, LayerId } from '../engine/pipeline/analysis';
+import type { PlanResult } from '../engine/pipeline/plan';
 import { DEFAULT_VISIBLE } from '../ui/planningStyle';
+
+/** What of steps 8-16 is drawn. */
+export type PlanLayer = 'roads' | 'blocks' | 'plots' | 'buildings' | 'earthwork';
+
+export interface PlanStatus {
+  running: boolean;
+  message: string;
+  error: string | null;
+}
 
 interface PlanningState {
   visible: LayerId[];
   toggle: (id: LayerId) => void;
+  plan: PlanResult | null;
+  planMs: number;
+  planStatus: PlanStatus;
+  planVisible: PlanLayer[];
+  togglePlan: (id: PlanLayer) => void;
+  setPlanStatus: (s: PlanStatus) => void;
+  setPlanResult: (plan: PlanResult, ms: number) => void;
   /** The client's hand-drawn zoning is hidden once, the first time the layers are opened. */
   zoningHidden: boolean;
   markZoningHidden: () => void;
@@ -18,6 +35,14 @@ export const usePlanning = create<PlanningState>((set) => ({
   visible: DEFAULT_VISIBLE,
   toggle: (id) =>
     set((s) => ({ visible: s.visible.includes(id) ? s.visible.filter((v) => v !== id) : [...s.visible, id] })),
+  plan: null,
+  planMs: 0,
+  planStatus: { running: false, message: '', error: null },
+  planVisible: ['roads', 'blocks', 'plots', 'buildings'],
+  togglePlan: (id) =>
+    set((s) => ({ planVisible: s.planVisible.includes(id) ? s.planVisible.filter((v) => v !== id) : [...s.planVisible, id] })),
+  setPlanStatus: (planStatus) => set({ planStatus }),
+  setPlanResult: (plan, planMs) => set({ plan, planMs, planStatus: { running: false, message: '', error: null } }),
   zoningHidden: false,
   markZoningHidden: () => set({ zoningHidden: true }),
 }));

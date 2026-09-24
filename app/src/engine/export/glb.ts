@@ -9,6 +9,7 @@ import type { FilledDem } from '../terrain/fill';
 import type { WaterModel } from '../terrain/water';
 import type { StormResult } from '../terrain/hydrology';
 import type { Tin } from '../terrain/tin';
+import type { PlanResult, Typology } from '../pipeline/plan';
 
 /**
  * GLB massing: the terrain mesh plus extruded plots, towers and blocks, in
@@ -38,7 +39,17 @@ export interface GlbOptions {
    */
   water?: WaterOptions;
   overlay?: TerrainOverlay;
+  /** Steps 8-16: villas, senior buildings, towers on podiums, school and clubhouse. */
+  plan?: PlanResult;
 }
+
+const PLAN_COLOURS: Record<Exclude<Typology, 'open'>, number> = {
+  villas: 0xf4e3b0,
+  senior: 0xd9c2ec,
+  apartments: 0xf0c4c0,
+  school: 0xc4dcf4,
+  clubhouse: 0xc8ecc8,
+};
 
 /**
  * Planning layers laid on the terrain: an image in plan (north up, covering
@@ -90,6 +101,7 @@ export function buildMassingScene(opts: GlbOptions): THREE.Scene {
     if (lines) group.add(lines);
     scene.add(group);
   }
+  if (opts.plan) scene.add(buildPlanMasses(opts.plan));
   if (opts.water) {
     const water = new THREE.Group();
     water.name = 'Water';
@@ -200,6 +212,39 @@ export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem): THREE.
       side: THREE.DoubleSide,
     }),
   );
+}
+
+/**
+ * The masses of the plan. Each villa is its ground floor (60% of the plot) with
+ * the smaller first floor (40%) on it, on the plot's platform level; towers
+ * stand on podiums that fill down to the low side of their ground.
+ */
+function buildPlanMasses(plan: PlanResult): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'Masterplan';
+  const villas = new THREE.Group();
+  villas.name = 'Villas';
+  for (const p of plan.plots) {
+    if (!Number.isFinite(p.baseRl)) continue;
+    villas.add(extrude(p.groundFloor, p.baseRl, p.floorHeightM, PLAN_COLOURS.villas, `${p.id} ground floor`));
+    villas.add(extrude(p.upperFloor, p.baseRl + p.floorHeightM, p.floorHeightM, PLAN_COLOURS.villas, `${p.id} first floor`));
+  }
+  group.add(villas);
+  const others = new THREE.Group();
+  others.name = 'Buildings';
+  for (const b of plan.buildings) {
+    if (!Number.isFinite(b.baseRl)) continue;
+    const colour = PLAN_COLOURS[b.typology];
+    if (b.podium) {
+      const h = Math.max(0.3, b.podium.heightM);
+      others.add(extrude(b.podium.ring, b.podium.topRl - h, h, 0x9a9aa2, `${b.id} podium`));
+      others.add(extrude(b.ring, b.podium.topRl, b.heightM, colour, `${b.id} tower`));
+    } else {
+      others.add(extrude(b.ring, b.baseRl, b.heightM, colour, b.id));
+    }
+  }
+  group.add(others);
+  return group;
 }
 
 /** The overlay image on a copy of the terrain surface, a hair above it. */

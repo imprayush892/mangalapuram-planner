@@ -13,6 +13,7 @@ import { runLevel1 } from '../engine/site/level1';
 import { pick } from '../engine/data/config';
 import { buildRaster } from './raster';
 import { useStormForViews } from '../state/hydrologyStore';
+import { usePlanning } from '../state/planningStore';
 import { drawPlan, drawTitleBlock } from './planRenderer';
 import { fitView } from './view';
 import { bboxOfMulti, multiPolyArea } from '../engine/geom/planar';
@@ -52,6 +53,7 @@ export default function ExportPanel(): React.ReactElement {
   const selectedZoneId = useSite((s) => s.selectedZoneId);
   const rules = useRules();
   const storm = useStormForViews();
+  const pipelinePlan = usePlanning((s) => s.plan);
   const { byZone, activeOptionIndex } = useLayout();
   const [utm, setUtm] = useState(false);
   const [includeContours, setIncludeContours] = useState(true);
@@ -113,11 +115,13 @@ export default function ExportPanel(): React.ReactElement {
   const doGlb = async (): Promise<void> => {
     const scene = buildMassingScene({
       dem: site.dem,
-      layouts,
+      // The planning pipeline's plan when there is one; the zone layouts otherwise.
+      layouts: pipelinePlan ? [] : layouts,
       parcel: site.parcel,
       terrainStep: 4,
       tin: site.tin ?? undefined,
       filled: site.filled ?? undefined,
+      plan: pipelinePlan ?? undefined,
     });
     const buffer = await exportGlb(scene);
     download(new Blob([buffer], { type: 'model/gltf-binary' }), `mangalapuram-massing-${stamp()}.glb`);

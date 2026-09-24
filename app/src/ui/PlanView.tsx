@@ -4,7 +4,8 @@ import type { RasterLayer } from './raster';
 import { buildRaster } from './raster';
 import { useStormForViews } from '../state/hydrologyStore';
 import { useAnalysisForViews, usePlanning } from '../state/planningStore';
-import { LAYER_STYLE, rgba } from './planningStyle';
+import { LAYER_STYLE, TIER_RGB, TYPOLOGY_RGB, rgba } from './planningStyle';
+import { earthworkRaster } from './earthwork';
 import { fitView, screenToWorld } from './view';
 import type { View } from './view';
 import { bboxOfMulti, pointInMulti } from '../engine/geom/planar';
@@ -67,6 +68,27 @@ export default function PlanView(): React.ReactElement {
   const storm = useStormForViews();
   const analysis = useAnalysisForViews();
   const planningVisible = usePlanning((s) => s.visible);
+  const pipelineResult = usePlanning((s) => s.plan);
+  const planVisible = usePlanning((s) => s.planVisible);
+  const pipelinePlan = useMemo(() => {
+    if (!pipelineResult || !site) return undefined;
+    const show = (l: string): boolean => planVisible.includes(l as never);
+    return {
+      earthwork: show('earthwork') ? earthworkRaster(site.dem, pipelineResult.earthwork) : null,
+      blocks: show('blocks')
+        ? pipelineResult.blocks.map((b) => ({
+            geom: b.geom,
+            fill: rgba(TYPOLOGY_RGB[b.typology], 0.28),
+            stroke: rgba(TYPOLOGY_RGB[b.typology], 0.9),
+          }))
+        : [],
+      roads: show('roads') ? pipelineResult.roads.map((r) => ({ geom: r.geom, fill: rgba(TIER_RGB[r.tier], 0.85) })) : [],
+      plots: show('plots') ? pipelineResult.plots.map((p) => ({ ring: p.ring, footprint: p.groundFloor })) : [],
+      buildings: show('buildings')
+        ? pipelineResult.buildings.map((b) => ({ ring: b.ring, fill: rgba(TYPOLOGY_RGB[b.typology], 0.95), podium: b.podium?.ring }))
+        : [],
+    };
+  }, [pipelineResult, planVisible, site]);
   const planning = useMemo(() => {
     if (!analysis) return [];
     return analysis.order
@@ -147,6 +169,7 @@ export default function PlanView(): React.ReactElement {
       circulation: masterPlan?.circulation.roads,
       splays: masterPlan?.junctions.splays,
       planning,
+      pipelinePlan,
       selectedZoneId,
       background: '#0f1518',
       zoneColours,
@@ -163,6 +186,7 @@ export default function PlanView(): React.ReactElement {
     raster,
     layers,
     planning,
+    pipelinePlan,
     selectedZoneId,
     layouts,
     masterPlan,

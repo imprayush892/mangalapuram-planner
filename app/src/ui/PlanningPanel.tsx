@@ -4,6 +4,7 @@ import { useSite } from '../state/store';
 import { Panel } from './primitives';
 import { LAYER_STYLE, rgba } from './planningStyle';
 import type { LayerId } from '../engine/pipeline/analysis';
+import PipelinePlanSection from './PipelinePlanSection';
 
 const AC = 4046.8564224;
 
@@ -137,6 +138,8 @@ export default function PlanningPanel(): React.ReactElement {
           Client's zoning plan, for comparison
         </label>
       </Panel>
+
+      <PipelinePlanSection />
     </div>
   );
 }

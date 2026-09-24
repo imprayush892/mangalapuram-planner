@@ -32,6 +32,8 @@ export default function ThreeView(): React.ReactElement {
   const water = rasterMode === 'hydrology' && active && 'natural' in active ? active : null;
   const analysis = useAnalysisForViews();
   const planningVisible = usePlanning((s) => s.visible);
+  const pipelinePlan = usePlanning((s) => s.plan);
+  const planVisible = usePlanning((s) => s.planVisible);
   const rules = useRules();
   const unbuildableSlope = pick<number>(rules?.kmbr, 'rule22_site_suitability.no_building_slope_deg_over', 45);
 
@@ -67,7 +69,10 @@ export default function ThreeView(): React.ReactElement {
             : null,
           analysis,
           planningVisible,
+          pipelinePlan,
+          planVisible,
         ) ?? undefined,
+      plan: pipelinePlan && planVisible.includes('buildings') ? pipelinePlan : undefined,
     });
     scene.background = new THREE.Color(0x0f1518);
     scene.fog = new THREE.Fog(0x0f1518, 900, 2400);
@@ -237,6 +242,8 @@ export default function ThreeView(): React.ReactElement {
     analysis,
     planningVisible,
     unbuildableSlope,
+    pipelinePlan,
+    planVisible,
   ]);
 
   return (

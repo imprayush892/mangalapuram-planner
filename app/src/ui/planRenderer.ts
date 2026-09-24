@@ -1,4 +1,4 @@
-import type { MultiPoly, Pt } from '../engine/geom/types';
+import type { Ring, MultiPoly, Pt } from '../engine/geom/types';
 import type { SiteModel } from '../engine/site/loadSite';
 import type { LayoutOption } from '../engine/generators/types';
 import type { LayerFlags } from '../state/store';
@@ -42,6 +42,17 @@ export interface PlanScene {
    * layouts, earliest step first.
    */
   planning?: { geom: MultiPoly; fill?: string; stroke?: string; width: number; dashed?: boolean }[];
+  /**
+   * Steps 8-16 as drawn: block tints, road corridors, plots and buildings,
+   * each already styled. Zones and plots are outlines; buildings are solid.
+   */
+  pipelinePlan?: {
+    earthwork: RasterLayer | null;
+    blocks: { geom: MultiPoly; fill: string; stroke: string }[];
+    roads: { geom: MultiPoly; fill: string }[];
+    plots: { ring: Ring; footprint: Ring }[];
+    buildings: { ring: Ring; fill: string; podium?: Ring }[];
+  };
   selectedZoneId: string | null;
   background: string;
   /**
@@ -117,6 +128,31 @@ export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanS
     if (p.dashed) ctx.setLineDash([6 * pen, 4 * pen]);
     fillMulti(ctx, view, p.geom, p.fill, p.stroke, p.width * pen);
     ctx.setLineDash([]);
+  }
+
+  const pp = scene.pipelinePlan;
+  if (pp) {
+    if (pp.earthwork) {
+      const r = pp.earthwork;
+      const topLeft = worldToScreen(view, [r.x0, r.y0 + r.heightM]);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(r.canvas, topLeft[0], topLeft[1], r.widthM * view.scale, r.heightM * view.scale);
+      ctx.imageSmoothingEnabled = true;
+    }
+    for (const b of pp.blocks) fillMulti(ctx, view, b.geom, b.fill, b.stroke, 0.8 * pen);
+    for (const r of pp.roads) fillMulti(ctx, view, r.geom, r.fill, undefined, 0);
+    for (const p of pp.plots) {
+      fillMulti(ctx, view, [[p.ring]], undefined, 'rgba(245,245,240,0.9)', 0.8 * pen);
+      fillMulti(ctx, view, [[p.footprint]], 'rgba(245,245,240,0.35)', undefined, 0);
+    }
+    for (const b of pp.buildings) {
+      if (b.podium) {
+        ctx.setLineDash([4 * pen, 3 * pen]);
+        fillMulti(ctx, view, [[b.podium]], 'rgba(120,120,125,0.35)', 'rgba(220,220,225,0.8)', 0.8 * pen);
+        ctx.setLineDash([]);
+      }
+      fillMulti(ctx, view, [[b.ring]], b.fill, 'rgba(20,20,20,0.9)', 1 * pen);
+    }
   }
 
   if (layers.layout) {

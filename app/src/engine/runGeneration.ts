@@ -5,6 +5,10 @@ import { applyOverrides } from './data/overrides';
 import type { OverrideSet } from './data/overrides';
 import { loadConfig } from './data/config';
 import type { ConfigBundle } from './data/config';
+import { runAnalysis } from './pipeline/analysis';
+import type { AnalysisResult } from './pipeline/analysis';
+import { runPlan } from './pipeline/plan';
+import type { PlanResult } from './pipeline/plan';
 import { generateVillaLayouts } from './generators/villa';
 import type { RoadDirection } from './generators/villa';
 import { generateTowerLayouts } from './generators/tower';
@@ -61,13 +65,22 @@ export interface MasterPlanRequest {
   zoneEdits?: ZoneEdit[];
 }
 
-export type WorkerRequest = GenerateRequest | MasterPlanRequest;
+/** The planning pipeline: steps 1-7 (analysis) and 8-16 (the plan). */
+export interface PipelineRequest {
+  job: 'pipeline';
+  id: number;
+  baseUrl: string;
+  overrides: OverrideSet;
+}
+
+export type WorkerRequest = GenerateRequest | MasterPlanRequest | PipelineRequest;
 
 export type GenerateResponse =
   | { id: number; status: 'progress'; message: string; done?: number; total?: number }
   | { id: number; status: 'zone'; zone: MasterPlanZone }
   | { id: number; status: 'done'; options: LayoutOption[]; elapsedMs: number }
   | { id: number; status: 'plan'; plan: MasterPlan; elapsedMs: number }
+  | { id: number; status: 'pipeline'; analysis: AnalysisResult; plan: PlanResult; elapsedMs: number }
   | { id: number; status: 'error'; error: string };
 
 /** Site data is loaded once per context and kept for the session. */
@@ -100,6 +113,40 @@ async function loadContext(
       planning: applyOverrides(baseConfig.planning, overrides.planning ?? {}),
     },
   };
+}
+
+/** Runs the planning pipeline end to end on the site as the rules stand. */
+export async function runPipelineJob(
+  req: PipelineRequest,
+  onProgress: (message: string) => void = () => {},
+): Promise<{ analysis: AnalysisResult; plan: PlanResult }> {
+  const { site, config } = await loadContext(req.baseUrl, req.overrides, onProgress);
+  onProgress('steps 1-7: water, slope and plotable land');
+  const analysis = runAnalysis({
+    dem: site.dem,
+    parcel: site.parcel,
+    features: site.features,
+    measured: site.measured,
+    surveySlopeDeg: site.surveySlopeDeg,
+    planning: config.planning,
+    assumptions: config.assumptions,
+    client: config.client,
+    kmbr: config.kmbr,
+  });
+  onProgress('steps 8-16: roads, blocks, plots and buildings');
+  const plan = runPlan(
+    {
+      dem: site.dem,
+      features: site.features,
+      kmbr: config.kmbr,
+      client: config.client,
+      assumptions: config.assumptions,
+      planning: config.planning,
+      programme: config.programme,
+    },
+    analysis,
+  );
+  return { analysis, plan };
 }
 
 /** Runs the whole master plan, zone by zone, then the circulation. */

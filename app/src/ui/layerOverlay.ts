@@ -1,7 +1,10 @@
 import type { Dem } from '../engine/terrain/dem';
 import type { AnalysisResult, LayerId } from '../engine/pipeline/analysis';
 import type { TerrainOverlay } from '../engine/export/glb';
-import { LAYER_STYLE } from './planningStyle';
+import { LAYER_STYLE, TIER_RGB, TYPOLOGY_RGB } from './planningStyle';
+import type { PlanResult } from '../engine/pipeline/plan';
+import type { PlanLayer } from '../state/planningStore';
+import type { MultiPoly, Ring } from '../engine/geom/types';
 
 /**
  * What is draped on the 3D terrain: the terrain raster chosen in the Site panel
@@ -14,9 +17,12 @@ export function buildTerrainOverlay(
   base: HTMLCanvasElement | null,
   analysis: AnalysisResult | null,
   visible: LayerId[],
+  plan: PlanResult | null = null,
+  planVisible: PlanLayer[] = [],
 ): TerrainOverlay | null {
   const shown = analysis ? analysis.order.filter((id) => visible.includes(id)) : [];
-  if (!base && shown.length === 0) return null;
+  const showPlan = (l: PlanLayer): boolean => !!plan && planVisible.includes(l);
+  if (!base && shown.length === 0 && !plan) return null;
   const { nx, ny, x0, y0, cell_m } = dem.meta;
   const canvas = document.createElement('canvas');
   canvas.width = nx;
@@ -60,6 +66,54 @@ export function buildTerrainOverlay(
     }
   }
 
+  // Steps 8-16 on the ground: block tints, road corridors, cut and fill.
+  if (plan) {
+    const toPx = (p: readonly [number, number]): [number, number] => [(p[0] - x0) / cell_m, ny - (p[1] - y0) / cell_m];
+    const fillGeom = (mp: MultiPoly, style: string): void => {
+      ctx.beginPath();
+      for (const poly of mp) {
+        for (const ring of poly) {
+          ring.forEach((p, i) => {
+            const [px, py] = toPx(p);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          });
+          ctx.closePath();
+        }
+      }
+      ctx.fillStyle = style;
+      ctx.fill('evenodd');
+    };
+    if (showPlan('blocks')) {
+      for (const b of plan.blocks) {
+        const [r, g, bl] = TYPOLOGY_RGB[b.typology];
+        fillGeom(b.geom, `rgba(${r},${g},${bl},0.3)`);
+      }
+    }
+    if (showPlan('earthwork')) {
+      const img = ctx.getImageData(0, 0, nx, ny);
+      for (let j = 0; j < ny; j += 1) {
+        for (let i = 0; i < nx; i += 1) {
+          const d = plan.earthwork[j * nx + i]!;
+          if (Math.abs(d) < 0.05) continue;
+          const p = ((ny - 1 - j) * nx + i) * 4;
+          const t = Math.min(1, Math.abs(d) / 3);
+          const a = 0.35 + 0.5 * t;
+          const rgb = d < 0 ? [225, 70, 55] : [60, 130, 230];
+          for (let c = 0; c < 3; c += 1) img.data[p + c] = Math.round(rgb[c]! * a + img.data[p + c]! * (1 - a));
+          img.data[p + 3] = Math.max(img.data[p + 3]!, Math.round(255 * a));
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+    if (showPlan('roads')) {
+      for (const r of plan.roads) {
+        const [cr, cg, cb] = TIER_RGB[r.tier];
+        fillGeom(r.geom, `rgba(${cr},${cg},${cb},0.9)`);
+      }
+    }
+  }
+
   const outlines = analysis
     ? shown
         .filter((id) => LAYER_STYLE[id].outline > 0)
@@ -68,6 +122,15 @@ export function buildTerrainOverlay(
           return { rings: analysis.layers[id].geom.flat(), colour: (r << 16) | (g << 8) | b };
         })
     : [];
+  if (plan && showPlan('plots')) {
+    outlines.push({ rings: plan.plots.map((p) => p.ring as Ring), colour: 0xf5f5f0 });
+  }
+  if (plan && showPlan('blocks')) {
+    for (const b of plan.blocks) {
+      const [r, g, bl] = TYPOLOGY_RGB[b.typology];
+      outlines.push({ rings: b.geom.flat(), colour: (r << 16) | (g << 8) | bl });
+    }
+  }
 
   return { image: canvas, x0, y0, widthM: nx * cell_m, heightM: ny * cell_m, outlines };
 }
