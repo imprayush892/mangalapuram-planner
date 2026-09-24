@@ -45,7 +45,21 @@ slope:
 
 roads:
   existing: fixed                          # built roads: kept exactly, checked against the limits below and reported
+  existing_tier: primary                   # the built roads are checked against the primary limit
   max_gradient: {primary: "1:8", secondary: "1:7", tertiary: "1:6"}   # replaces client/assumptions road_gradient
+  # DEFAULT pending owner (asked 2026-09-24): primary = client public width, secondary = KMBR
+  # through-street width, tertiary = client internal width. The client's strictly north-south
+  # 18 m spine is not used: a straight N-S line cannot keep within 1:8 on this terrain.
+  width_m: {primary: 10, secondary: 7, tertiary: 6}
+  routing:
+    # Per metre of road: plotable land 1. Crossing these costs more, so roads go round them
+    # where they reasonably can. Rule 22 slope is impassable.
+    cost: {public_space: 1.5, waterlogging: 12, natural_drain: 40, existing_road: 0.4}
+    # Penalty per metre for a step at twice the gradient limit (grows with the square of the excess).
+    over_grade_penalty: 60
+  # Villa streets run along the contours; secondary cross streets run up the slope every
+  # this many plots (ASSUMPTION), which sets the block length.
+  cross_street_every_plots: 8
 
 plotable:
   # A plotable zone must fit the smallest plot: nothing narrower than this survives.
@@ -54,6 +68,8 @@ plotable:
 
 villas:                                    # replaces client_rules villa_plots sizing (18 m side, 45% footprint, 20/30/50 plot sizing)
   built_area_sft: {min: 2700, max: 3000}   # never over 3,000 sq ft
+  design_built_area_sft: 2850              # ASSUMPTION: the plots are cut at the middle of the range
+  floor_height_m: 3.0                      # ASSUMPTION, as assumptions.yaml floor_to_floor_m.apartments
   fsi: 1.0                                 # built area = plot area
   floors: 2                                # G+1
   ground_floor_share_of_plot: 0.60         # footprint = the plot's own shape scaled to 60% of its area
@@ -64,11 +80,42 @@ villas:                                    # replaces client_rules villa_plots s
 senior_living:                             # replaces client "senior = villa-style plots"
   min_floors: 4                            # G+3 minimum
   min_clear_between_buildings_m: 12
+  # Units and unit size come from programme.yaml (use: senior). DEFAULTS pending owner:
+  units_per_floor: 6
+  plan_efficiency: 0.8                     # plinth share of the floor plate (client_rules apartments.flats_share_of_footprint)
+  plate_aspect: 2.0                        # long side : short side, long side along the contours
+  setback_m: 3.0                           # KMBR Table 4 front average for A1/A2; yards above 10 m to be checked
+  floor_height_m: 3.0
   method: "units -> floors -> units per floor -> floor plate -> footprint -> placement"
 
 apartments:
   fsi_max: 3.0
+  # Units and unit size come from programme.yaml (use: apartments). DEFAULTS pending owner:
+  flats_per_floor: 4                       # client_rules apartments.flats_per_floor.min
+  max_floors: 20                           # client_rules apartments.max_floors
+  plan_efficiency: 0.8
+  plate_aspect: 2.0
+  min_clear_between_buildings_m: 12        # client_rules apartments.spacing.min_clear_m
+  setback_m: 6.0                           # client_rules apartments.spacing.joining.joined_block_inside
+  podium_margin_m: 6.0                     # podium runs this far past the tower on every side
+  floor_height_m: 3.0                      # assumptions.yaml floor_to_floor_m.apartments
   terrain_response: podium                 # podium height follows the ground; no forced flat platform
   method: "FSI -> built-up area -> floors -> floor plate -> footprint -> podium -> terrain response"
 
 special_zones: [clubhouse, school]         # sited from the layers, joined to roads and paths
+
+# Which use takes land first when the programme wants more than the plotable land holds.
+# DEFAULT pending owner: amenities, then senior and apartments, and villas take what is left.
+# Commercial, hotel, business hub and hospital are not placed by this pipeline (reported).
+typology_priority: [school, clubhouse, senior, apartments, villas]
+
+school:
+  land_ac_from: core_campus                # programme.yaml school land_ac.core_campus
+  max_mean_grade: "1:8"                    # a campus wants gentle ground
+clubhouse:
+  building_land_ac: 1.0                    # programme clubhouse_annex land; the golf lies in the public space beside it
+
+amenities:                                 # school and clubhouse buildings
+  max_wing_plate_m2: 1200                  # ASSUMPTION: a big programme is built as wings no larger than this a floor
+  min_clear_between_wings_m: 12            # ASSUMPTION: as the senior and apartment spacing
+  setback_m: 3.0                           # KMBR Table 4 front average; height-driven yards to be checked
