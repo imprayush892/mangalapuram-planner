@@ -43,7 +43,7 @@ export interface GlbOptions {
   plan?: PlanResult;
 }
 
-const PLAN_COLOURS: Record<Exclude<Typology, 'open' | 'golf' | 'reserved'>, number> = {
+const PLAN_COLOURS: Record<Exclude<Typology, 'open' | 'golf' | 'reserved' | 'future'>, number> = {
   villas: 0xf4e3b0,
   senior: 0xd9c2ec,
   apartments: 0xf0c4c0,

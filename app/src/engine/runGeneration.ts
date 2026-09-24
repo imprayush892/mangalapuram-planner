@@ -138,7 +138,7 @@ export async function runPipelineJob(
     {
       dem: site.dem,
       features: site.features,
-      zones: site.zones.map((z) => ({ name: z.name, geom: z.geom })),
+      zones: site.zones.map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc })),
       kmbr: config.kmbr,
       client: config.client,
       assumptions: config.assumptions,

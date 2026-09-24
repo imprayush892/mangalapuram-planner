@@ -45,6 +45,7 @@ export const TYPOLOGY_RGB: Record<import('../engine/pipeline/plan').Typology, [n
   commercial: [225, 130, 190],
   batching: [165, 135, 100],
   reserved: [200, 200, 200],
+  future: [226, 221, 208],
   open: [150, 160, 165],
 };
 
@@ -58,6 +59,7 @@ export const TYPOLOGY_LABEL: Record<import('../engine/pipeline/plan').Typology, 
   commercial: 'Commercial and convention',
   batching: 'Batching plant yard',
   reserved: 'Reserved (hospital)',
+  future: 'Future phase',
   open: 'Open space',
 };
 

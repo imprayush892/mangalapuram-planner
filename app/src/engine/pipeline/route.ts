@@ -31,6 +31,11 @@ export interface RouteRequest {
   sources: Iterable<number>;
   /** Stop at the first of these reached. Omit to explore everything reachable. */
   targets?: Mask;
+  /**
+   * Cost multiplier for a step in direction (di, dj), grid columns east and rows
+   * north: how a road is steered to an orientation (north-south roads). 1 = none.
+   */
+  dirWeight?: (di: number, dj: number) => number;
 }
 
 export interface RouteResult {
@@ -116,7 +121,7 @@ export function route(req: RouteRequest): RouteResult {
       if (!Number.isFinite(zn)) continue;
       const len = cell * (di !== 0 && dj !== 0 ? Math.SQRT2 : 1);
       const g = Math.abs(zn - z[k]!) / len;
-      let step = len * (cost[k]! + cn) * 0.5;
+      let step = len * (cost[k]! + cn) * 0.5 * (req.dirWeight ? req.dirWeight(di, dj) : 1);
       if (g > req.grade) {
         const over = (g - req.grade) / req.grade;
         step += len * req.overGradePenalty * over * over;

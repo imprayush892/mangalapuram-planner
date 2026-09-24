@@ -28,7 +28,7 @@ async function plan(): Promise<{ a: AnalysisResult; p: PlanResult; s: Awaited<Re
       kmbr: c.kmbr,
     });
     const p = runPlan(
-      { dem: s.dem, features: s.features, zones: s.zones.map((z) => ({ name: z.name, geom: z.geom })), kmbr: c.kmbr, client: c.client, assumptions: c.assumptions, planning: c.planning, programme: c.programme },
+      { dem: s.dem, features: s.features, zones: s.zones.map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc })), kmbr: c.kmbr, client: c.client, assumptions: c.assumptions, planning: c.planning, programme: c.programme },
       a,
     );
     cache = { a, p };
@@ -66,7 +66,7 @@ describe('step 8 roads', () => {
 describe('steps 9-11 villa plots', () => {
   it('cuts plots of 2,500-3,000 sq ft, compact ones of 2,000-2,500 where those will not fit; no side under 15 m, aspect 1:1 to 1:2.5', async () => {
     const { p } = await plan();
-    expect(p.plots.length).toBeGreaterThan(250);
+    expect(p.plots.length).toBeGreaterThan(150);
     for (const pl of p.plots) {
       expect(pl.areaM2).toBeGreaterThanOrEqual(sftToM2(2000) - 0.5);
       expect(pl.areaM2).toBeLessThanOrEqual(sftToM2(3000) + 0.5);

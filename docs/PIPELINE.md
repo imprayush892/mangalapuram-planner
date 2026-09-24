@@ -29,6 +29,16 @@ checked on top. Values marked DEFAULT / ASSUMPTION / ESTIMATE there await the ow
 | 14 | Placement | school, clubhouse, senior, commercial as one compact group each in their zone; towers on the lower ground, spread, staggered for views (within 100 m up or down the slope no tower hides over a third of another), 12 m apart, podiums following the ground, every top under the airport limit (140 m AMSL, AAI CCZM grid C9) | built |
 | 15-16 | 3D and masterplan | terrain, hydrology, zones, blocks by use, roads by tier, plot outlines and cut/fill draped on the ground; villas, senior, towers on podiums, school, clubhouse, commercial and the batching plant as masses; the GLB export carries the same | built |
 
+## Master-plan options (owner, 25 Sep)
+Two switches in `config/planning_rules.yaml` `options`, four plans:
+
+| | Roads to the ground (`road_orientation: terrain`) | North-south roads (`north_south`) |
+|---|---|---|
+| Plot rules (`villa_sizing: rules`) | A1: 2,500-3,000 + 2,000-2,500 sq ft plots, least cut and fill | A2: the same plots; primary and secondary within 10 deg of north-south, a cardinal grid |
+| Plots to the count (`count`) | B1: the villa zones carry the programme's 20 an acre (23.91 ac, 478 villas); the plot is the largest that fits (`runPlanToCount`) | B2: the same count on a north-south grid |
+
+Shared by all four: the client zoning with three owner moves (three of six 16,500 sq ft towers on the clubhouse zone's dry side across the existing road; the senior zone's flood land and leftover slivers to the clubhouse as golf and public space, senior living in one piece; Phase 2 and 3 held as future phases).
+
 ## What the plan does not do yet
 - The hotel and the business hub have no zone in the client's zoning plan and are not placed.
 - The airport limit uses an estimated TBM level (70.6 m AMSL from SRTM, about ±10 m) until the

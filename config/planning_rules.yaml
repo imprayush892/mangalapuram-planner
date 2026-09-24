@@ -17,6 +17,11 @@
 # natural drains), and then only to hand that ground to open space.
 version: 2026-09-25
 
+# The four master-plan options (owner 25 Sep): villa sizing x road orientation.
+options:
+  villa_sizing: rules            # rules = 2,500-3,000 + 2,000-2,500 sq ft plots; count = sized to the villa count
+  road_orientation: terrain      # terrain = least cut and fill; north_south = Vastu, primary and secondary N-S
+
 zoning:
   source: client                           # data/processed/zones_client_registered.geojson
   # Zone name -> use, first match wins (case-insensitive substring of the zone name).
@@ -31,7 +36,15 @@ zoning:
     - {match: "HOSPITAL", use: reserved}   # deferred until the land is acquired: kept, nothing placed
     # DEFAULT pending owner (asked 25 Sep): the client's PHASE 2 and PHASE 3 zones carry no
     # use in the zoning plan. They take villas, the use furthest short of its programme.
-    - {match: "PHASE", use: villas}
+    # Owner 25 Sep: the villas are sized on the four villa zones (23.91 ac); PHASE 2 and 3 are
+    # future phases and are not planned at this stage.
+    - {match: "PHASE", use: future}
+  # Owner 25 Sep: three more towers on the dry side of the clubhouse zone, across the existing
+  # road; the clubhouse keeps the other side, and takes the senior zone's waterlogged land as
+  # golf and public space so it does not shrink.
+  apartments_in_clubhouse: dry_side
+  senior_waterlogged_to_clubhouse: true
+  senior_consolidate: true               # owner 25 Sep: senior living is one piece; leftover slivers go to the clubhouse
   # Land outside every client zone (the gaps the zoning plan leaves for circulation) is
   # where the primary roads prefer to run; what they do not use is open space.
 
@@ -92,6 +105,10 @@ roads:
   # ASSUMPTION: a cross street whose grading to 1:7 would move more than this (m3 per metre of
   # street) is left out and its blocks merge; 30 m3/m is a 7 m road in about 4 m of cut.
   cross_street_max_earthwork_m3_per_m: 30
+  cross_street_min_spacing_m: 60          # ASSUMPTION: small plots do not bring cross streets closer than this
+  north_south:                             # Vastu option (owner 25 Sep)
+    tolerance_deg: 10                      # primary and secondary within 10 degrees of north-south
+    step_weights: {across: 4, diagonal: 20}    # routing: an east-west step costs 4, a diagonal 20, against 1 north-south: a cardinal grid
   # A villa street with fewer plots than this, serving nothing else, is taken out and its
   # land given to green (owner 25 Sep: no roads to nowhere).
   min_plots_per_street: 2
@@ -114,6 +131,10 @@ villas:                                    # replaces client_rules villa_plots s
   # Owner 25 Sep: where the main type will not fit, a smaller plot rather than wasted land.
   # With the 15 m minimum side the smallest plot is 15 x 15 m = 2,422 sq ft.
   compact_built_area_sft: {min: 2000, max: 2500}
+  # Sizing by count (owner 25 Sep): 700 villas on 35 ac in the programme = 20 an acre of villa
+  # zone, taken on the zones' own area (labels, 23.91 ac); the plot is whatever fits that many.
+  count_basis: {programme_units: 700, programme_land_ac: 35}
+  count_sizing: {max_aspect: 2.5, max_depth_m: 18, min_width_m: 6, min_area_m2: 80, max_area_m2: 280, steps: 7}
   design_built_area_sft: 2850              # ASSUMPTION: the plots are cut at the middle of the range
   floor_height_m: 3.0                      # ASSUMPTION, as assumptions.yaml floor_to_floor_m.apartments
   fsi: 1.0                                 # built area = plot area
@@ -142,8 +163,10 @@ apartments:
   plan_efficiency: 0.8
   plate_aspect: 2.0
   min_clear_between_buildings_m: 12        # client_rules apartments.spacing.min_clear_m
-  setback_m: 6.0                           # client_rules apartments.spacing.joining.joined_block_inside
-  podium_margin_m: 6.0                     # podium runs this far past the tower on every side
+  # Owner 25 Sep: the 16,500 sq ft tower footprint is the whole building on the ground, so no podium
+  # margin beyond it; yard at the KMBR ground minimum (height-driven yards to be checked).
+  setback_m: 3.0                           # was 6.0 (client_rules joined_block_inside)
+  podium_margin_m: 0                       # was 6.0
   # Owner 25 Sep: no tower stacked behind another. A tower may not stand in front of or
   # behind another (overlapping it along the contours) within this distance up or down
   # the slope, so every tower keeps its view out. ASSUMPTION.
@@ -152,6 +175,10 @@ apartments:
   # contours by at most this share of its length, so the view passes between them.
   view_max_overlap_share: 0.34
   min_floors: 6                            # ASSUMPTION: under this the airport limit leaves too little to build
+  # Owner 25 Sep: six towers, three in the apartment zone and three on the clubhouse zone's dry
+  # side; footprint as proposed by the owner. Floors from FSI, shared equally in each zone.
+  towers_per_zone: 3
+  tower_footprint_sft: 16500
   floor_height_m: 3.0                      # assumptions.yaml floor_to_floor_m.apartments
   terrain_response: podium                 # podium height follows the ground; no forced flat platform
   method: "FSI -> built-up area -> floors -> floor plate -> footprint -> podium -> terrain response"
@@ -176,6 +203,7 @@ school:
   max_mean_grade: "1:8"                    # a campus wants gentle ground
 clubhouse:
   building_land_ac: 1.0                    # programme clubhouse_annex land
+  max_floors: 3                            # ASSUMPTION (was 2 in code): the clubhouse keeps the smaller west side
   # Owner 25 Sep: the flooded land is open space, and part of it can be the golf course,
   # which belongs to the clubhouse; golf cannot go on steep land.
   golf:
