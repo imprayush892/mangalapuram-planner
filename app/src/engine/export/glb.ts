@@ -41,6 +41,8 @@ export interface GlbOptions {
   overlay?: TerrainOverlay;
   /** Steps 8-16: villas, senior buildings, towers on podiums, school and clubhouse. */
   plan?: PlanResult;
+  /** The villas as masses with the plan's buildings; on unless set false. */
+  planVillas?: boolean;
 }
 
 const PLAN_COLOURS: Record<Exclude<Typology, 'open' | 'golf' | 'reserved' | 'future'>, number> = {
@@ -103,7 +105,7 @@ export function buildMassingScene(opts: GlbOptions): THREE.Scene {
     if (lines) group.add(lines);
     scene.add(group);
   }
-  if (opts.plan) scene.add(buildPlanMasses(opts.plan));
+  if (opts.plan) scene.add(buildPlanMasses(opts.plan, opts.planVillas ?? true));
   if (opts.water) {
     const water = new THREE.Group();
     water.name = 'Water';
@@ -221,12 +223,12 @@ export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem): THREE.
  * the smaller first floor (40%) on it, on the plot's platform level; towers
  * stand on podiums that fill down to the low side of their ground.
  */
-function buildPlanMasses(plan: PlanResult): THREE.Group {
+function buildPlanMasses(plan: PlanResult, withVillas = true): THREE.Group {
   const group = new THREE.Group();
   group.name = 'Masterplan';
   const villas = new THREE.Group();
   villas.name = 'Villas';
-  for (const p of plan.plots) {
+  for (const p of withVillas ? plan.plots : []) {
     if (!Number.isFinite(p.baseRl)) continue;
     villas.add(extrude(p.groundFloor, p.baseRl, p.floorHeightM, PLAN_COLOURS.villas, `${p.id} ground floor`));
     villas.add(extrude(p.upperFloor, p.baseRl + p.floorHeightM, p.floorHeightM, PLAN_COLOURS.villas, `${p.id} first floor`));

@@ -30,6 +30,8 @@ import { GlassPanel, EdgeTab } from './ui/shell/Glass';
 import { IconRail } from './ui/shell/IconRail';
 import type { RailItem } from './ui/shell/IconRail';
 import { SolveBar } from './ui/shell/SolveBar';
+import PresentBar from './ui/PresentBar';
+import { usePresent } from './state/presentStore';
 
 const ExportPanel = lazy(() => import('./ui/ExportPanel'));
 const ThreeView = lazy(() => import('./ui/ThreeView'));
@@ -60,6 +62,8 @@ export default function App(): React.ReactElement {
   const viewMode = useSite((s) => s.viewMode);
   const setViewMode = useSite((s) => s.setViewMode);
   const { section, leftOpen, rightOpen, setSection, toggleLeft, toggleRight } = useUi();
+  const presenting = usePresent((s) => s.active);
+  const startPresenting = usePresent((s) => s.start);
 
   const rules = useRules();
   const switches = useSettings((s) => s.switches);
@@ -171,6 +175,15 @@ export default function App(): React.ReactElement {
               </button>
             ))}
           </span>
+          <button
+            type="button"
+            onClick={startPresenting}
+            disabled={status !== 'ready' || presenting}
+            title="Present the plan step by step: terrain, water, the land that can be built on, roads, the four master plans, the massing. Next / Back, arrow keys or a clicker; Esc ends."
+            className="rounded border border-accent/70 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent hover:bg-accent/20 disabled:opacity-40"
+          >
+            ▶ Present
+          </button>
           <span className="text-[10px] text-muted">
             {status === 'loading' && 'loading…'}
             {status === 'error' && <span className="text-bad">{error}</span>}
@@ -179,78 +192,86 @@ export default function App(): React.ReactElement {
         </GlassPanel>
       </div>
 
-      {/* the rail, and whatever it opened */}
-      <div className="pointer-events-none absolute bottom-40 left-0 top-16 z-10 flex items-start gap-2 p-3">
-        <IconRail
-          items={RAIL}
-          active={section}
-          onPick={(id) => setSection(id as never)}
-        />
-        {section && leftOpen && (
-          <GlassPanel className="pointer-events-auto flex max-h-full w-[330px] flex-col">
-            <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
-              <span className="text-[10px] uppercase tracking-wider text-fg">
-                {RAIL.find((r) => r.id === section)?.label}
-              </span>
-              <button
-                type="button"
-                onClick={() => setSection(section)}
-                className="px-1 text-[11px] text-muted hover:text-fg"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="border-b border-line/70 px-3 py-1.5 text-[10px] leading-snug text-muted">
-              {RAIL.find((r) => r.id === section)?.does}
-            </p>
-            <div className="min-h-0 flex-1 overflow-y-auto pt-1">
-              {status !== 'ready' ? (
-                <div className="p-3 text-muted">
-                  {status === 'error' ? <span className="text-bad">{error}</span> : 'Loading site data…'}
-                </div>
-              ) : (
-                <SectionBody section={section} />
-              )}
-            </div>
-          </GlassPanel>
-        )}
-        {!leftOpen && <EdgeTab label="Panels" side="left" onClick={toggleLeft} />}
-      </div>
-
-      {/* what the settings produce */}
-      <div className="pointer-events-none absolute bottom-40 right-0 top-16 z-10 flex items-start justify-end p-3">
-        {rightOpen ? (
-          <GlassPanel className="pointer-events-auto flex max-h-full w-[250px] flex-col">
-            <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
-              <span className="text-[10px] uppercase tracking-wider text-muted">Metrics</span>
-              <button type="button" onClick={toggleRight} className="px-1 text-[11px] text-muted hover:text-fg">
-                ▸
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto pt-2">
-              <MetricsHud />
-            </div>
-          </GlassPanel>
-        ) : (
-          <EdgeTab label="Metrics" side="right" onClick={toggleRight} />
-        )}
-      </div>
-
-      {/* the levers, the solve state and the scenarios: always there */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-0 px-3 pb-0">
-        <div className="pointer-events-auto w-full max-w-[1200px]">
-          <GlassPanel className="mb-1 rounded-b-none border-b-0">
-            <LeverStrip />
-            <div className="border-t border-line/70">
-              <SolveBar stale={staleReasons.length > 0} reasons={staleReasons} onSolve={solve} />
-            </div>
-          </GlassPanel>
+      {presenting ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center p-4">
+          <PresentBar />
         </div>
-        <div className="pointer-events-none w-full max-w-[1200px]">
-          <ScenarioDock />
+      ) : (
+        <>
+        {/* the rail, and whatever it opened */}
+        <div className="pointer-events-none absolute bottom-40 left-0 top-16 z-10 flex items-start gap-2 p-3">
+          <IconRail
+            items={RAIL}
+            active={section}
+            onPick={(id) => setSection(id as never)}
+          />
+          {section && leftOpen && (
+            <GlassPanel className="pointer-events-auto flex max-h-full w-[330px] flex-col">
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-fg">
+                  {RAIL.find((r) => r.id === section)?.label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSection(section)}
+                  className="px-1 text-[11px] text-muted hover:text-fg"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="border-b border-line/70 px-3 py-1.5 text-[10px] leading-snug text-muted">
+                {RAIL.find((r) => r.id === section)?.does}
+              </p>
+              <div className="min-h-0 flex-1 overflow-y-auto pt-1">
+                {status !== 'ready' ? (
+                  <div className="p-3 text-muted">
+                    {status === 'error' ? <span className="text-bad">{error}</span> : 'Loading site data…'}
+                  </div>
+                ) : (
+                  <SectionBody section={section} />
+                )}
+              </div>
+            </GlassPanel>
+          )}
+          {!leftOpen && <EdgeTab label="Panels" side="left" onClick={toggleLeft} />}
         </div>
-      </div>
+
+        {/* what the settings produce */}
+        <div className="pointer-events-none absolute bottom-40 right-0 top-16 z-10 flex items-start justify-end p-3">
+          {rightOpen ? (
+            <GlassPanel className="pointer-events-auto flex max-h-full w-[250px] flex-col">
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-muted">Metrics</span>
+                <button type="button" onClick={toggleRight} className="px-1 text-[11px] text-muted hover:text-fg">
+                  ▸
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto pt-2">
+                <MetricsHud />
+              </div>
+            </GlassPanel>
+          ) : (
+            <EdgeTab label="Metrics" side="right" onClick={toggleRight} />
+          )}
+        </div>
+
+        {/* the levers, the solve state and the scenarios: always there */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-0 px-3 pb-0">
+          <div className="pointer-events-auto w-full max-w-[1200px]">
+            <GlassPanel className="mb-1 rounded-b-none border-b-0">
+              <LeverStrip />
+              <div className="border-t border-line/70">
+                <SolveBar stale={staleReasons.length > 0} reasons={staleReasons} onSolve={solve} />
+              </div>
+            </GlassPanel>
+          </div>
+          <div className="pointer-events-none w-full max-w-[1200px]">
+            <ScenarioDock />
+          </div>
+        </div>
+        </>
+      )}
     </div>
   );
 }

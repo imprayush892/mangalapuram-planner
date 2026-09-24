@@ -24,6 +24,8 @@ interface PlanningState {
   planStatus: PlanStatus;
   planVisible: PlanLayer[];
   togglePlan: (id: PlanLayer) => void;
+  /** The villas as masses in 3D, when the buildings are drawn. */
+  villaMasses: boolean;
   setPlanStatus: (s: PlanStatus) => void;
   setPlanResult: (plan: PlanResult, ms: number) => void;
   /** The client's hand-drawn zoning is hidden once, the first time the layers are opened. */
@@ -39,6 +41,7 @@ export const usePlanning = create<PlanningState>((set) => ({
   planMs: 0,
   planStatus: { running: false, message: '', error: null },
   planVisible: ['roads', 'blocks', 'plots', 'buildings'],
+  villaMasses: true,
   togglePlan: (id) =>
     set((s) => ({ planVisible: s.planVisible.includes(id) ? s.planVisible.filter((v) => v !== id) : [...s.planVisible, id] })),
   setPlanStatus: (planStatus) => set({ planStatus }),

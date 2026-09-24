@@ -3,6 +3,7 @@ import { dataBaseUrl } from './appBase';
 import { useMasterPlan } from './masterPlanStore';
 import type { GenerateRequest, GenerateResponse, MasterPlanRequest, PipelineRequest } from '../engine/runGeneration';
 import { usePlanning } from './planningStore';
+import { usePresent } from './presentStore';
 import type { LayoutOption } from '../engine/generators/types';
 
 let worker: Worker | null = null;
@@ -199,7 +200,8 @@ export function runPipeline(overrides: PipelineRequest['overrides']): void {
         .then(({ runPipelineJob }) => runPipelineJob(full, (message) => setPlanStatus({ running: true, message, error: null })))
         .then(({ plan }) => {
           if (id !== latestPipeline) return;
-          setPlanResult(plan, Date.now() - started);
+          if (usePresent.getState().active) usePresent.getState().stash(plan);
+          else setPlanResult(plan, Date.now() - started);
         })
         .catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
     }, 50);
@@ -215,7 +217,11 @@ export function runPipeline(overrides: PipelineRequest['overrides']): void {
     }
     w.removeEventListener('message', onMessage);
     if (msg.status === 'error') fail(msg.error);
-    else if (msg.status === 'pipeline' && id === latestPipeline) setPlanResult(msg.plan, msg.elapsedMs);
+    else if (msg.status === 'pipeline' && id === latestPipeline) {
+      // While presenting, the views show the presentation's plans; this one waits.
+      if (usePresent.getState().active) usePresent.getState().stash(msg.plan);
+      else setPlanResult(msg.plan, msg.elapsedMs);
+    }
   };
   const onError = (): void => {
     w.removeEventListener('message', onMessage);

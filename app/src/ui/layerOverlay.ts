@@ -19,10 +19,12 @@ export function buildTerrainOverlay(
   visible: LayerId[],
   plan: PlanResult | null = null,
   planVisible: PlanLayer[] = [],
+  /** Zones drawn filled and outlined (presentation mode's zoning step). */
+  zones: { geom: MultiPoly; colour: string }[] = [],
 ): TerrainOverlay | null {
   const shown = analysis ? analysis.order.filter((id) => visible.includes(id)) : [];
   const showPlan = (l: PlanLayer): boolean => !!plan && planVisible.includes(l);
-  if (!base && shown.length === 0 && !plan) return null;
+  if (!base && shown.length === 0 && !plan && zones.length === 0) return null;
   const { nx, ny, x0, y0, cell_m } = dem.meta;
   const canvas = document.createElement('canvas');
   canvas.width = nx;
@@ -66,24 +68,26 @@ export function buildTerrainOverlay(
     }
   }
 
+  const toPx = (p: readonly [number, number]): [number, number] => [(p[0] - x0) / cell_m, ny - (p[1] - y0) / cell_m];
+  const fillGeom = (mp: MultiPoly, style: string): void => {
+    ctx.beginPath();
+    for (const poly of mp) {
+      for (const ring of poly) {
+        ring.forEach((p, i) => {
+          const [px, py] = toPx(p);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.closePath();
+      }
+    }
+    ctx.fillStyle = style;
+    ctx.fill('evenodd');
+  };
+  for (const z of zones) fillGeom(z.geom, `${z.colour}66`);
+
   // Steps 8-16 on the ground: block tints, road corridors, cut and fill.
   if (plan) {
-    const toPx = (p: readonly [number, number]): [number, number] => [(p[0] - x0) / cell_m, ny - (p[1] - y0) / cell_m];
-    const fillGeom = (mp: MultiPoly, style: string): void => {
-      ctx.beginPath();
-      for (const poly of mp) {
-        for (const ring of poly) {
-          ring.forEach((p, i) => {
-            const [px, py] = toPx(p);
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-          });
-          ctx.closePath();
-        }
-      }
-      ctx.fillStyle = style;
-      ctx.fill('evenodd');
-    };
     if (showPlan('blocks')) {
       for (const b of plan.blocks) {
         const [r, g, bl] = TYPOLOGY_RGB[b.typology];
@@ -122,6 +126,7 @@ export function buildTerrainOverlay(
           return { rings: analysis.layers[id].geom.flat(), colour: (r << 16) | (g << 8) | b };
         })
     : [];
+  for (const z of zones) outlines.push({ rings: z.geom.flat(), colour: parseInt(z.colour.slice(1), 16) });
   if (plan && showPlan('plots')) {
     outlines.push({ rings: plan.plots.map((p) => p.ring as Ring), colour: 0xf5f5f0 });
   }

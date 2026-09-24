@@ -29,6 +29,16 @@ checked on top. Values marked DEFAULT / ASSUMPTION / ESTIMATE there await the ow
 | 14 | Placement | school, clubhouse, senior, commercial as one compact group each in their zone; towers on the lower ground, spread, staggered for views (within 100 m up or down the slope no tower hides over a third of another), 12 m apart, podiums following the ground, every top under the airport limit (140 m AMSL, AAI CCZM grid C9) | built |
 | 15-16 | 3D and masterplan | terrain, hydrology, zones, blocks by use, roads by tier, plot outlines and cut/fill draped on the ground; villas, senior, towers on podiums, school, clubhouse, commercial and the batching plant as masses; the GLB export carries the same | built |
 
+## Presentation mode (owner, 26 Sep)
+**▶ Present** in the top bar reveals the pipeline one step at a time, in 3D (or 2D), each step adding
+to the last: terrain, the planning storm, waterlogging, public space, slope, non-buildable land,
+plotable land, the client's zoning, roads, then the villa plots, where the plan forks into the four
+master plans (A1-B2, pick any; 1-4 on the keyboard). After that: cut and fill, uses and golf, the
+towers, the other buildings, the villas in 3D, the full master plan. Next / Back, the arrow keys,
+Page Up / Down (a clicker) or the space bar step; Esc ends and restores the screen. The four plans
+are worked out in background workers as soon as presenting starts (the two sized to the count
+take about a minute). Code: `state/presentStore.ts` (the steps), `ui/PresentBar.tsx`.
+
 ## Master-plan options (owner, 25 Sep)
 Two switches in `config/planning_rules.yaml` `options`, four plans:
 
