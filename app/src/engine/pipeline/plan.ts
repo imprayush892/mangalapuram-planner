@@ -1145,7 +1145,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   };
   const towersAll = towersByZone.reduce((sum, t) => sum + t.towers, 0);
   const aptPlate = towerFootprintSft ? sftToM2(towerFootprintSft) : (apt.fpf * aptPlinthM2) / apt.eff;
-  const flatsPerFloor = towerFootprintSft ? Math.max(1, Math.floor((aptPlate * apt.eff) / aptPlinthM2)) : apt.fpf;
+  const flatsPerFloorSet = pick<number | null>(planning, 'apartments.tower_flats_per_floor', null);
+  const towerFloorsSet = pick<number | null>(planning, 'apartments.tower_floors', null);
+  const flatsPerFloor = flatsPerFloorSet ?? (towerFootprintSft ? Math.max(1, Math.floor((aptPlate * apt.eff) / aptPlinthM2)) : apt.fpf);
   const kmbrGap = (h: number, floors: number): number => {
     try {
       return gapBetweenBuildingsM(input.kmbr, h, highRise(input.kmbr, h, floors).isHighRise);
@@ -1765,7 +1767,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         const perTower = unitsTotal && towersAll > 0 ? unitsTotal / towersAll : 0;
         const floorsByFsi = !zoneTowers
           ? Number.POSITIVE_INFINITY
-          : perTower > 0
+          : towerFloorsSet
+            ? towerFloorsSet
+            : perTower > 0
             ? Math.ceil(perTower / flatsPerFloor)
             : Math.floor((apt.fsi * z.areaM2) / (zoneTowers * aptPlate));
         const P = apt.podium;
@@ -1789,7 +1793,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         }
         const minHi = towers.reduce((m, t) => Math.min(m, t.pHi), Infinity);
         const spreadCap = 2 * (dims.L + 2 * P) + towerClear;
-        let budget = perTower > 0 ? Number.POSITIVE_INFINITY : apt.fsi * z.areaM2;
+        let budget = perTower > 0 || towerFloorsSet ? Number.POSITIVE_INFINITY : apt.fsi * z.areaM2;
         const chosen: T[] = [];
         let relaxed = 0;
         for (;;) {

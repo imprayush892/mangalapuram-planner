@@ -193,6 +193,10 @@ apartments:
     - {match: "PHASE 2", towers: 2}        # 4.0 ac carved from Phase 2
     - {match: "PHASE 3", towers: 1}        # 2.7 ac carved from Phase 3
   units_total: 1000
+  # Owner 25 Sep: each tower is a 16,500 sq ft block of 20 floors with 10 flats a floor (owner's
+  # calculation); the airport line can still hold a tower on high ground lower.
+  tower_floors: 20
+  tower_flats_per_floor: 10
   tower_footprint_sft: 16500
   floor_height_m: 3.0                      # assumptions.yaml floor_to_floor_m.apartments
   terrain_response: podium                 # podium height follows the ground; no forced flat platform
