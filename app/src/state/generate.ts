@@ -4,6 +4,10 @@ import { useMasterPlan } from './masterPlanStore';
 import type { GenerateRequest, GenerateResponse, MasterPlanRequest, PipelineRequest } from '../engine/runGeneration';
 import { usePlanning } from './planningStore';
 import { usePresent } from './presentStore';
+import { fetchSource } from '../engine/data/source';
+import { PRESENT_PLAN_OPTIONS, loadPrebuiltPlans } from '../engine/present/prebuilt';
+import type { PresentOptionId } from '../engine/present/prebuilt';
+import type { PlanResult } from '../engine/pipeline/plan';
 import type { LayoutOption } from '../engine/generators/types';
 
 let worker: Worker | null = null;
@@ -179,6 +183,7 @@ export function runMasterPlanGeneration(
  * main-thread fallback as the generators.
  */
 let latestPipeline = 0;
+let prebuilt: Promise<Partial<Record<PresentOptionId, PlanResult>>> | null = null;
 export function runPipeline(overrides: PipelineRequest['overrides']): void {
   const { setPlanStatus, setPlanResult } = usePlanning.getState();
   const id = nextId++;
@@ -186,6 +191,31 @@ export function runPipeline(overrides: PipelineRequest['overrides']): void {
   const started = Date.now();
   const full: PipelineRequest = { job: 'pipeline', id, baseUrl: dataBaseUrl(), overrides };
   setPlanStatus({ running: true, message: 'starting…', error: null });
+
+  // The rules as written, one of the four master plans: a hosted copy ships it ready-made.
+  const onlyOptions = Object.entries(overrides).every(([doc, o]) =>
+    Object.keys(o ?? {}).every((k) => doc === 'planning' && k.startsWith('options.')),
+  );
+  if (onlyOptions) {
+    const sizing = (overrides.planning?.['options.villa_sizing'] as string | undefined) ?? 'rules';
+    const roads = (overrides.planning?.['options.road_orientation'] as string | undefined) ?? 'terrain';
+    const opt = PRESENT_PLAN_OPTIONS.find((o) => o.sizing === sizing && o.roads === roads)?.id;
+    prebuilt ??= loadPrebuiltPlans(fetchSource(dataBaseUrl()));
+    void prebuilt.then((plans) => {
+      if (id !== latestPipeline) return;
+      const plan = opt ? plans[opt] : undefined;
+      if (plan) {
+        if (usePresent.getState().active) usePresent.getState().stash(plan);
+        else setPlanResult(plan, Date.now() - started);
+      } else runPipelineLive(full, id, started);
+    });
+    return;
+  }
+  runPipelineLive(full, id, started);
+}
+
+function runPipelineLive(full: PipelineRequest, id: number, started: number): void {
+  const { setPlanStatus, setPlanResult } = usePlanning.getState();
 
   const fail = (error: string): void => {
     if (id !== latestPipeline) return;
@@ -227,7 +257,7 @@ export function runPipeline(overrides: PipelineRequest['overrides']): void {
     w.removeEventListener('message', onMessage);
     workerBlocked = true;
     worker = null;
-    runPipeline(overrides);
+    runPipelineLive(full, id, started);
   };
   w.addEventListener('message', onMessage);
   w.addEventListener('error', onError, { once: true });
