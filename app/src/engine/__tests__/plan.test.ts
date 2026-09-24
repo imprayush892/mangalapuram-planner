@@ -154,11 +154,12 @@ describe('steps 12-14 typologies, FSI and placement', () => {
     }
   });
 
-  it('keeps apartments within FSI 3.0 on every parcel, towers 12 m apart on podiums', async () => {
+  it('keeps apartments within the KMBR FSI ceiling (6.0 with the fee) on every parcel, towers on podiums', async () => {
     const { p } = await plan();
     const apt = p.parcels.filter((x) => x.use === 'apartments');
     expect(apt.length).toBeGreaterThan(0);
-    for (const x of apt) expect(x.fsi, x.id).toBeLessThanOrEqual(3 + 1e-9);
+    // Owner 25 Sep: 1,000 flats in six towers; FSI is reported against the tiers, not capped at 3.
+    for (const x of apt) expect(x.fsi, x.id).toBeLessThanOrEqual(6 + 1e-9);
     const towers = p.buildings.filter((b) => b.typology === 'apartments');
     for (const t of towers) {
       expect(t.floors).toBeLessThanOrEqual(20);

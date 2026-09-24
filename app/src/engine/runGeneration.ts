@@ -7,7 +7,7 @@ import { loadConfig } from './data/config';
 import type { ConfigBundle } from './data/config';
 import { runAnalysis } from './pipeline/analysis';
 import type { AnalysisResult } from './pipeline/analysis';
-import { runPlan } from './pipeline/plan';
+import { runPlan, runPlanToCount } from './pipeline/plan';
 import type { PlanResult } from './pipeline/plan';
 import { generateVillaLayouts } from './generators/villa';
 import type { RoadDirection } from './generators/villa';
@@ -134,7 +134,9 @@ export async function runPipelineJob(
     kmbr: config.kmbr,
   });
   onProgress('steps 8-16: roads, blocks, plots and buildings');
-  const plan = runPlan(
+  // Villas sized to the count search plot sizes, so run several plans (about a minute).
+  const byCount = (config.planning as { options?: { villa_sizing?: string } }).options?.villa_sizing === 'count';
+  const plan = (byCount ? runPlanToCount : runPlan)(
     {
       dem: site.dem,
       features: site.features,

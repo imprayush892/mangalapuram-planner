@@ -59,7 +59,7 @@ export const TYPOLOGY_LABEL: Record<import('../engine/pipeline/plan').Typology, 
   commercial: 'Commercial and convention',
   batching: 'Batching plant yard',
   reserved: 'Reserved (hospital)',
-  future: 'Future phase',
+  future: 'To be decided with client',
   open: 'Open space',
 };
 

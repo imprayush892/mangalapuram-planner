@@ -39,12 +39,21 @@ zoning:
     # Owner 25 Sep: the villas are sized on the four villa zones (23.91 ac); PHASE 2 and 3 are
     # future phases and are not planned at this stage.
     - {match: "PHASE", use: future}
-  # Owner 25 Sep: three more towers on the dry side of the clubhouse zone, across the existing
-  # road; the clubhouse keeps the other side, and takes the senior zone's waterlogged land as
-  # golf and public space so it does not shrink.
-  apartments_in_clubhouse: dry_side
-  senior_waterlogged_to_clubhouse: true
-  senior_consolidate: true               # owner 25 Sep: senior living is one piece; leftover slivers go to the clubhouse
+  # Owner 25 Sep (revised): the clubhouse zone's dry side, across the existing road, becomes senior
+  # living; the client's senior zone, all of it, joins the clubhouse as clubhouse, golf and public space.
+  clubhouse_dry_side_to: senior
+  senior_zone_to_clubhouse: true
+  # Owner 25 Sep: land carved from Phase 2 and 3, in this order. Apartments: the programme's 12 ac
+  # less the apartment zone's 5.3 ac = 6.7 ac, 4.0 in Phase 2 and 2.7 in Phase 3, on the lower ground
+  # (airport limit). Villas: the programme's 35 ac less the villa zones' 23.91 ac, split equally, by an
+  # existing road with the best outlook. What is left of each phase is to be decided with the client.
+  phase_land:
+    - {zone: "PHASE 2", use: apartments, ac: 4.0, by: low_ground}
+    - {zone: "PHASE 3", use: apartments, ac: 2.7, by: low_ground}
+    - {zone: "PHASE 2", use: villas, ac: villa_share, by: road_and_view}
+    - {zone: "PHASE 3", use: villas, ac: villa_share, by: road_and_view}
+  phase_land_access_reach_m: 80            # ASSUMPTION: road access counts fully at the road, nothing past 80 m
+  phase_land_weights: {access: 0.6, view: 0.4, low: 0.7}   # ASSUMPTION
   # Land outside every client zone (the gaps the zoning plan leaves for circulation) is
   # where the primary roads prefer to run; what they do not use is open space.
 
@@ -156,7 +165,7 @@ senior_living:                             # replaces client "senior = villa-sty
   method: "units -> floors -> units per floor -> floor plate -> footprint -> placement"
 
 apartments:
-  fsi_max: 3.0
+  fsi_max: 4.0                             # owner 25 Sep: 3.0 was tentative; 4.0 is acceptable (KMBR A1 with the Rs 5,000/m2 fee)
   # Units and unit size come from programme.yaml (use: apartments). DEFAULTS pending owner:
   flats_per_floor: 4                       # client_rules apartments.flats_per_floor.min
   max_floors: 20                           # client_rules apartments.max_floors
@@ -178,6 +187,12 @@ apartments:
   # Owner 25 Sep: six towers, three in the apartment zone and three on the clubhouse zone's dry
   # side; footprint as proposed by the owner. Floors from FSI, shared equally in each zone.
   towers_per_zone: 3
+  # Owner 25 Sep (revised): six towers across three places, 1,000 flats shared equally between them.
+  towers_by_zone:
+    - {match: "APARTMENTS &", towers: 3}   # the client's apartment zone, 5.3 ac in the site
+    - {match: "PHASE 2", towers: 2}        # 4.0 ac carved from Phase 2
+    - {match: "PHASE 3", towers: 1}        # 2.7 ac carved from Phase 3
+  units_total: 1000
   tower_footprint_sft: 16500
   floor_height_m: 3.0                      # assumptions.yaml floor_to_floor_m.apartments
   terrain_response: podium                 # podium height follows the ground; no forced flat platform

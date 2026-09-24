@@ -19,7 +19,7 @@ checked on top. Values marked DEFAULT / ASSUMPTION / ESTIMATE there await the ow
 | 5 | Slope | per cell against the 1:5 plot limit and the Rule 22 45° limit | built |
 | 6 | Non-buildable | KMBR Rule 22(3): slope over 45° on the mesh or the raw survey TIN, less specks under 200 m² (owner 25 Sep: mesh noise, taken by plot cut and fill); flood-liable land; 22(4): natural drains kept clear | built |
 | 7 | Plotable zones | safe, not Rule 22 ground, clear of drains, off the existing roads, reachable by a 15 m plot | built |
-| 0 | Zones | the client's zoning plan (`zones_client_registered.geojson`) gives each zone its use (`zoning.uses`); PHASE 2 and 3 are held as future phases (owner 25 Sep); the hospital zone is reserved; waterlogged, Rule 22 and drain ground in a zone goes to open space | built |
+| 0 | Zones | the client's zoning plan (`zones_client_registered.geojson`) gives each zone its use (`zoning.uses`); PHASE 2 and 3 give land to apartments and villas, the rest to be decided (owner 25 Sep); the hospital zone is reserved; waterlogged, Rule 22 and drain ground in a zone goes to open space | built |
 | 8 | Roads | existing roads fixed and checked against 1:8; primary roads (1:8) join every zone's buildable land to the network, preferring the gaps and edges between zones and kept out of the school, clubhouse and senior campuses; in the villa zones, streets along the contours at the spacing that fits the most plots (tertiary, 1:6) and cross streets every 8 plots (secondary, 1:7, left out over 30 m³/m of grading); drives to every building; roads that serve nothing are taken out and their land is green | built |
 | 9 | Plot subdivision | villa plots on both sides of every road through villa land: standard 2,500-3,000 sq ft first (15 m wide), compact 2,000-2,500 where a standard one will not fit (15 x 15 m = 2,422 sq ft with the 15 m minimum side) | built |
 | 10 | Plot slope | every plot's ground fitted with a plane; checked against 1:5 | built |
@@ -37,7 +37,17 @@ Two switches in `config/planning_rules.yaml` `options`, four plans:
 | Plot rules (`villa_sizing: rules`) | A1: 2,500-3,000 + 2,000-2,500 sq ft plots, least cut and fill | A2: the same plots; primary and secondary within 10 deg of north-south, a cardinal grid |
 | Plots to the count (`count`) | B1: the villa zones carry the programme's 20 an acre (23.91 ac, 478 villas); the plot is the largest that fits (`runPlanToCount`) | B2: the same count on a north-south grid |
 
-Shared by all four: the client zoning with three owner moves (three of six 16,500 sq ft towers on the clubhouse zone's dry side across the existing road; the senior zone's flood land and leftover slivers to the clubhouse as golf and public space, senior living in one piece; Phase 2 and 3 held as future phases).
+Shared by all four (owner, 25 Sep, revised):
+- Apartments: six 16,500 sq ft towers, 1,000 flats shared equally (up to 20 floors, under the airport line):
+  3 in the client's apartment zone (5.3 ac in the site), 2 on 4.0 ac and 1 on 2.7 ac carved from Phase 2
+  and Phase 3 on their lower ground (programme 12 ac less 5.3). FSI up to 4 is acceptable.
+- Villas: the programme's 35 ac less the villa zones' 23.91 ac, split equally between Phase 2 and 3, by an
+  existing road with the best outlook; option B sizes 700 villas to that land.
+- The clubhouse zone's dry side, across the existing road, is senior living; the client's senior zone,
+  all of it, joins the clubhouse as clubhouse, golf and public space.
+- What is left of Phase 2 and 3 is to be decided with the client.
+
+The web app's plan panel switches between the four options (the count options take about a minute).
 
 ## What the plan does not do yet
 - The hotel and the business hub have no zone in the client's zoning plan and are not placed.

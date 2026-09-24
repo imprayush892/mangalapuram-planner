@@ -26,6 +26,15 @@ const LAYERS: { id: PlanLayer; label: string }[] = [
 export default function PipelinePlanSection(): React.ReactElement {
   const overrides = useSettings((s) => s.overrides);
   const { plan, planMs, planStatus, planVisible, togglePlan } = usePlanning();
+  const setOverride = useSettings((s) => s.setOverride);
+  const sizing = (overrides.planning?.['options.villa_sizing'] as string | undefined) ?? plan?.option.villaSizing ?? 'rules';
+  const roadsMode = (overrides.planning?.['options.road_orientation'] as string | undefined) ?? plan?.option.roads ?? 'terrain';
+  const OPTIONS: { id: string; sizing: 'rules' | 'count'; roads: 'terrain' | 'north_south'; label: string }[] = [
+    { id: 'A1', sizing: 'rules', roads: 'terrain', label: 'Plot rules · roads to the ground' },
+    { id: 'A2', sizing: 'rules', roads: 'north_south', label: 'Plot rules · north–south roads' },
+    { id: 'B1', sizing: 'count', roads: 'terrain', label: 'To the count · roads to the ground' },
+    { id: 'B2', sizing: 'count', roads: 'north_south', label: 'To the count · north–south roads' },
+  ];
   const [open, setOpen] = useState<string | null>(null);
 
   // Re-plan when a rule changes, a moment after the last change.
@@ -89,6 +98,30 @@ export default function PipelinePlanSection(): React.ReactElement {
           </button>
         }
       >
+        <div className="mb-2 grid grid-cols-2 gap-1">
+          {OPTIONS.map((o) => {
+            const on = o.sizing === sizing && o.roads === roadsMode;
+            return (
+              <button
+                key={o.id}
+                onClick={() => {
+                  setOverride('planning', 'options.villa_sizing', o.sizing);
+                  setOverride('planning', 'options.road_orientation', o.roads);
+                }}
+                title={o.sizing === 'count' ? 'Sizes the plots to the villa count: takes about a minute' : undefined}
+                className={`rounded border px-1.5 py-1 text-left text-[10px] ${on ? 'border-accent bg-accent/10 text-fg' : 'border-line text-muted hover:text-fg'}`}
+              >
+                <span className="font-semibold">{o.id}</span> {o.label}
+              </button>
+            );
+          })}
+        </div>
+        {plan && (
+          <div className="mb-1 text-[10px] text-muted">
+            Villas: {plan.plots.length} plots
+            {plan.option.villaSizing === 'count' ? ` of ${plan.option.villaTarget}, ${plan.option.plotW.toFixed(1)} × ${plan.option.plotD.toFixed(1)} m` : ''}
+          </div>
+        )}
         {planStatus.running && <div className="mb-1 text-[10px] text-accent">{planStatus.message}</div>}
         {planStatus.error && <div className="mb-1 text-[10px] text-bad">{planStatus.error}</div>}
         {!plan ? (

@@ -740,35 +740,150 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     to.areaM2 = to.cells.length * cellArea;
     return moved;
   };
-  // Owner 25 Sep: three more towers on the dry side of the clubhouse zone, across
-  // the existing road; the clubhouse keeps the wet side, with the golf.
+  // ---- zoning moves (owner, 25 Sep)
   const clubZone = zones.find((z) => z.use === 'clubhouse' && z.cells.length > 0);
-  if (clubZone && pick<string | null>(planning, 'zoning.apartments_in_clubhouse', null) === 'dry_side') {
+  const originalSenior = zones.filter((z) => z.use === 'senior' && z.cells.length > 0);
+  // The clubhouse zone's dry side, across the existing road, takes another use
+  // (senior living); the clubhouse keeps the wet side, with the golf.
+  const drySideUse = pick<string | null>(planning, 'zoning.clubhouse_dry_side_to', null) as Typology | null;
+  if (clubZone && drySideUse) {
     const sides = patches(dem, minus(clubZone.mask, L.existingRoads.mask)).filter((p) => p.length * cellArea >= M2_PER_ACRE);
     if (sides.length >= 2) {
       const wetShare = (p: number[]): number => p.filter((k) => L.waterlogging.mask[k]).length / p.length;
       const dry = [...sides].sort((a, b) => wetShare(a) - wetShare(b))[0]!;
       const inDry = new Set(dry);
-      const aptZone: ZoneInfo = { name: 'CLUBHOUSE · APARTMENTS', use: 'apartments', mask: emptyMask(dem), cells: [], areaM2: 0 };
-      zones.push(aptZone);
-      moveCells(clubZone, aptZone, (k) => inDry.has(k));
-      notes.push(`apartments take the dry side of the clubhouse zone across the existing road (${(aptZone.areaM2 / M2_PER_ACRE).toFixed(2)} ac); the clubhouse keeps the other side`);
+      const label = drySideUse === 'senior' ? 'SENIOR LIVING' : drySideUse.toUpperCase();
+      const nz: ZoneInfo = { name: `CLUBHOUSE · ${label}`, use: drySideUse, mask: emptyMask(dem), cells: [], areaM2: 0 };
+      zones.push(nz);
+      moveCells(clubZone, nz, (k) => inDry.has(k));
+      notes.push(`${label.toLowerCase()} takes the dry side of the clubhouse zone across the existing road (${(nz.areaM2 / M2_PER_ACRE).toFixed(2)} ac); the clubhouse keeps the other side`);
     }
   }
-  if (clubZone && pick<boolean>(planning, 'zoning.senior_waterlogged_to_clubhouse', false)) {
+  // The client's senior zone, all of it, joins the clubhouse as clubhouse, golf and public space.
+  if (clubZone && pick<boolean>(planning, 'zoning.senior_zone_to_clubhouse', false)) {
     let moved = 0;
-    for (const z of zones) if (z.use === 'senior') moved += moveCells(z, clubZone, (k) => L.waterlogging.mask[k] === 1);
-    if (moved > 0) notes.push(`the senior zone's waterlogged ${((moved * cellArea) / M2_PER_ACRE).toFixed(2)} ac joins the clubhouse as golf and public space`);
-    // Owner 25 Sep: senior living is one consolidated piece; the slivers the water
-    // and the road leave on its edges are no use to it and go to the clubhouse.
-    if (pick<boolean>(planning, 'zoning.senior_consolidate', false)) {
-      for (const z of zones) {
-        if (z.use !== 'senior' || z.cells.length === 0) continue;
-        const parts = patches(dem, minus(z.mask, L.existingRoads.mask)).sort((p, q) => q.length - p.length);
-        const keep = new Set(parts[0] ?? []);
-        const slivers = moveCells(z, clubZone, (k) => !keep.has(k) && !L.existingRoads.mask[k]);
-        if (slivers > 0) notes.push(`senior living kept as one piece; ${((slivers * cellArea) / M2_PER_ACRE).toFixed(2)} ac of leftover slivers join the clubhouse`);
+    for (const z of originalSenior) moved += moveCells(z, clubZone, () => true);
+    if (moved > 0) notes.push(`the client's senior zone (${((moved * cellArea) / M2_PER_ACRE).toFixed(2)} ac) joins the clubhouse as clubhouse, golf and public space`);
+  }
+
+  // ---- land carved from the phase zones: apartments on the lower ground, then
+  // villas by an existing road with the best outlook; the rest is to be decided.
+  interface Carve {
+    zone: string;
+    use: Typology;
+    ac: number | 'villa_share';
+    by: 'low_ground' | 'road_and_view';
+  }
+  const carves = pick<Carve[]>(planning, 'zoning.phase_land', []);
+  if (carves.length > 0) {
+    const progLand = pick<number>(planning, 'villas.count_basis.programme_land_ac', 35);
+    const villaLabels = zones.filter((z) => z.use === 'villas').reduce((sum, z) => sum + (z.labelAc ?? z.areaM2 / M2_PER_ACRE), 0);
+    const villaCarves = carves.filter((cv) => cv.ac === 'villa_share').length;
+    const villaShare = villaCarves > 0 ? Math.max(0, progLand - villaLabels) / villaCarves : 0;
+    const reach = pick<number>(planning, 'zoning.phase_land_access_reach_m', 80);
+    const w = pick<{ access: number; view: number; low: number }>(planning, 'zoning.phase_land_weights', { access: 0.6, view: 0.4, low: 0.7 });
+    // Existing roads, inside the site or along its edge.
+    const exW = pick<number>(input.client, 'roads.public.width_m', 10);
+    const roadAll = emptyMask(dem);
+    for (const f of input.features) {
+      if (f.kind !== 'existing_road_edge') continue;
+      for (const line of f.lines) {
+        if (line.length < 2) continue;
+        const m = rasterise(dem, bufferPolyline(line, exW));
+        for (let k = 0; k < n; k += 1) if (m[k]) roadAll[k] = 1;
       }
+    }
+    const roadDist = distanceTo(dem, roadAll);
+    // Outlook: share of the ground within 250 m at least 5 m below, sampled every 10 m.
+    const probes: { x: number; y: number; z: number }[] = [];
+    for (let j = 0; j < ny; j += 5) {
+      for (let i = 0; i < nx; i += 5) {
+        const k = j * nx + i;
+        if (!terrain[k]) continue;
+        const p = dem.cellCentre(i, j);
+        probes.push({ x: p[0], y: p[1], z: dem.values[k]! });
+      }
+    }
+    const outlook = (k: number): number => {
+      const i = k % nx;
+      const j = (k - i) / nx;
+      const p = dem.cellCentre(i, j);
+      const z0 = dem.values[k]!;
+      let near = 0;
+      let below = 0;
+      for (const q of probes) {
+        const d2 = (q.x - p[0]) ** 2 + (q.y - p[1]) ** 2;
+        if (d2 < 400 || d2 > 62500) continue;
+        near += 1;
+        if (q.z < z0 - 5) below += 1;
+      }
+      return near > 0 ? below / near : 0;
+    };
+    const decided = new Set<ZoneInfo>();
+    for (const cv of carves) {
+      const ph = zones.find((z) => z.name.toUpperCase().startsWith(cv.zone.toUpperCase()) && !z.name.includes('·') && z.cells.length > 0);
+      const acres = cv.ac === 'villa_share' ? villaShare : cv.ac;
+      if (!ph || acres <= 0) continue;
+      const cand = ph.cells.filter((k) => !L.waterlogging.mask[k] && !L.nonBuildable.mask[k] && !L.drains.mask[k] && !L.existingRoads.mask[k]);
+      if (cand.length === 0) continue;
+      let zlo = Infinity;
+      let zhi = -Infinity;
+      for (const k of cand) {
+        zlo = Math.min(zlo, dem.values[k]!);
+        zhi = Math.max(zhi, dem.values[k]!);
+      }
+      const score = new Map<number, number>();
+      for (const k of cand) {
+        const access = Math.max(0, 1 - roadDist[k]! / reach);
+        const s =
+          cv.by === 'low_ground'
+            ? w.low * (1 - (dem.values[k]! - zlo) / Math.max(1e-6, zhi - zlo)) + (1 - w.low) * access
+            : w.access * access + w.view * outlook(k);
+        score.set(k, s);
+      }
+      // Grow one piece from the best-scoring ground until it holds its land.
+      const want = Math.round((acres * M2_PER_ACRE) / cellArea);
+      const inCand = new Set(cand);
+      const seen = new Set<number>();
+      const frontier: number[] = [];
+      const push = (k: number): void => {
+        if (seen.has(k) || !inCand.has(k)) return;
+        seen.add(k);
+        frontier.push(k);
+      };
+      const seed = [...score.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      const chosen = new Set<number>();
+      if (seed !== undefined) push(seed);
+      while (frontier.length > 0 && chosen.size < want) {
+        let bi = 0;
+        for (let q = 1; q < frontier.length; q += 1) if (score.get(frontier[q]!)! > score.get(frontier[bi]!)!) bi = q;
+        const k = frontier.splice(bi, 1)[0]!;
+        chosen.add(k);
+        const i = k % nx;
+        const j = (k - i) / nx;
+        for (const [di, dj] of N4) {
+          const a = i + di;
+          const b = j + dj;
+          if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+          push(b * nx + a);
+        }
+      }
+      const label = cv.use === 'villas' ? 'VILLAS' : cv.use === 'apartments' ? 'APARTMENTS' : cv.use.toUpperCase();
+      const nz: ZoneInfo = { name: `${ph.name} · ${label}`, use: cv.use, mask: emptyMask(dem), cells: [], areaM2: 0, labelAc: cv.use === 'villas' ? acres : undefined };
+      zones.push(nz);
+      moveCells(ph, nz, (k) => chosen.has(k));
+      decided.add(ph);
+      const got = nz.areaM2 / M2_PER_ACRE;
+      notes.push(
+        got < acres - 0.05
+          ? `${nz.name}: only ${got.toFixed(2)} of ${acres.toFixed(2)} ac of buildable land is left in the phase`
+          : `${nz.name}: ${got.toFixed(2)} ac, ${cv.by === 'low_ground' ? 'on the lower ground of the phase' : 'by the existing road with the best outlook'}`,
+      );
+    }
+    for (const ph of decided) {
+      const left = ph.areaM2 / M2_PER_ACRE;
+      ph.name = `${ph.name} · TO BE DECIDED`;
+      notes.push(`${ph.name}: ${left.toFixed(2)} ac left, to be decided with the client`);
     }
   }
   // The ground each zone can build on: not waterlogged at the planning storm's
@@ -1020,6 +1135,15 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const senNeeded = seniorUnits > 0 ? Math.ceil(seniorUnits / senPerBuilding) : 0;
   const towerFootprintSft = pick<number | null>(planning, 'apartments.tower_footprint_sft', null);
   const towersPerZone = pick<number | null>(planning, 'apartments.towers_per_zone', null);
+  // Owner 25 Sep: a set number of towers in each apartment zone, and the programme's
+  // flats shared equally between all the towers.
+  const towersByZone = pick<{ match: string; towers: number }[]>(planning, 'apartments.towers_by_zone', []);
+  const unitsTotal = pick<number | null>(planning, 'apartments.units_total', null);
+  const towersFor = (name: string): number | null => {
+    const r = towersByZone.find((t) => name.toUpperCase().startsWith(t.match.toUpperCase()));
+    return r ? r.towers : towersPerZone;
+  };
+  const towersAll = towersByZone.reduce((sum, t) => sum + t.towers, 0);
   const aptPlate = towerFootprintSft ? sftToM2(towerFootprintSft) : (apt.fpf * aptPlinthM2) / apt.eff;
   const flatsPerFloor = towerFootprintSft ? Math.max(1, Math.floor((aptPlate * apt.eff) / aptPlinthM2)) : apt.fpf;
   const kmbrGap = (h: number, floors: number): number => {
@@ -1627,16 +1751,23 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         });
       } else notes.push(`the batching plant does not fit on the ${z.name} zone's buildable land`);
     }
-    if (z.use === 'apartments' && (aptUnitsLeft > 0 || towersPerZone)) {
+    if (z.use === 'apartments' && (aptUnitsLeft > 0 || towersFor(z.name))) {
+      const zoneTowers = towersFor(z.name);
       // Towers on the lower ground, spread over the zone, none in another's
       // view, each under the airport height limit, within FSI on the zone.
       /** Towers of one plan shape: lower ground first, spread, staggered, under the airport limit. */
       const planTowers = (dims: { L: number; D: number }): DraftBuilding[] => {
         const out: DraftBuilding[] = [];
-        let unitsLeft = towersPerZone ? Number.POSITIVE_INFINITY : aptUnitsLeft;
-        const want = towersPerZone ?? Number.POSITIVE_INFINITY;
-        // With a set number of towers, each takes an equal share of the zone's FSI.
-        const floorsByFsi = towersPerZone ? Math.floor((apt.fsi * z.areaM2) / (towersPerZone * aptPlate)) : Number.POSITIVE_INFINITY;
+        let unitsLeft = zoneTowers ? Number.POSITIVE_INFINITY : aptUnitsLeft;
+        const want = zoneTowers ?? Number.POSITIVE_INFINITY;
+        // A set number of towers: floors from the tower's share of the flats when
+        // the programme's total is set, else an equal share of the zone's FSI.
+        const perTower = unitsTotal && towersAll > 0 ? unitsTotal / towersAll : 0;
+        const floorsByFsi = !zoneTowers
+          ? Number.POSITIVE_INFINITY
+          : perTower > 0
+            ? Math.ceil(perTower / flatsPerFloor)
+            : Math.floor((apt.fsi * z.areaM2) / (zoneTowers * aptPlate));
         const P = apt.podium;
         const cands = candidatesIn(siteLand(z), dims, apt.setback + P);
         type T = Cand & { ring: Ring; pod: Ring; pLo: number; pHi: number; floorsCap: number; bc: number };
@@ -1658,7 +1789,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         }
         const minHi = towers.reduce((m, t) => Math.min(m, t.pHi), Infinity);
         const spreadCap = 2 * (dims.L + 2 * P) + towerClear;
-        let budget = apt.fsi * z.areaM2;
+        let budget = perTower > 0 ? Number.POSITIVE_INFINITY : apt.fsi * z.areaM2;
         const chosen: T[] = [];
         let relaxed = 0;
         for (;;) {
@@ -1698,7 +1829,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             }
           }
           // A set number of towers: where staggering leaves no room, the view rule gives way.
-          if (!best && towersPerZone && fallback) {
+          if (!best && zoneTowers && fallback) {
             best = fallback;
             relaxed += 1;
           }
@@ -1738,7 +1869,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       let bestPlan: DraftBuilding[] = [];
       for (const asp of [apt.aspect, ...aspects.filter((x) => x !== apt.aspect && x >= 1.5)]) {
         const got = planTowers(plateDims(aptPlate, asp));
-        const score = (p: DraftBuilding[]): number => (towersPerZone ? p.length * 1e6 : 0) + p.reduce((s, b) => s + b.units, 0);
+        const score = (p: DraftBuilding[]): number => (zoneTowers ? p.length * 1e6 : 0) + p.reduce((s, b) => s + b.units, 0);
         if (score(got) > score(bestPlan)) bestPlan = got;
       }
       for (const b of bestPlan) {
@@ -1747,8 +1878,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       }
       const relaxedN = (bestPlan as DraftBuilding[] & { relaxed?: number }).relaxed ?? 0;
       if (relaxedN > 0) notes.push(`${z.name}: ${relaxedN} tower${relaxedN > 1 ? 's' : ''} could not be fully staggered for views and stand partly behind another`);
-      if (towersPerZone && bestPlan.length < towersPerZone) {
-        notes.push(`${z.name}: ${bestPlan.length} of ${towersPerZone} towers of ${Math.round(aptPlate * 10.7639).toLocaleString('en-IN')} sq ft fit with their setbacks, clear distance and views`);
+      if (zoneTowers && bestPlan.length < zoneTowers) {
+        notes.push(`${z.name}: ${bestPlan.length} of ${zoneTowers} towers of ${Math.round(aptPlate * 10.7639).toLocaleString('en-IN')} sq ft fit with their setbacks, clear distance and views`);
       }
     }
   }
