@@ -38,6 +38,10 @@ towers, the other buildings, the villas in 3D, the full master plan. Next / Back
 Page Up / Down (a clicker) or the space bar step; Esc ends and restores the screen. The four plans
 are worked out in background workers as soon as presenting starts (the two sized to the count
 take about a minute). Code: `state/presentStore.ts` (the steps), `ui/PresentBar.tsx`.
+A hosted copy (`npm run build:deploy`) ships the four plans ready-made in `dist/data/plans`
+(`scripts/present-plans.mjs`), each with a fingerprint of the rules and site files it was planned on;
+the app uses one only when the fingerprint matches and no rule has been overridden, otherwise it plans
+live (in a worker, or on the page where the host blocks workers).
 
 ## Master-plan options (owner, 25 Sep)
 Two switches in `config/planning_rules.yaml` `options`, four plans:

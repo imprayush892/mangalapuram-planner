@@ -9,6 +9,8 @@ import type { LayerId } from '../engine/pipeline/analysis';
 import type { BuildingUse, PlanResult } from '../engine/pipeline/plan';
 import type { GenerateResponse, PipelineRequest } from '../engine/runGeneration';
 import type { OverrideSet } from '../engine/data/overrides';
+import { fetchSource } from '../engine/data/source';
+import { loadPrebuiltPlans } from '../engine/present/prebuilt';
 
 /**
  * Presentation mode: the planning pipeline revealed one step at a time on the
@@ -329,77 +331,105 @@ function apply(): void {
 
 let workers: Worker[] = [];
 let prepId = 1_000_000;
+/** Bumped when presenting ends, so a plan still being worked out lands nowhere. */
+let epoch = 0;
+/** Plans worked out on the main thread, one at a time, where a worker will not run. */
+let mainQueue: Promise<void> = Promise.resolve();
 
-/** Works out the four plans in the background, each in its own worker. */
-function prepare(overrides: OverrideSet): void {
-  const have = usePresent.getState().plans;
+/** Only the option switches differ from the rules as written: prebuilt plans answer them. */
+function rulesAsWritten(overrides: OverrideSet): boolean {
+  return Object.entries(overrides).every(([doc, o]) =>
+    Object.keys(o ?? {}).every((k) => doc === 'planning' && k.startsWith('options.')),
+  );
+}
+
+/**
+ * The four plans: the prebuilt ones where they answer the rules as they stand
+ * (a hosted copy ships them), the rest worked out in background workers, or on
+ * the main thread one at a time where the host will not start a worker.
+ */
+async function prepare(overrides: OverrideSet): Promise<void> {
+  const my = epoch;
+  const setPrep = (id: OptionId, msg: string | undefined): void =>
+    usePresent.setState((st) => {
+      const prep = { ...st.prep };
+      if (msg === undefined) delete prep[id];
+      else prep[id] = msg;
+      return { prep };
+    });
+  const done = (id: OptionId, plan: PlanResult): void => {
+    if (my !== epoch) return;
+    usePresent.setState((st) => ({ plans: { ...st.plans, [id]: plan } }));
+    setPrep(id, undefined);
+    if (usePresent.getState().active && usePresent.getState().option === id) apply();
+  };
+  const fail = (id: OptionId, error: string): void => {
+    if (my !== epoch) return;
+    usePresent.setState((st) => ({ errors: { ...st.errors, [id]: error } }));
+    setPrep(id, undefined);
+  };
+
+  const missing = PRESENT_OPTIONS.filter((o) => !usePresent.getState().plans[o.id]);
+  for (const o of missing) setPrep(o.id, 'loading…');
+  if (rulesAsWritten(overrides)) {
+    const pre = await loadPrebuiltPlans(fetchSource(dataBaseUrl()));
+    if (my !== epoch) return;
+    for (const o of missing) {
+      const plan = pre[o.id];
+      if (plan) done(o.id, plan);
+    }
+  }
+
   for (const o of PRESENT_OPTIONS) {
-    if (have[o.id]) continue;
-    const ov: OverrideSet = {
-      ...overrides,
-      planning: {
-        ...overrides.planning,
-        'options.villa_sizing': o.sizing,
-        'options.road_orientation': o.roads,
-      },
-    };
-    const id = prepId++;
+    if (usePresent.getState().plans[o.id]) continue;
     const req: PipelineRequest = {
       job: 'pipeline',
-      id,
+      id: prepId++,
       baseUrl: dataBaseUrl(),
-      overrides: ov,
+      overrides: { ...overrides, planning: { ...overrides.planning, 'options.villa_sizing': o.sizing, 'options.road_orientation': o.roads } },
     };
-    const setPrep = (msg: string | undefined): void =>
-      usePresent.setState((st) => {
-        const prep = { ...st.prep };
-        if (msg === undefined) delete prep[o.id];
-        else prep[o.id] = msg;
-        return { prep };
+    const onMain = (): void => {
+      setPrep(o.id, 'queued on this page (it may pause)…');
+      mainQueue = mainQueue.then(async () => {
+        if (my !== epoch) return;
+        try {
+          const { runPipelineJob } = await import('../engine/runGeneration');
+          const { plan } = await runPipelineJob(req, (m) => setPrep(o.id, m));
+          done(o.id, plan);
+        } catch (e) {
+          fail(o.id, e instanceof Error ? e.message : String(e));
+        }
       });
-    const done = (plan: PlanResult): void => {
-      usePresent.setState((st) => ({ plans: { ...st.plans, [o.id]: plan } }));
-      setPrep(undefined);
-      if (usePresent.getState().active && usePresent.getState().option === o.id) apply();
     };
-    const fail = (error: string): void => {
-      usePresent.setState((st) => ({
-        errors: { ...st.errors, [o.id]: error },
-      }));
-      setPrep(undefined);
-    };
-    setPrep('starting…');
-    let w: Worker | null = null;
+    setPrep(o.id, 'starting…');
+    let worker: Worker;
     try {
-      w = new Worker(new URL('../workers/generate.worker.ts', import.meta.url), { type: 'module' });
+      worker = new Worker(new URL('../workers/generate.worker.ts', import.meta.url), { type: 'module' });
     } catch {
-      w = null;
-    }
-    if (!w) {
-      void import('../engine/runGeneration')
-        .then(({ runPipelineJob }) => runPipelineJob(req, (m) => setPrep(m)))
-        .then(({ plan }) => done(plan))
-        .catch((e: unknown) => fail(e instanceof Error ? e.message : String(e)));
+      onMain();
       continue;
     }
-    const worker = w;
     workers.push(worker);
-    worker.onmessage = (ev: MessageEvent<GenerateResponse>) => {
-      const msg = ev.data;
-      if (msg.id !== id) return;
-      if (msg.status === 'progress') {
-        setPrep(msg.message);
-        return;
-      }
-      if (msg.status === 'pipeline') done(msg.plan);
-      else if (msg.status === 'error') fail(msg.error);
+    const drop = (): void => {
       worker.terminate();
       workers = workers.filter((x) => x !== worker);
     };
-    worker.onerror = () => {
-      fail('the worker stopped');
-      worker.terminate();
-      workers = workers.filter((x) => x !== worker);
+    worker.onmessage = (ev: MessageEvent<GenerateResponse>) => {
+      const msg = ev.data;
+      if (msg.id !== req.id) return;
+      if (msg.status === 'progress') {
+        setPrep(o.id, msg.message);
+        return;
+      }
+      if (msg.status === 'pipeline') done(o.id, msg.plan);
+      else if (msg.status === 'error') fail(o.id, msg.error);
+      drop();
+    };
+    // A host that blocks workers fails them here, not at construction: plan on the page instead.
+    worker.onerror = (ev) => {
+      ev.preventDefault();
+      drop();
+      onMain();
     };
     worker.postMessage(req);
   }
@@ -436,12 +466,13 @@ export const usePresent = create<PresentState>((set, get) => ({
     set({ active: true, step: 0, option, plans, prep: {}, errors: {}, saved });
     useSite.setState({ viewMode: '3d' });
     apply();
-    prepare(useSettings.getState().overrides);
+    void prepare(useSettings.getState().overrides);
   },
   stop: () => {
     const { saved } = get();
     for (const w of workers) w.terminate();
     workers = [];
+    epoch += 1;
     set({ active: false, prep: {} });
     if (saved) {
       useSite.setState({

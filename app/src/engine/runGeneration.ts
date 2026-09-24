@@ -1,6 +1,7 @@
 import { loadSite } from './site/loadSite';
 import type { SiteModel } from './site/loadSite';
 import { fetchSource } from './data/source';
+import type { AssetSource } from './data/source';
 import { applyOverrides } from './data/overrides';
 import type { OverrideSet } from './data/overrides';
 import { loadConfig } from './data/config';
@@ -92,8 +93,9 @@ async function loadContext(
   overrides: OverrideSet,
   onProgress: (message: string) => void,
   zoneEdits: readonly ZoneEdit[] = [],
+  source?: AssetSource,
 ): Promise<{ site: SiteModel; config: ConfigBundle }> {
-  const src = fetchSource(baseUrl);
+  const src = source ?? fetchSource(baseUrl);
   onProgress('loading site data');
   sitePromise ??= loadSite(src);
   configPromise ??= loadConfig(src);
@@ -119,8 +121,10 @@ async function loadContext(
 export async function runPipelineJob(
   req: PipelineRequest,
   onProgress: (message: string) => void = () => {},
+  /** Where the data comes from; fetched from `req.baseUrl` when absent (the prebuilt plans read from disk). */
+  source?: AssetSource,
 ): Promise<{ analysis: AnalysisResult; plan: PlanResult }> {
-  const { site, config } = await loadContext(req.baseUrl, req.overrides, onProgress);
+  const { site, config } = await loadContext(req.baseUrl, req.overrides, onProgress, [], source);
   onProgress('steps 1-7: water, slope and plotable land');
   const analysis = runAnalysis({
     dem: site.dem,
