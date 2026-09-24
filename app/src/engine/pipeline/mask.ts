@@ -215,7 +215,7 @@ export function dropSmall(dem: Dem, m: Mask, minM2: number): Mask {
  * anticlockwise, holes clockwise; where two cells touch only at a corner they
  * are kept apart (4-connected), so no ring ever crosses itself.
  */
-export function toMulti(dem: Dem, m: Mask): MultiPoly {
+export function toMulti(dem: Dem, m: Mask, smooth = false): MultiPoly {
   const { nx, ny, x0, y0, cell_m } = dem.meta;
   const on = (i: number, j: number): boolean => i >= 0 && j >= 0 && i < nx && j < ny && m[j * nx + i] === 1;
   // Vertices are lattice corners (i, j) with key j * (nx + 1) + i.
@@ -262,7 +262,8 @@ export function toMulti(dem: Dem, m: Mask): MultiPoly {
         dir = step(cur, nxt);
         cur = nxt;
       }
-      rings.push(simplify(ring.map(corner)));
+      const r = simplify(ring.map(corner));
+      rings.push(smooth ? smoothRing(r, cell_m) : r);
     }
   }
 
@@ -296,6 +297,78 @@ function midpointInside(h: Ring): Pt | null {
   // For a clockwise ring the filled side (the outer polygon's interior) is on
   // the left of the walking direction: step a hair that way.
   return [mx - ((b[1] - a[1]) / len) * 1e-3, my + ((b[0] - a[0]) / len) * 1e-3];
+}
+
+/**
+ * A traced ring without its 2 m staircase, for drawing: every corner is cut
+ * back to the middle of its edges (so a run of cell steps becomes a straight
+ * diagonal), then straightened within a third of a cell. Orientation is kept,
+ * so outers and holes still sort by the sign of their area.
+ */
+export function smoothRing(r: Ring, cell: number): Ring {
+  const n = r.length;
+  if (n < 4) return r;
+  const cut: Pt[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const p = r[(i - 1 + n) % n]!;
+    const c = r[i]!;
+    const q = r[(i + 1) % n]!;
+    const lp = Math.hypot(p[0] - c[0], p[1] - c[1]);
+    const lq = Math.hypot(q[0] - c[0], q[1] - c[1]);
+    const t = Math.min(cell / 2, lp / 2, lq / 2);
+    if (lp > 0) cut.push([c[0] + ((p[0] - c[0]) * t) / lp, c[1] + ((p[1] - c[1]) * t) / lp]);
+    if (lq > 0) cut.push([c[0] + ((q[0] - c[0]) * t) / lq, c[1] + ((q[1] - c[1]) * t) / lq]);
+  }
+  const out = dpRing(cut, cell / 3);
+  return out.length >= 3 ? out : r;
+}
+
+function dpOpen(pts: readonly Pt[], tol: number): Pt[] {
+  if (pts.length < 3) return [...pts];
+  const keep = new Uint8Array(pts.length);
+  keep[0] = 1;
+  keep[pts.length - 1] = 1;
+  const stack: [number, number][] = [[0, pts.length - 1]];
+  while (stack.length > 0) {
+    const [a, b] = stack.pop()!;
+    const A = pts[a]!;
+    const B = pts[b]!;
+    const dx = B[0] - A[0];
+    const dy = B[1] - A[1];
+    const L = Math.hypot(dx, dy);
+    let best = -1;
+    let far = 0;
+    for (let i = a + 1; i < b; i += 1) {
+      const P = pts[i]!;
+      const d = L > 0 ? Math.abs(dx * (A[1] - P[1]) - dy * (A[0] - P[0])) / L : Math.hypot(P[0] - A[0], P[1] - A[1]);
+      if (d > far) {
+        far = d;
+        best = i;
+      }
+    }
+    if (best >= 0 && far > tol) {
+      keep[best] = 1;
+      stack.push([a, best], [best, b]);
+    }
+  }
+  return pts.filter((_, i) => keep[i] === 1);
+}
+
+function dpRing(pts: readonly Pt[], tol: number): Pt[] {
+  if (pts.length < 5) return [...pts];
+  // Split at the point furthest from the first, so both halves are open lines.
+  let far = 0;
+  let fd = -1;
+  for (let i = 1; i < pts.length; i += 1) {
+    const d = Math.hypot(pts[i]![0] - pts[0]![0], pts[i]![1] - pts[0]![1]);
+    if (d > fd) {
+      fd = d;
+      far = i;
+    }
+  }
+  const a = dpOpen(pts.slice(0, far + 1), tol);
+  const b = dpOpen([...pts.slice(far), pts[0]!], tol);
+  return [...a.slice(0, -1), ...b.slice(0, -1)];
 }
 
 /** Drops corners where the edge carries straight on. */

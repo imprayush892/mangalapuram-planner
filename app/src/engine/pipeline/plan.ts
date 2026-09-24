@@ -3,40 +3,55 @@ import type { MultiPoly, Pt, Ring } from '../geom/types';
 import type { SiteFeature } from '../site/types';
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
+import { bufferPolyline } from '../geom/offset';
 import { coverageFsi, highRise, gapBetweenBuildingsM } from '../rules/kmbr';
 import type { Occupancy } from '../rules/kmbr';
 import { sftToM2, M2_PER_ACRE } from '../units';
 import type { AnalysisResult } from './analysis';
 import { parseRatio } from './analysis';
 import type { Mask } from './mask';
-import { and, areaM2, count, dilate, emptyMask, erode, maskFrom, or, patches, toMulti } from './mask';
+import { and, areaM2, count, dilate, distanceTo, emptyMask, erode, maskFrom, minus, or, patches, rasterise, toMulti } from './mask';
 import { corridor, gradeLimitedProfile, lineLength, pathToLine, route } from './route';
 
 /**
- * Planning steps 8-16: from the plotable land to buildings on the ground.
+ * Planning steps 8-16, led by the client's zoning plan (owner, 25 Sep 2026).
  *
- *   8  roads         existing roads fixed and checked; primary roads reach every
- *                    plotable zone, secondary roads split big zones into blocks,
- *                    tertiary streets serve the villa plots; every road held to
- *                    its tier's gradient, cut and fill where the ground will not do
- *   12 typologies    each block given a use, in the owner's priority order, by
- *                    what its ground and position suit
- *   9  plots         villa blocks cut into plots along contour streets
- *   10 plot slope    every plot's ground fitted with a plane and checked to 1:5
- *   11 cut and fill  a platform at no more than 1:5 for each plot, balanced;
- *                    pads for buildings; the road profiles
- *   13 FSI           villas G 60% + F 40% of the plot; senior and apartment
- *                    buildings sized back from the units the programme asks for
- *   14 placement     buildings placed on the flattest ground that keeps the
- *                    required clear distance; apartment podiums take up the fall
+ *   0  zones         every zone keeps the use the client's zoning plan gives it;
+ *                    only the water and the terrain take ground from it
+ *                    (waterlogging, Rule 22 slope, natural drains -> open space)
+ *   8  roads         existing roads fixed and checked; primary roads join every
+ *                    zone to the network along the gaps and edges between zones,
+ *                    never through the school, clubhouse or senior campus;
+ *                    in the villa zones, streets along the contours at the
+ *                    spacing that fits the most plots and cross streets up the
+ *                    slope; every road held to its tier's gradient
+ *   9  plots         villa plots on both sides of every road through villa land:
+ *                    the main type (2,500-3,000 sq ft) first, a compact one
+ *                    (2,000-2,500) where the main one will not fit
+ *   10-11 slope      every plot's platform held to 1:5, cut and fill balanced
+ *   13-14 buildings  senior, school, clubhouse, commercial and the batching
+ *                    plant as compact groups in their zones; apartment towers
+ *                    spread over their zone on its lower ground, under the
+ *                    airport height limit, none standing in another's view
+ *   -  golf          gentle open ground in and beside the clubhouse zone
+ *   -  tidy          roads that serve nothing are taken out and their land
+ *                    given to green
  *   15-16 massing    everything above, ready to draw in 2D and 3D
- *
- * Typologies are settled per block before the villa plots are cut, because a
- * plot's size depends on what it is for.
  */
 
 export type RoadTier = 'existing' | 'primary' | 'secondary' | 'tertiary';
-export type Typology = 'school' | 'clubhouse' | 'senior' | 'apartments' | 'villas' | 'open';
+export type Typology =
+  | 'school'
+  | 'clubhouse'
+  | 'golf'
+  | 'senior'
+  | 'apartments'
+  | 'villas'
+  | 'commercial'
+  | 'batching'
+  | 'reserved'
+  | 'open';
+export type BuildingUse = 'school' | 'clubhouse' | 'senior' | 'apartments' | 'commercial' | 'batching';
 
 export interface PlanRoad {
   id: string;
@@ -52,6 +67,8 @@ export interface PlanRoad {
   withinLimitAsIs: boolean;
   cutM3: number;
   fillM3: number;
+  /** Villa plots fronting it. */
+  plots: number;
   notes: string[];
 }
 
@@ -65,6 +82,8 @@ export interface PlanBlock {
   frontage: RoadTier[];
   centroid: Pt;
   typology: Typology;
+  /** The client zone it lies in, or null outside every zone. */
+  zone: string | null;
   why: string[];
   builtUpM2: number;
   fsi: number;
@@ -83,6 +102,10 @@ export interface Platform {
 export interface PlanPlot {
   id: string;
   blockId: string;
+  zone: string;
+  /** Main type (villas.built_area_sft) or the compact fill-in (villas.compact_built_area_sft). */
+  kind: 'standard' | 'compact';
+  roadId: string;
   ring: Ring;
   areaM2: number;
   widthM: number;
@@ -99,12 +122,16 @@ export interface PlanPlot {
 export interface PlanBuilding {
   id: string;
   blockId: string;
-  typology: Exclude<Typology, 'villas' | 'open'>;
+  zone: string;
+  typology: BuildingUse;
   ring: Ring;
   footprintM2: number;
   floors: number;
   heightM: number;
   baseRl: number;
+  /** Highest point, lift room and parapet included (KMBR Rule 24(2)), RL and above mean sea level. */
+  topRl: number;
+  topAmslM: number;
   units: number;
   builtUpM2: number;
   podium?: { ring: Ring; topRl: number; bottomRl: number; heightM: number; levels: number };
@@ -112,7 +139,7 @@ export interface PlanBuilding {
   notes: string[];
 }
 
-/** A development parcel: the blocks one use was given, with its FSI worked out. */
+/** A development parcel: one zone's land for one use, with its FSI worked out. */
 export interface PlanParcel {
   id: string;
   use: Typology;
@@ -132,12 +159,30 @@ export interface ProgrammeRow {
   note: string;
 }
 
+/** What became of one client zone. */
+export interface ZoneReport {
+  name: string;
+  use: Typology;
+  areaM2: number;
+  buildableM2: number;
+  /** Taken from the zone: waterlogged at the planning storm's peak, Rule 22 slope, natural drains. */
+  waterM2: number;
+  steepM2: number;
+  drainM2: number;
+  roadsM2: number;
+  /** What was built there, in words. */
+  holds: string;
+}
+
 export interface PlanResult {
   roads: PlanRoad[];
   blocks: PlanBlock[];
   plots: PlanPlot[];
   buildings: PlanBuilding[];
   parcels: PlanParcel[];
+  zones: ZoneReport[];
+  golf: { areaM2: number; inZoneM2: number; outsideZoneM2: number; onWaterloggedM2: number; maxGrade: number };
+  airport: { capAmslM: number; capRl: number; tbmAmslM: number; rooftopM: number };
   /** Design minus ground per DEM cell: + fill, − cut, 0 untouched. */
   earthwork: Float32Array;
   cutM3: number;
@@ -153,6 +198,8 @@ export interface PlanResult {
 export interface PlanInput {
   dem: Dem;
   features: SiteFeature[];
+  /** The client's zoning plan, clipped to the parcel. */
+  zones: { name: string; geom: MultiPoly }[];
   kmbr: YamlDoc;
   client: YamlDoc;
   assumptions: YamlDoc;
@@ -448,15 +495,139 @@ interface ProgrammeLine {
 
 /* ---------------------------------------------------------------- run */
 
+interface RoadRec extends PlanRoad {
+  /** Corridor cells inside the parcel. */
+  cells: Int32Array;
+  /** Cut (−) or fill (+) per corridor cell it grades, kept apart so a road taken out takes its earthwork with it. */
+  dzCells: Int32Array;
+  dz: Float32Array;
+  kept: boolean;
+  /** A villa street laid along a row of plots. */
+  row: boolean;
+  /** A drive laid to a building. */
+  access: boolean;
+}
+
+interface Cand {
+  f: Frame;
+  a0: number;
+  a1: number;
+  b0: number;
+  b1: number;
+  fall: number;
+  lo: number;
+  hi: number;
+  c: Pt;
+}
+
+interface Placed {
+  ring: Ring;
+  cand: Cand;
+}
+
+interface DraftPlot {
+  ring: Ring;
+  f: Frame;
+  a0: number;
+  b0: number;
+  w: number;
+  d: number;
+  road: RoadRec | null;
+  zone: string;
+}
+
+const N4: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+
+/** Segments bucketed on a grid, for "is anything near this rectangle" questions. */
+class SegIndex {
+  private readonly cells = new Map<string, { a: Pt; b: Pt; half: number }[]>();
+  constructor(private readonly size: number) {}
+  private key(i: number, j: number): string {
+    return `${i},${j}`;
+  }
+  add(a: Pt, b: Pt, half: number): void {
+    const s = this.size;
+    const i0 = Math.floor((Math.min(a[0], b[0]) - half) / s);
+    const i1 = Math.floor((Math.max(a[0], b[0]) + half) / s);
+    const j0 = Math.floor((Math.min(a[1], b[1]) - half) / s);
+    const j1 = Math.floor((Math.max(a[1], b[1]) + half) / s);
+    for (let i = i0; i <= i1; i += 1) {
+      for (let j = j0; j <= j1; j += 1) {
+        const k = this.key(i, j);
+        const list = this.cells.get(k);
+        if (list) list.push({ a, b, half });
+        else this.cells.set(k, [{ a, b, half }]);
+      }
+    }
+  }
+  addLine(line: readonly Pt[], half: number): void {
+    for (let q = 1; q < line.length; q += 1) this.add(line[q - 1]!, line[q]!, half);
+  }
+  near(ring: Ring): { a: Pt; b: Pt; half: number }[] {
+    const s = this.size;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const [x, y] of ring) {
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+    const seen = new Set<{ a: Pt; b: Pt; half: number }>();
+    for (let i = Math.floor(x0 / s); i <= Math.floor(x1 / s); i += 1) {
+      for (let j = Math.floor(y0 / s); j <= Math.floor(y1 / s); j += 1) {
+        for (const e of this.cells.get(this.key(i, j)) ?? []) seen.add(e);
+      }
+    }
+    return [...seen];
+  }
+}
+
+/** Rings bucketed by centre, for overlap tests between plots. */
+class RingIndex {
+  private readonly cells = new Map<string, Ring[]>();
+  constructor(private readonly size: number) {}
+  private at(r: Ring): [number, number] {
+    const cx = r.reduce((s, p) => s + p[0], 0) / r.length;
+    const cy = r.reduce((s, p) => s + p[1], 0) / r.length;
+    return [Math.floor(cx / this.size), Math.floor(cy / this.size)];
+  }
+  add(r: Ring): void {
+    const [i, j] = this.at(r);
+    const k = `${i},${j}`;
+    const list = this.cells.get(k);
+    if (list) list.push(r);
+    else this.cells.set(k, [r]);
+  }
+  overlaps(r: Ring): boolean {
+    const [i, j] = this.at(r);
+    for (let di = -1; di <= 1; di += 1) {
+      for (let dj = -1; dj <= 1; dj += 1) {
+        for (const o of this.cells.get(`${i + di},${j + dj}`) ?? []) if (rectsOverlap(o, r)) return true;
+      }
+    }
+    return false;
+  }
+}
+
 export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult {
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const { dem, planning } = input;
-  const { nx } = dem.meta;
-  const n = nx * dem.meta.ny;
+  const { nx, ny } = dem.meta;
+  const n = nx * ny;
   const cellArea = dem.cell * dem.cell;
   const L = analysis.layers;
+  const terrain = L.terrain.mask;
   const notes: string[] = [];
-  const delta = new Float32Array(n);
+  const ac = (m2: number): string => `${(m2 / M2_PER_ACRE).toFixed(2)} ac`;
+  const sft = (m2: number): string => Math.round(m2 * 10.7639).toLocaleString('en-IN');
 
   const lim = {
     primary: parseRatio(pick(planning, 'roads.max_gradient.primary', null), 'roads.max_gradient.primary'),
@@ -471,64 +642,153 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const plotLimit = analysis.limits.plotMax;
   const penalty = num(planning, 'roads.routing.over_grade_penalty');
 
+  /* ---------------------------------------------- 0 the client's zones */
+  const useRules = pick<{ match: string; use: string }[]>(planning, 'zoning.uses', []);
+  const zoneUse = (name: string): Typology => {
+    const r = useRules.find((u) => name.toUpperCase().includes(String(u.match).toUpperCase()));
+    return (r?.use ?? 'open') as Typology;
+  };
+  interface ZoneInfo {
+    name: string;
+    use: Typology;
+    mask: Mask;
+    cells: number[];
+    areaM2: number;
+  }
+  const zoneOf = new Int16Array(n).fill(-1);
+  const zones: ZoneInfo[] = input.zones.map((z, zi) => {
+    const r = and(rasterise(dem, z.geom), terrain);
+    const mask = emptyMask(dem);
+    const cells: number[] = [];
+    for (let k = 0; k < n; k += 1) {
+      if (!r[k] || zoneOf[k]! >= 0) continue;
+      zoneOf[k] = zi;
+      mask[k] = 1;
+      cells.push(k);
+    }
+    return { name: z.name, use: zoneUse(z.name), mask, cells, areaM2: cells.length * cellArea };
+  });
+  if (zones.every((z) => z.cells.length === 0)) notes.push('no client zone lies in the parcel: nothing to plan');
+  // The ground each zone can build on: not waterlogged at the planning storm's
+  // peak, not Rule 22 slope, clear of the natural drains and the built roads.
+  const buildable = minus(terrain, L.waterlogging.mask, L.nonBuildable.mask, L.drains.mask, L.existingRoads.mask);
+  const landCache = new Map<ZoneInfo, Mask>();
+  const zoneLand = (z: ZoneInfo): Mask => {
+    let m = landCache.get(z);
+    if (!m) {
+      m = and(z.mask, buildable);
+      landCache.set(z, m);
+    }
+    return m;
+  };
+  const cellsOf = (m: Mask): number[] => {
+    const out: number[] = [];
+    for (let k = 0; k < n; k += 1) if (m[k]) out.push(k);
+    return out;
+  };
+
   /* ------------------------------------------------ 8a existing roads */
   const existingTier = pick<string>(planning, 'roads.existing_tier', 'primary') as 'primary' | 'secondary' | 'tertiary';
   const exLimit = lim[existingTier] ?? lim.primary;
+  const exWidth = pick<number>(input.client, 'roads.public.width_m', 10);
+  const existingLines: Pt[][] = input.features.filter((f) => f.kind === 'existing_road_edge').flatMap((f) => f.lines);
   let exLen = 0;
   let exOver = 0;
   let exMax = 0;
-  for (const f of input.features) {
-    if (f.kind !== 'existing_road_edge') continue;
-    for (const line of f.lines) {
-      for (let a = 1; a < line.length; a += 1) {
-        const p = line[a - 1]!;
-        const q = line[a]!;
-        const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
-        const zp = dem.sampleBilinear(p);
-        const zq = dem.sampleBilinear(q);
-        if (!(len > 2) || !Number.isFinite(zp) || !Number.isFinite(zq)) continue;
-        const g = Math.abs(zq - zp) / len;
-        exLen += len;
-        exMax = Math.max(exMax, g);
-        if (g > exLimit) exOver += len;
-      }
+  for (const line of existingLines) {
+    for (let a = 1; a < line.length; a += 1) {
+      const p = line[a - 1]!;
+      const q = line[a]!;
+      const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      const zp = dem.sampleBilinear(p);
+      const zq = dem.sampleBilinear(q);
+      if (!(len > 2) || !Number.isFinite(zp) || !Number.isFinite(zq)) continue;
+      const g = Math.abs(zq - zp) / len;
+      exLen += len;
+      exMax = Math.max(exMax, g);
+      if (g > exLimit) exOver += len;
     }
   }
 
   /* ------------------------------------------------------- cost map */
+  // Per metre of road: along a zone's edge 1, through the gaps the zoning plan
+  // leaves between zones less, through a zone's middle more, and through the
+  // school, clubhouse and senior campuses so much more that a road only goes
+  // there to reach them.
   const c = {
     publicSpace: num(planning, 'roads.routing.cost.public_space'),
     wet: num(planning, 'roads.routing.cost.waterlogging'),
     drain: num(planning, 'roads.routing.cost.natural_drain'),
     road: num(planning, 'roads.routing.cost.existing_road'),
   };
+  const interiorCost = pick<Record<string, number>>(planning, 'roads.zone_interior_cost', {});
+  const edgeBand = num(planning, 'roads.zone_edge_band_m');
+  const outsideCost = num(planning, 'roads.outside_zones_cost');
+  const isProtected = (u: Typology): boolean => (interiorCost[u] ?? 0) > 5;
+  const zoneEdge = emptyMask(dem);
+  for (let k = 0; k < n; k += 1) {
+    if (!terrain[k]) continue;
+    const i = k % nx;
+    const j = (k - i) / nx;
+    for (const [di, dj] of N4) {
+      const a = i + di;
+      const b = j + dj;
+      if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+      const q = b * nx + a;
+      if (terrain[q] && zoneOf[q] !== zoneOf[k]) {
+        zoneEdge[k] = 1;
+        break;
+      }
+    }
+  }
+  const edgeDist = distanceTo(dem, zoneEdge);
   const baseCost = new Float32Array(n).fill(Number.POSITIVE_INFINITY);
   for (let k = 0; k < n; k += 1) {
-    if (!L.terrain.mask[k]) continue;
-    if (L.nonBuildable.mask[k]) continue;
-    let v = 1;
-    if (L.publicSpace.mask[k]) v = c.publicSpace;
-    if (L.waterlogging.mask[k]) v = c.wet;
-    if (L.drains.mask[k]) v = c.drain;
+    if (!terrain[k] || L.nonBuildable.mask[k]) continue;
+    const zi = zoneOf[k]!;
+    let v: number;
+    if (zi < 0) v = outsideCost;
+    else {
+      const u = zones[zi]!.use;
+      const inner = interiorCost[u] ?? 2.5;
+      v = isProtected(u) ? inner : edgeDist[k]! <= edgeBand ? 1 : inner;
+    }
+    if (L.publicSpace.mask[k]) v = Math.max(v, c.publicSpace);
+    if (L.waterlogging.mask[k]) v = Math.max(v, c.wet);
+    if (L.drains.mask[k]) v = Math.max(v, c.drain);
     if (L.existingRoads.mask[k]) v = c.road;
     baseCost[k] = v;
   }
 
-  const roads: PlanRoad[] = [];
-  let network: Mask = Uint8Array.from(L.existingRoads.mask);
-  const addRoad = (tier: Exclude<RoadTier, 'existing'>, path: number[], why: string): Mask | null => {
-    if (path.length < 2) return null;
-    const line = pathToLine(dem, path);
-    if (lineLength(line) < 4) return null;
+  /* ----------------------------------------------------------- roads */
+  const roads: RoadRec[] = [];
+  const network: Mask = Uint8Array.from(L.existingRoads.mask);
+  const scratch = new Float32Array(n);
+  const addRoad = (tier: Exclude<RoadTier, 'existing'>, line: Pt[], why: string, row = false): RoadRec | null => {
+    if (line.length < 2 || lineLength(line) < 4) return null;
     const prof = gradeLimitedProfile(dem, line, lim[tier]);
-    const cor = corridor(dem, line, width[tier], prof, delta);
-    const corMask = and(cor.mask, L.terrain.mask);
-    roads.push({
-      id: `${tier}-${roads.filter((r) => r.tier === tier).length + 1}`,
+    const cor = corridor(dem, line, width[tier], prof, scratch);
+    const cells: number[] = [];
+    const dzCells: number[] = [];
+    const dz: number[] = [];
+    for (let k = 0; k < n; k += 1) {
+      if (!cor.mask[k]) continue;
+      if (scratch[k] !== 0) {
+        dzCells.push(k);
+        dz.push(scratch[k]!);
+        scratch[k] = 0;
+      }
+      if (terrain[k]) {
+        cells.push(k);
+        network[k] = 1;
+      }
+    }
+    const rec: RoadRec = {
+      id: '',
       tier,
       centreline: line,
       widthM: width[tier],
-      geom: toMulti(dem, corMask),
+      geom: bufferPolyline(line, width[tier]),
       lengthM: lineLength(line),
       limit: lim[tier],
       terrainMaxGrade: prof.terrainMaxGrade,
@@ -536,34 +796,69 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       withinLimitAsIs: prof.terrainMaxGrade <= lim[tier] + 1e-6,
       cutM3: cor.cutM3,
       fillM3: cor.fillM3,
+      plots: 0,
       notes: [why],
-    });
-    network = or(network, corMask);
-    return corMask;
+      cells: Int32Array.from(cells),
+      dzCells: Int32Array.from(dzCells),
+      dz: Float32Array.from(dz),
+      kept: true,
+      row,
+      access: false,
+    };
+    roads.push(rec);
+    return rec;
+  };
+  const networkCells = (): number[] => cellsOf(network);
+  /** Some cell of `cells` lies within `r` cells of the network. */
+  const nearNetwork = (cells: readonly number[], r = 1): boolean => {
+    for (const k of cells) {
+      const i = k % nx;
+      const j = (k - i) / nx;
+      for (let dj = -r; dj <= r; dj += 1) {
+        for (let di = -r; di <= r; di += 1) {
+          const a = i + di;
+          const b = j + dj;
+          if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+          if (network[b * nx + a]) return true;
+        }
+      }
+    }
+    return false;
+  };
+  const rebuildNetwork = (): void => {
+    network.set(L.existingRoads.mask);
+    for (const r of roads) if (r.kept) for (const k of r.cells) network[k] = 1;
   };
 
   /* ------------------------------------------------- 8b primary roads */
-  const zones = patches(dem, L.plotable.mask).sort((a, b) => b.length - a.length);
   if (count(network) === 0) {
     notes.push('no existing road inside the parcel: the primary network starts from the largest zone');
-    const first = zones[0];
-    if (first) for (const k of first.slice(0, 1)) network[k] = 1;
+    const first = [...zones].sort((a, b) => b.areaM2 - a.areaM2)[0];
+    const k0 = first ? cellsOf(zoneLand(first))[0] : undefined;
+    if (k0 !== undefined) network[k0] = 1;
   }
+  const minPiece = num(planning, 'roads.primary_serves_pieces_over_m2');
   let unreached = 0;
-  for (const zone of zones) {
-    const zmask = emptyMask(dem);
-    for (const k of zone) zmask[k] = 1;
-    if (count(and(dilate(dem, network, dem.cell), zmask)) > 0) continue;
-    const sources: number[] = [];
-    for (let k = 0; k < n; k += 1) if (network[k]) sources.push(k);
-    const r = route({ dem, cost: baseCost, grade: lim.primary, overGradePenalty: penalty, sources, targets: zmask });
-    if (!r.path) {
-      unreached += 1;
-      continue;
+  const zoneOrder = zones
+    .filter((z) => z.use !== 'reserved' && z.use !== 'open' && z.cells.length > 0)
+    .sort((a, b) => b.areaM2 - a.areaM2);
+  for (const z of zoneOrder) {
+    const pieces = patches(dem, zoneLand(z))
+      .filter((p) => p.length * cellArea >= minPiece)
+      .sort((a, b) => b.length - a.length);
+    for (const piece of pieces) {
+      if (nearNetwork(piece, 1)) continue;
+      const target = emptyMask(dem);
+      for (const k of piece) target[k] = 1;
+      const r = route({ dem, cost: baseCost, grade: lim.primary, overGradePenalty: penalty, sources: networkCells(), targets: target });
+      if (!r.path) {
+        unreached += 1;
+        continue;
+      }
+      addRoad('primary', pathToLine(dem, r.path), `joins ${z.name} (${ac(piece.length * cellArea)} of buildable land) to the network`);
     }
-    addRoad('primary', r.path, `joins a ${((zone.length * cellArea) / M2_PER_ACRE).toFixed(1)} ac plotable zone to the network`);
   }
-  if (unreached > 0) notes.push(`${unreached} plotable zones could not be reached by any road and are left unplanned`);
+  if (unreached > 0) notes.push(`${unreached} pieces of zone land could not be reached by any road`);
 
   /* --------------------------------------- programme and typology sizes */
   const lines = pick<ProgrammeLine[]>(input.programme, 'lines', []);
@@ -583,6 +878,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const villaUnits = units('villas');
   const schoolBuaM2 = sftToM2(bua('school'));
   const clubBuaM2 = sftToM2(bua('club'));
+  const commercialBuaM2 = sftToM2(bua('commercial'));
+  const conventionLine = byUse('convention')[0] as (ProgrammeLine & { hall_m2?: number }) | undefined;
+  const conventionHallM2 = conventionLine?.hall_m2 ?? (conventionLine?.bua_sft ? sftToM2(conventionLine.bua_sft) : 0);
 
   const sen = {
     floors: num(planning, 'senior_living.min_floors'),
@@ -597,21 +895,28 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     fsi: num(planning, 'apartments.fsi_max'),
     fpf: num(planning, 'apartments.flats_per_floor'),
     maxFloors: num(planning, 'apartments.max_floors'),
+    minFloors: num(planning, 'apartments.min_floors'),
     eff: num(planning, 'apartments.plan_efficiency'),
     aspect: num(planning, 'apartments.plate_aspect'),
     clear: num(planning, 'apartments.min_clear_between_buildings_m'),
     setback: num(planning, 'apartments.setback_m'),
     podium: num(planning, 'apartments.podium_margin_m'),
     fh: num(planning, 'apartments.floor_height_m'),
+    viewDepth: num(planning, 'apartments.view_clear_depth_m'),
+    viewOverlap: num(planning, 'apartments.view_max_overlap_share'),
   };
+  const air = {
+    amsl: num(planning, 'airport.permissible_top_amsl_m'),
+    tbmAmsl: num(planning, 'airport.tbm_amsl_m'),
+    tbmRl: num(planning, 'airport.tbm_rl'),
+    roof: num(planning, 'airport.rooftop_allowance_m'),
+  };
+  const capRl = air.amsl - air.tbmAmsl + air.tbmRl;
+  const toAmsl = (rl: number): number => rl - air.tbmRl + air.tbmAmsl;
   const senPlate = (sen.upf * seniorPlinthM2) / sen.eff;
   const senPerBuilding = sen.upf * sen.floors;
   const senNeeded = seniorUnits > 0 ? Math.ceil(seniorUnits / senPerBuilding) : 0;
-  const senDims = plateDims(senPlate, sen.aspect);
   const aptPlate = (apt.fpf * aptPlinthM2) / apt.eff;
-  const aptPerTower = apt.fpf * apt.maxFloors;
-  const aptNeeded = aptUnits > 0 ? Math.ceil(aptUnits / aptPerTower) : 0;
-  const aptDims = plateDims(aptPlate, apt.aspect);
   const kmbrGap = (h: number, floors: number): number => {
     try {
       return gapBetweenBuildingsM(input.kmbr, h, highRise(input.kmbr, h, floors).isHighRise);
@@ -619,720 +924,249 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       return 0;
     }
   };
-  const towerH = apt.maxFloors * apt.fh;
-  const towerClear = Math.max(apt.clear, kmbrGap(towerH, apt.maxFloors));
-
+  const towerClear = Math.max(apt.clear, kmbrGap(apt.maxFloors * apt.fh, apt.maxFloors));
   const schoolLandAc = schoolLand(lines);
-  const schoolLandM2 = schoolLandAc * M2_PER_ACRE;
-  const clubLandM2 = num(planning, 'clubhouse.building_land_ac') * M2_PER_ACRE;
-  const schoolMaxGrade = parseRatio(pick(planning, 'school.max_mean_grade', '1:8'), 'school.max_mean_grade');
   const wingMax = num(planning, 'amenities.max_wing_plate_m2');
   const wingGap = num(planning, 'amenities.min_clear_between_wings_m');
   const amenitySetback = num(planning, 'amenities.setback_m');
+  const comm = {
+    occ: pick<string>(planning, 'commercial.occupancy', 'F_commercial') as Occupancy,
+    maxFloors: num(planning, 'commercial.max_floors'),
+    wingMax: num(planning, 'commercial.max_wing_plate_m2'),
+    setback: num(planning, 'commercial.setback_m'),
+    hallFh: num(planning, 'commercial.convention_floor_height_m'),
+  };
+  const plantDims = pick<number[]>(planning, 'batching_plant.plant_footprint_m', []);
+  const plantH = num(planning, 'batching_plant.height_m');
 
-  const villaArea = sftToM2(num(planning, 'villas.design_built_area_sft'));
+  /* -------------------------------------- villa plot sizes (steps 9, 13) */
   const vFsi = num(planning, 'villas.fsi');
-  const plotArea = villaArea / vFsi;
   const plotW = num(planning, 'villas.min_plot_side_m');
-  const plotD = Math.max(plotW, plotArea / plotW);
+  const mainMinM2 = sftToM2(num(planning, 'villas.built_area_sft.min')) / vFsi;
+  const mainMaxM2 = sftToM2(num(planning, 'villas.built_area_sft.max')) / vFsi;
+  const compactMinM2 = sftToM2(num(planning, 'villas.compact_built_area_sft.min')) / vFsi;
+  const compactMaxM2 = sftToM2(num(planning, 'villas.compact_built_area_sft.max')) / vFsi;
+  const designM2 = sftToM2(num(planning, 'villas.design_built_area_sft')) / vFsi;
+  const plotD = Math.max(plotW, designM2 / plotW);
+  const mainMinD = Math.max(plotW, mainMinM2 / plotW + 0.01);
+  const mainMaxD = mainMaxM2 / plotW;
+  const depthsMain = [...new Set([plotD, (plotD + mainMinD) / 2, mainMinD])].filter((d) => d >= plotW && d <= mainMaxD + 1e-9);
+  const compactD = Math.max(plotW, compactMinM2 / plotW);
+  const depthsCompact = compactD <= compactMaxM2 / plotW + 1e-9 && compactD < mainMinD ? [compactD] : [];
   const gfShare = num(planning, 'villas.ground_floor_share_of_plot');
   const ffShare = num(planning, 'villas.first_floor_share_of_plot');
   const vfh = num(planning, 'villas.floor_height_m');
   const tw = width.tertiary;
 
-  /* -------------------------------------------- 8c the contour grid */
-  // In each plotable zone: villa streets along the contours, two plot depths
-  // and a street apart, and secondary cross streets up the slope every
-  // `cross_street_every_plots` plots. The cells between them are the blocks.
+  /* ------------------------------------- 8c streets in the villa zones */
   const minBlock = num(planning, 'plotable.min_area_m2');
   const crossEvery = num(planning, 'roads.cross_street_every_plots');
   const pitch = 2 * plotD + tw + 0.5;
   const crossPitch = crossEvery * plotW + width.secondary + 1;
-
-  const addRoadLine = (tier: Exclude<RoadTier, 'existing'>, line: Pt[], why: string): Mask | null => {
-    if (line.length < 2 || lineLength(line) < 4) return null;
-    const prof = gradeLimitedProfile(dem, line, lim[tier]);
-    const cor = corridor(dem, line, width[tier], prof, delta);
-    const corMask = and(cor.mask, L.terrain.mask);
-    roads.push({
-      id: `${tier}-${roads.filter((r) => r.tier === tier).length + 1}`,
-      tier,
-      centreline: line,
-      widthM: width[tier],
-      geom: toMulti(dem, corMask),
-      lengthM: lineLength(line),
-      limit: lim[tier],
-      terrainMaxGrade: prof.terrainMaxGrade,
-      designMaxGrade: prof.designMaxGrade,
-      withinLimitAsIs: prof.terrainMaxGrade <= lim[tier] + 1e-6,
-      cutM3: cor.cutM3,
-      fillM3: cor.fillM3,
-      notes: [why],
-    });
-    network = or(network, corMask);
-    return corMask;
-  };
-
-  type GridBlock = PlanBlock & {
-    cells: number[];
-    mask: Mask;
-    zone: number;
-    k: number;
-    m: number;
-    f: Frame;
-    v0: number;
-  };
-  const blocks: GridBlock[] = [];
-  const zoneFrames: { f: Frame; v0: number; w0: number; cot: number; cells: number[] }[] = [];
-  // A cross street whose grading would move more earth than this per metre is
-  // left out: the blocks either side join into one longer block, still
-  // reached along the contour streets.
   const maxCrossEarth = num(planning, 'roads.cross_street_max_earthwork_m3_per_m');
   let droppedCross = 0;
   let droppedEarth = 0;
-  const reached = dilate(dem, network, dem.cell * 2);
-  zones.forEach((zone, zi) => {
-    if (zone.length * cellArea < minBlock) return;
-    if (!zone.some((k) => reached[k])) return;
-    const zmask = emptyMask(dem);
-    for (const k of zone) zmask[k] = 1;
-    const f = frameFor(dem, zone);
-    // Cross streets climb at the secondary limit where the ground is steeper
-    // than it: straight up would need deep cuts, so they run at the angle
-    // whose rise is the limit (grade x sin(angle) = limit).
-    const g = zoneGrade(dem, zone);
-    const sinA = g > lim.secondary ? lim.secondary / g : 1;
-    const cot = Math.sqrt(Math.max(0, 1 - sinA * sinA)) / sinA;
-    let wmin = Infinity;
-    let wmax = -Infinity;
-    let vmin = Infinity;
-    let vmax = -Infinity;
-    for (const k of zone) {
-      const [x, y] = toFrame(f, dem.cellCentre(k % nx, Math.floor(k / nx)));
-      wmin = Math.min(wmin, x - y * cot);
-      wmax = Math.max(wmax, x - y * cot);
-      vmin = Math.min(vmin, y);
-      vmax = Math.max(vmax, y);
-    }
-    const cols = Math.max(1, Math.round((wmax - wmin) / crossPitch));
-    const w0 = (wmin + wmax) / 2 - (cols * crossPitch) / 2;
-    zoneFrames[zi] = { f, v0: vmin, w0, cot, cells: zone };
-    const why =
-      sinA < 1
-        ? `cross street every ${crossEvery} plots, climbing at ${Math.round((Math.asin(sinA) * 180) / Math.PI)}° to the contours so the ${(g * 100).toFixed(0)}% ground rises at the 1:${Math.round(1 / lim.secondary)} limit`
-        : `cross street every ${crossEvery} plots, straight up ground gentler than the limit`;
-    // Cross streets on the interior column lines, where they run through the zone.
-    for (let m = 1; m < cols; m += 1) {
-      const wc = w0 + m * crossPitch;
-      let start = Number.NaN;
-      for (let y = vmin - 1; y <= vmax + 2; y += 1) {
-        const cc = dem.cellAt(toWorld(f, wc + y * cot, y));
-        const inside = cc ? zmask[cc.j * nx + cc.i] === 1 : false;
-        if (inside && Number.isNaN(start)) start = y;
-        if ((!inside || y > vmax + 1) && !Number.isNaN(start)) {
-          if (y - start >= 20) {
-            const line: Pt[] = [toWorld(f, wc + start * cot, start), toWorld(f, wc + (y - 1) * cot, y - 1)];
-            const prof = gradeLimitedProfile(dem, line, lim.secondary);
-            let earth = 0;
-            for (let q = 1; q < prof.s.length; q += 1) {
-              earth += Math.abs(prof.design[q]! - prof.terrain[q]!) * (prof.s[q]! - prof.s[q - 1]!) * width.secondary;
+  const villaZones = zones.filter((z) => z.use === 'villas');
+  let villaLand = emptyMask(dem);
+  let villaZoneMask = emptyMask(dem);
+  for (const z of villaZones) {
+    villaLand = or(villaLand, zoneLand(z));
+    villaZoneMask = or(villaZoneMask, z.mask);
+  }
+  for (const z of villaZones) {
+    for (const piece of patches(dem, zoneLand(z))) {
+      if (piece.length * cellArea < minBlock) continue;
+      const pm = emptyMask(dem);
+      for (const k of piece) pm[k] = 1;
+      const f = frameFor(dem, piece);
+      let umin = Infinity;
+      let umax = -Infinity;
+      let vmin = Infinity;
+      let vmax = -Infinity;
+      for (const k of piece) {
+        const [a, b] = toFrame(f, dem.cellCentre(k % nx, Math.floor(k / nx)));
+        umin = Math.min(umin, a);
+        umax = Math.max(umax, a);
+        vmin = Math.min(vmin, b);
+        vmax = Math.max(vmax, b);
+      }
+      const inP = (a: number, b: number): boolean => {
+        const cc = dem.cellAt(toWorld(f, a, b));
+        return cc !== null && pm[cc.j * nx + cc.i] === 1;
+      };
+      // Cross streets up the slope, at the angle whose rise is the secondary limit.
+      const g = zoneGrade(dem, piece);
+      const sinA = g > lim.secondary ? lim.secondary / g : 1;
+      const cot = Math.sqrt(Math.max(0, 1 - sinA * sinA)) / sinA;
+      let wmin = Infinity;
+      let wmax = -Infinity;
+      for (const k of piece) {
+        const [x, y] = toFrame(f, dem.cellCentre(k % nx, Math.floor(k / nx)));
+        wmin = Math.min(wmin, x - y * cot);
+        wmax = Math.max(wmax, x - y * cot);
+      }
+      const cols = Math.max(1, Math.round((wmax - wmin) / crossPitch));
+      const w0 = (wmin + wmax) / 2 - (cols * crossPitch) / 2;
+      const crossWhy =
+        sinA < 1
+          ? `cross street every ${crossEvery} plots, climbing at ${Math.round((Math.asin(sinA) * 180) / Math.PI)}° to the contours so the ${(g * 100).toFixed(0)}% ground rises at 1:${Math.round(1 / lim.secondary)}`
+          : `cross street every ${crossEvery} plots, straight up ground gentler than the limit`;
+      for (let m = 1; m < cols; m += 1) {
+        const wc = w0 + m * crossPitch;
+        let start = Number.NaN;
+        for (let y = vmin - 1; y <= vmax + 2; y += 1) {
+          const inside = inP(wc + y * cot, y);
+          if (inside && Number.isNaN(start)) start = y;
+          if ((!inside || y > vmax + 1) && !Number.isNaN(start)) {
+            if (y - start >= 20) {
+              const line: Pt[] = [toWorld(f, wc + start * cot, start), toWorld(f, wc + (y - 1) * cot, y - 1)];
+              const prof = gradeLimitedProfile(dem, line, lim.secondary);
+              let earth = 0;
+              for (let q = 1; q < prof.s.length; q += 1) {
+                earth += Math.abs(prof.design[q]! - prof.terrain[q]!) * (prof.s[q]! - prof.s[q - 1]!) * width.secondary;
+              }
+              if (earth / lineLength(line) <= maxCrossEarth) addRoad('secondary', line, crossWhy);
+              else {
+                droppedCross += 1;
+                droppedEarth += earth;
+              }
             }
-            if (earth / lineLength(line) <= maxCrossEarth) addRoadLine('secondary', line, why);
+            start = Number.NaN;
+          }
+        }
+      }
+      // Streets along the contours at the spacing (phase) that fits the most
+      // plots either side, counted by runs of land deep enough for a plot.
+      const sideOk = (u: number, vs: number, s: 1 | -1): boolean =>
+        inP(u, vs + s * (tw / 2 + 0.6)) && inP(u, vs + s * (tw / 2 + mainMinD / 2)) && inP(u, vs + s * (tw / 2 + mainMinD - 0.6));
+      const streetsAt = (phi: number): number[] => {
+        const out: number[] = [];
+        for (let vs = vmin + phi; vs <= vmax; vs += pitch) out.push(vs);
+        return out;
+      };
+      const plotsAlong = (vs: number): number => {
+        let total = 0;
+        for (const s of [1, -1] as const) {
+          let run = 0;
+          for (let u = umin; u <= umax + 1; u += 1) {
+            if (u <= umax && inP(u, vs) && sideOk(u, vs, s)) run += 1;
             else {
-              droppedCross += 1;
-              droppedEarth += earth;
+              total += Math.floor(run / plotW);
+              run = 0;
             }
           }
-          start = Number.NaN;
+        }
+        return total;
+      };
+      let bestPhi = 0;
+      let bestCount = -1;
+      for (let phi = 0; phi < pitch; phi += 2) {
+        const got = streetsAt(phi).reduce((s, vs) => s + plotsAlong(vs), 0);
+        if (got > bestCount) {
+          bestCount = got;
+          bestPhi = phi;
+        }
+      }
+      const netAt = (u: number, vs: number): boolean => {
+        const cc = dem.cellAt(toWorld(f, u, vs));
+        return cc !== null && network[cc.j * nx + cc.i] === 1;
+      };
+      for (const vs of streetsAt(bestPhi)) {
+        let start = Number.NaN;
+        for (let u = umin - 1; u <= umax + 2; u += 1) {
+          const ok = u <= umax + 1 && inP(u, vs) && (sideOk(u, vs, 1) || sideOk(u, vs, -1));
+          if (ok && Number.isNaN(start)) start = u;
+          if (!ok && !Number.isNaN(start)) {
+            const a0 = start;
+            const a1 = u - 1;
+            start = Number.NaN;
+            if (a1 - a0 < plotW) continue;
+            // Carry the street on to meet a road within 12 m at either end.
+            let s0 = a0;
+            let s1 = a1;
+            for (let d = 1; d <= 12 && !netAt(s0, vs); d += 1) if (netAt(a0 - d, vs)) s0 = a0 - d;
+            for (let d = 1; d <= 12 && !netAt(s1, vs); d += 1) if (netAt(a1 + d, vs)) s1 = a1 + d;
+            addRoad('tertiary', [toWorld(f, s0, vs), toWorld(f, s1, vs)], `villa street along the contours in ${z.name}, plots on both sides`, true);
+          }
         }
       }
     }
-  });
+  }
   if (droppedCross > 0) {
     notes.push(
       `${droppedCross} cross streets left out: grading them to 1:${Math.round(1 / lim.secondary)} would move ${Math.round(droppedEarth).toLocaleString()} m³ (over ${maxCrossEarth} m³ a metre)`,
     );
   }
-  // Cells into blocks by their grid cell, less the roads.
-  const byKey = new Map<string, number[]>();
-  zones.forEach((zone, zi) => {
-    const zf = zoneFrames[zi];
-    if (!zf) return;
-    for (const k of zone) {
-      if (network[k]) continue;
-      const [x, y] = toFrame(zf.f, dem.cellCentre(k % nx, Math.floor(k / nx)));
-      const m = Math.floor((x - y * zf.cot - zf.w0) / crossPitch);
-      const kk = Math.floor((y - zf.v0) / pitch);
-      const key = `${zi}:${kk}:${m}`;
-      const list = byKey.get(key);
-      if (list) list.push(k);
-      else byKey.set(key, [k]);
-    }
-  });
-  const nearNetForFront = dilate(dem, network, dem.cell * 1.5);
-  const tierMaskOf = (tier: RoadTier): Mask => {
-    if (tier === 'existing') return L.existingRoads.mask;
-    let m = emptyMask(dem);
-    for (const r of roads) if (r.tier === tier) m = or(m, maskFromGeom(dem, r, L.terrain.mask));
-    return m;
-  };
-  const tierMasks: Record<'existing' | 'primary' | 'secondary', Mask> = {
-    existing: tierMaskOf('existing'),
-    primary: tierMaskOf('primary'),
-    secondary: tierMaskOf('secondary'),
-  };
-  for (const [key, cells] of byKey) {
-    const [zi, kk, m] = key.split(':').map(Number) as [number, number, number];
-    const zf = zoneFrames[zi]!;
-    const km = emptyMask(dem);
-    for (const k of cells) km[k] = 1;
-    for (const part of patches(dem, km)) {
-      if (part.length * cellArea < minBlock) continue;
-      const mask = emptyMask(dem);
-      for (const k of part) mask[k] = 1;
-      let g = 0;
-      let gn = 0;
-      let steep = 0;
-      for (const k of part) {
-        const v = analysis.gradient[k]!;
-        if (!Number.isFinite(v)) continue;
-        g += v;
-        gn += 1;
-        if (v > plotLimit) steep += 1;
+
+  // Every street must reach the network the primaries built: a group of
+  // streets on its own gets a link (at most 400 m, 1:6), or is taken out.
+  {
+    const main = emptyMask(dem);
+    for (let k = 0; k < n; k += 1) if (L.existingRoads.mask[k]) main[k] = 1;
+    for (const r of roads) if (r.tier === 'primary') for (const k of r.cells) main[k] = 1;
+    const comps = patches(dem, network);
+    const inMain = (comp: number[]): boolean => comp.some((k) => main[k]);
+    const linkCost = Float32Array.from(baseCost);
+    let dropped = 0;
+    for (const comp of comps.sort((a, b) => b.length - a.length)) {
+      if (inMain(comp)) {
+        for (const k of comp) main[k] = 1;
+        continue;
       }
-      const around = dilate(dem, mask, dem.cell * 1.5);
-      const frontage = (['existing', 'primary', 'secondary'] as const).filter((t) => count(and(around, tierMasks[t])) > 0);
-      void nearNetForFront;
-      blocks.push({
-        id: `B${blocks.length + 1}`,
-        cells: part,
-        mask,
-        zone: zi,
-        k: kk,
-        m,
-        f: zf.f,
-        v0: zf.v0,
-        geom: toMulti(dem, mask),
-        areaM2: part.length * cellArea,
-        meanGrade: gn > 0 ? g / gn : 0,
-        steepShare: gn > 0 ? steep / gn : 0,
-        frontage: [...frontage],
-        centroid: centroidOf(dem, mask),
-        typology: 'villas',
-        why: [],
-        builtUpM2: 0,
-        fsi: 0,
-      });
-    }
-  }
-
-  /* --------------------------------------------- 12 typologies by block */
-  const wetPatches = patches(dem, L.publicSpace.mask).sort((a, b) => b.length - a.length);
-  const biggestPublic = emptyMask(dem);
-  for (const k of wetPatches[0] ?? []) biggestPublic[k] = 1;
-  const nearPublic = dilate(dem, biggestPublic, 12);
-  const siteC = centroidOf(dem, L.terrain.mask);
-  const gradeText = (g: number): string => `1:${(1 / Math.max(g, 1e-3)).toFixed(0)}`;
-  const hasFront = (b: PlanBlock, tiers: RoadTier[]): boolean => b.frontage.some((t) => tiers.includes(t));
-  const isFree = (b: GridBlock): boolean => b.typology === 'villas' && b.why.length === 0;
-  const neighbours = (b: GridBlock): GridBlock[] =>
-    blocks.filter(
-      (o) =>
-        o !== b &&
-        o.zone === b.zone &&
-        ((o.m === b.m && Math.abs(o.k - b.k) === 1) || (o.k === b.k && Math.abs(o.m - b.m) === 1)),
-    );
-  /** Grow a group of free blocks from a seed, nearest-ranked neighbours first, until it has `area`. */
-  const grow = (seed: GridBlock, area: number, rank: (b: GridBlock) => number): GridBlock[] => {
-    const group = [seed];
-    let got = seed.areaM2;
-    while (got < area) {
-      const front = group
-        .flatMap(neighbours)
-        .filter((o) => isFree(o) && !group.includes(o))
-        .sort((a, b) => rank(a) - rank(b));
-      const next = front[0];
-      if (!next) break;
-      group.push(next);
-      got += next.areaM2;
-    }
-    return group;
-  };
-  type Parcel = { id: string; cells: number[]; mask: Mask; areaM2: number; blocks: GridBlock[] };
-  const parcelOf = (group: GridBlock[], id: string): Parcel => {
-    let mask = emptyMask(dem);
-    const cells: number[] = [];
-    for (const b of group) {
-      mask = or(mask, b.mask);
-      cells.push(...b.cells);
-    }
-    return { id, cells, mask, areaM2: group.reduce((s, b) => s + b.areaM2, 0), blocks: group };
-  };
-
-  type Placed = { ring: Ring; samples: { p: Pt; a: number; b: number }[] };
-  /**
-   * Up to `want` buildings of `dims` in a parcel: on a 2 m lattice in the
-   * parcel's own frame, long side along the contours or across them, kept
-   * `setback` (+ `extra`) inside, flattest ground first, never nearer than
-   * `clear` to another.
-   */
-  const place = (
-    b: { cells: number[]; mask: Mask },
-    dims: { L: number; D: number },
-    setback: number,
-    clear: number,
-    want: number,
-    extra: number,
-  ): Placed[] => {
-    if (want <= 0) return [];
-    const f = frameFor(dem, b.cells);
-    const inset = erode(dem, b.mask, setback + extra);
-    let umin = Infinity;
-    let umax = -Infinity;
-    let vmin = Infinity;
-    let vmax = -Infinity;
-    for (const k of b.cells) {
-      const [a, bb] = toFrame(f, dem.cellCentre(k % nx, Math.floor(k / nx)));
-      umin = Math.min(umin, a);
-      umax = Math.max(umax, a);
-      vmin = Math.min(vmin, bb);
-      vmax = Math.max(vmax, bb);
-    }
-    const cands: { a0: number; a1: number; b0: number; b1: number; fall: number }[] = [];
-    for (const along of [true, false]) {
-      const du = along ? dims.L : dims.D;
-      const dv = along ? dims.D : dims.L;
-      for (let a = umin + du / 2; a <= umax - du / 2; a += 2) {
-        for (let bb = vmin + dv / 2; bb <= vmax - dv / 2; bb += 2) {
-          const smp = rectSamples(f, a - du / 2, a + du / 2, bb - dv / 2, bb + dv / 2, 2);
-          if (!allIn(dem, inset, smp)) continue;
-          let lo = Infinity;
-          let hi = -Infinity;
-          for (const q of smp) {
-            const z = dem.sampleBilinear(q.p);
-            if (!Number.isFinite(z)) continue;
-            lo = Math.min(lo, z);
-            hi = Math.max(hi, z);
+      const r = route({ dem, cost: linkCost, grade: lim.tertiary, overGradePenalty: penalty, sources: comp, targets: main });
+      if (r.path && r.path.length * dem.cell <= 400) {
+        const link = addRoad('tertiary', pathToLine(dem, r.path), 'links villa streets to the network');
+        for (const k of comp) main[k] = 1;
+        if (link) for (const k of link.cells) main[k] = 1;
+      } else {
+        const inComp = new Set(comp);
+        for (const rd of roads) {
+          if (rd.kept && rd.tier !== 'primary' && rd.cells.length > 0 && inComp.has(rd.cells[0]!)) {
+            rd.kept = false;
+            dropped += 1;
           }
-          cands.push({ a0: a - du / 2, a1: a + du / 2, b0: bb - dv / 2, b1: bb + dv / 2, fall: hi - lo + (along ? 0 : 0.5) });
         }
       }
     }
-    cands.sort((x, y) => x.fall - y.fall);
-    const chosen: Placed[] = [];
-    for (const cnd of cands) {
-      if (chosen.length >= want) break;
-      const ring = rectRing(f, cnd.a0, cnd.a1, cnd.b0, cnd.b1);
-      if (chosen.some((o) => ringGap(o.ring, ring) < clear)) continue;
-      chosen.push({ ring, samples: rectSamples(f, cnd.a0, cnd.a1, cnd.b0, cnd.b1, 1) });
-    }
-    return chosen;
-  };
-
-  const fitAmenity = (
-    p: Parcel,
-    occ: Occupancy,
-    buaM2: number,
-    maxFloors: number,
-  ): { floors: number; wings: Placed[]; wingPlate: number; key: string; coverage: number } | null => {
-    const cf = coverageFsi(input.kmbr, occ);
-    let floors = 1;
-    while (floors < maxFloors && buaM2 / floors > (cf.coveragePct / 100) * p.areaM2) floors += 1;
-    for (; floors <= maxFloors; floors += 1) {
-      const plate = buaM2 / floors;
-      const nW = Math.max(1, Math.ceil(plate / wingMax));
-      const wingPlate = plate / nW;
-      const wings = place(p, plateDims(wingPlate, 2), amenitySetback, wingGap, nW, 0);
-      if (wings.length === nW) return { floors, wings, wingPlate, key: cf.key, coverage: cf.coveragePct };
-    }
-    return null;
-  };
-
-  const parcels: { parcel: Parcel; use: Typology; placed: Placed[]; fit?: NonNullable<ReturnType<typeof fitAmenity>> }[] = [];
-  const priority = pick<string[]>(planning, 'typology_priority', ['school', 'clubhouse', 'senior', 'apartments', 'villas']);
-  let clubCentroid: Pt | null = null;
-  const assign = (group: GridBlock[], use: Typology, why: string[]): void => {
-    for (const b of group) {
-      b.typology = use;
-      b.why = why;
-    }
-  };
-  const tryAmenity = (
-    use: 'school' | 'clubhouse',
-    occ: Occupancy,
-    buaM2: number,
-    maxFloors: number,
-    landM2: number,
-    seedRank: (b: GridBlock) => number,
-    why: (p: Parcel) => string[],
-  ): boolean => {
-    const seeds = blocks.filter(isFree).sort((a, b) => seedRank(a) - seedRank(b));
-    for (const seed of seeds) {
-      for (const target of [landM2, landM2 * 1.5, landM2 * 2.2, landM2 * 3.5]) {
-        const group = grow(seed, target, (b) => b.meanGrade);
-        const p = parcelOf(group, `${use}`);
-        const fit = fitAmenity(p, occ, buaM2, maxFloors);
-        if (!fit) continue;
-        assign(group, use, why(p));
-        parcels.push({ parcel: p, use, placed: fit.wings, fit });
-        if (use === 'clubhouse') clubCentroid = centroidOf(dem, p.mask);
-        return true;
-      }
-    }
-    return false;
-  };
-
-  for (const use of priority) {
-    if (use === 'school' && schoolBuaM2 > 0) {
-      const ok = tryAmenity(
-        'school',
-        'B_school',
-        schoolBuaM2,
-        4,
-        schoolLandM2,
-        (b) => (hasFront(b, ['existing', 'primary']) ? 0 : 5) + b.meanGrade / schoolMaxGrade,
-        (p) => [
-          `campus of ${(p.areaM2 / M2_PER_ACRE).toFixed(1)} ac for ${schoolLandAc} ac asked (programme.yaml school core_campus)`,
-          'grown from the gentlest block with primary frontage, for buses and drop-off',
-        ],
-      );
-      if (!ok) notes.push('no group of blocks holds the school campus and building');
-    }
-    if (use === 'clubhouse' && clubBuaM2 > 0) {
-      const ok = tryAmenity(
-        'clubhouse',
-        'D1_recreational',
-        clubBuaM2,
-        2,
-        clubLandM2,
-        (b) =>
-          (count(and(b.mask, nearPublic)) > 0 ? 0 : 5) + Math.hypot(b.centroid[0] - siteC[0], b.centroid[1] - siteC[1]) / 200,
-        () => [
-          `${(clubBuaM2 * 10.7639).toFixed(0)} sq ft of clubhouse (programme.yaml, use: club)`,
-          'beside the largest public-space patch, which takes the mini golf and landscape, and central',
-        ],
-      );
-      if (!ok) notes.push('no group of blocks holds the clubhouse');
-    }
-    if (use === 'senior' && senNeeded > 0) {
-      let left = senNeeded;
-      const perBuilding = (senDims.L + sen.clear) * (senDims.D + sen.clear);
-      for (let round = 0; round < 60 && left > 0; round += 1) {
-        const cc = clubCentroid;
-        const seed = blocks
-          .filter(isFree)
-          .sort((a, b) => {
-            const sc = (x: GridBlock): number =>
-              x.meanGrade / plotLimit + (cc ? Math.hypot(x.centroid[0] - cc[0], x.centroid[1] - cc[1]) / 300 : 0);
-            return sc(a) - sc(b);
-          })[0];
-        if (!seed) break;
-        const group = grow(seed, left * perBuilding * 1.3, (b) => b.meanGrade);
-        const p = parcelOf(group, `senior-${round + 1}`);
-        const got = place(p, senDims, sen.setback, sen.clear, left, 0);
-        if (got.length === 0) {
-          seed.why = ['no senior building fits here'];
-          seed.typology = 'villas';
-          continue;
-        }
-        left -= got.length;
-        assign(group, 'senior', [
-          `senior living: ${seniorUnits} units need ${senNeeded} buildings of ${senPerBuilding}; this group holds ${got.length}`,
-          `gentle ground (mean ${gradeText(p.blocks.reduce((s, b) => s + b.meanGrade * b.areaM2, 0) / p.areaM2)}) for step-free movement` + (cc ? ', near the clubhouse' : ''),
-        ]);
-        parcels.push({ parcel: p, use: 'senior', placed: got });
-      }
-      for (const b of blocks) if (b.why[0] === 'no senior building fits here') b.why = [];
-      if (left > 0) notes.push(`${left} senior buildings found no room`);
-    }
-    if (use === 'apartments' && aptNeeded > 0) {
-      let left = aptNeeded;
-      const perTower = Math.max(
-        (aptPlate * apt.maxFloors) / apt.fsi,
-        (aptDims.L + 2 * apt.podium + towerClear) * (aptDims.D + 2 * apt.podium + towerClear),
-      );
-      for (let round = 0; round < 80 && left > 0; round += 1) {
-        const seed = blocks
-          .filter(isFree)
-          .sort((a, b) => {
-            const sc = (x: GridBlock): number => -x.meanGrade / plotLimit + (hasFront(x, ['existing', 'primary']) ? 0 : 0.5);
-            return sc(a) - sc(b);
-          })[0];
-        if (!seed) break;
-        const group = grow(seed, left * perTower, (b) => -b.meanGrade);
-        const p = parcelOf(group, `apartments-${round + 1}`);
-        const fsiCap = Math.floor((apt.fsi * p.areaM2) / (aptPlate * apt.maxFloors));
-        const got = place(p, aptDims, apt.setback, towerClear, Math.min(left, fsiCap), apt.podium);
-        if (got.length === 0) {
-          seed.why = ['no tower fits here'];
-          continue;
-        }
-        left -= got.length;
-        assign(group, 'apartments', [
-          `apartments: ${aptUnits} units need ${aptNeeded} towers; this group holds ${got.length} within FSI ${apt.fsi}`,
-          `undulating ground (mean ${gradeText(p.blocks.reduce((s, b) => s + b.meanGrade * b.areaM2, 0) / p.areaM2)}): podiums take up the fall where villa plots would need earthwork`,
-        ]);
-        parcels.push({ parcel: p, use: 'apartments', placed: got });
-      }
-      for (const b of blocks) if (b.why[0] === 'no tower fits here') b.why = [];
-      if (left > 0) notes.push(`${left} apartment towers found no room`);
-    }
-  }
-  // Every parcel must reach a road: one with no frontage gets a secondary
-  // connector from the network, held to 1:7.
-  for (const pc of parcels) {
-    const touch = count(and(pc.parcel.mask, dilate(dem, network, dem.cell * 1.5))) > 0;
-    if (touch) continue;
-    const sources: number[] = [];
-    for (let k = 0; k < n; k += 1) if (network[k]) sources.push(k);
-    const r = route({ dem, cost: baseCost, grade: lim.secondary, overGradePenalty: penalty, sources, targets: pc.parcel.mask });
-    if (r.path) addRoad('secondary', r.path, `gives the ${pc.use} parcel its road access`);
-    else notes.push(`the ${pc.use} parcel ${pc.parcel.id} has no road access that can be built`);
-  }
-
-  // A group grows until its buildings fit; blocks no building stands on go
-  // back to the villas, keeping the land each use must hold on its own:
-  // FSI for apartments, the campus for the school, the building land for
-  // the clubhouse, a building's share with its clearance for senior living.
-  for (const pc of parcels) {
-    const holds = new Set<number>();
-    for (const pl of pc.placed) {
-      for (const q of pl.samples) {
-        const cc = dem.cellAt(q.p);
-        if (cc) {
-          const bi = blocks.indexOf(pc.parcel.blocks.find((b) => b.mask[cc.j * nx + cc.i] === 1) as GridBlock);
-          if (bi >= 0) holds.add(bi);
-        }
-      }
-    }
-    const keepArea =
-      pc.use === 'apartments'
-        ? (pc.placed.length * aptPlate * apt.maxFloors) / apt.fsi
-        : pc.use === 'school'
-          ? schoolLandM2
-          : pc.use === 'clubhouse'
-            ? clubLandM2
-            : pc.placed.length * (senDims.L + sen.clear) * (senDims.D + sen.clear);
-    let area = pc.parcel.areaM2;
-    const spare = pc.parcel.blocks
-      .filter((b) => !holds.has(blocks.indexOf(b)))
-      .sort((a, b) => a.areaM2 - b.areaM2);
-    const released: GridBlock[] = [];
-    for (const b of spare) {
-      if (area - b.areaM2 < keepArea) continue;
-      area -= b.areaM2;
-      b.typology = 'villas';
-      b.why = [];
-      released.push(b);
-    }
-    if (released.length > 0) pc.parcel.blocks = pc.parcel.blocks.filter((b) => !released.includes(b));
-  }
-
-  for (const b of blocks) {
-    if (b.typology === 'villas' && b.why.length === 0) {
-      b.why = [
-        'villas take the land the other uses leave (planning_rules.yaml typology_priority)',
-        `mean ground ${gradeText(b.meanGrade)}; ${(b.steepShare * 100).toFixed(0)}% steeper than the 1:5 plot limit`,
-      ];
+    if (dropped > 0) {
+      notes.push(`${dropped} villa streets could not be joined to the network within 400 m and were left out`);
+      rebuildNetwork();
     }
   }
 
-  /* ------------------------------- 9-11, 13 villa streets, plots, platforms */
-  const plots: PlanPlot[] = [];
-  const placedRings: Ring[] = [];
-  const roadSegs: { a: Pt; b: Pt; half: number }[] = [];
-  const addSegs = (line: readonly Pt[], half: number): void => {
-    for (let q = 1; q < line.length; q += 1) roadSegs.push({ a: line[q - 1]!, b: line[q]!, half });
-  };
-  const exWidth = pick<number>(input.client, 'roads.public.width_m', 10);
-  for (const r of roads) addSegs(r.centreline, r.widthM / 2);
-  for (const f of input.features) if (f.kind === 'existing_road_edge') for (const line of f.lines) addSegs(line, exWidth / 2);
+  /* ---------------------------------- 9 villa plots along every road */
+  const segIndex = new SegIndex(25);
+  for (const line of existingLines) segIndex.addLine(line, exWidth / 2);
+  for (const r of roads) if (r.kept) segIndex.addLine(r.centreline, r.widthM / 2);
   const clearOfRoads = (ring: Ring): boolean => {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const [x, y] of ring) {
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-    for (const sg of roadSegs) {
-      const h = sg.half - 0.05;
-      if (Math.max(sg.a[0], sg.b[0]) < minX - h || Math.min(sg.a[0], sg.b[0]) > maxX + h) continue;
-      if (Math.max(sg.a[1], sg.b[1]) < minY - h || Math.min(sg.a[1], sg.b[1]) > maxY + h) continue;
-      if (ringSegmentGap(ring, sg.a, sg.b) < h) return false;
-    }
+    for (const sg of segIndex.near(ring)) if (ringSegmentGap(ring, sg.a, sg.b) < sg.half - 0.05) return false;
     return true;
   };
-  // Land is tested cell by cell, but the grid runs at an angle to the 2 m
-  // raster, so a plot filling its row band exactly always clips a cell of the
-  // next row. Rows test against all villa land; overlaps between plots are
-  // caught exactly, by geometry, in addPlot.
-  const landOk = (land: Mask, smp: readonly { p: Pt }[]): boolean => {
+  const plotLand = or(villaLand, and(network, villaZoneMask));
+  const landOk = (smp: readonly { p: Pt }[]): boolean => {
     for (const q of smp) {
       const cc = dem.cellAt(q.p);
-      if (!cc || !land[cc.j * nx + cc.i]) return false;
+      if (!cc || !plotLand[cc.j * nx + cc.i]) return false;
     }
     return true;
   };
-  const blockIndex = new Int32Array(n).fill(-1);
-  blocks.forEach((b, i) => {
-    for (const k of b.cells) blockIndex[k] = i;
-  });
-  const addPlot = (f: Frame, a0: number, b0: number): boolean => {
-    const ring = rectRing(f, a0, a0 + plotW, b0, b0 + plotD);
-    const centre = toWorld(f, a0 + plotW / 2, b0 + plotD / 2);
+  const drafts: DraftPlot[] = [];
+  const plotIndex = new RingIndex(25);
+  const tryPlot = (f: Frame, a0: number, b0: number, d: number, road: RoadRec | null): boolean => {
+    const ring = rectRing(f, a0, a0 + plotW, b0, b0 + d);
+    const centre = toWorld(f, a0 + plotW / 2, b0 + d / 2);
     const cc = dem.cellAt(centre);
-    const bi = cc ? blockIndex[cc.j * nx + cc.i]! : -1;
-    if (bi < 0 || blocks[bi]!.typology !== 'villas') return false;
-    if (placedRings.some((o) => rectsOverlap(o, ring)) || !clearOfRoads(ring)) return false;
-    const smp = rectSamples(f, a0, a0 + plotW, b0, b0 + plotD, 1);
-    const pf = platformFor(dem, smp, plotLimit, delta);
-    plots.push({
-      id: `P${plots.length + 1}`,
-      blockId: blocks[bi]!.id,
-      ring,
-      areaM2: plotW * plotD,
-      widthM: plotW,
-      depthM: plotD,
-      platform: {
-        existingGrade: pf.existingGrade,
-        designGrade: pf.designGrade,
-        withinLimitAsIs: pf.withinLimitAsIs,
-        cutM3: pf.cutM3,
-        fillM3: pf.fillM3,
-        maxCutM: pf.maxCutM,
-        maxFillM: pf.maxFillM,
-      },
-      baseRl: pf.level(a0 + plotW / 2, b0 + plotD / 2),
-      groundFloor: scaleRing(ring, Math.sqrt(gfShare)),
-      upperFloor: scaleRing(ring, Math.sqrt(ffShare)),
-      builtUpM2: plotW * plotD * (gfShare + ffShare),
-      fsi: gfShare + ffShare,
-      floorHeightM: vfh,
-    });
-    placedRings.push(ring);
+    if (!cc || !villaLand[cc.j * nx + cc.i]) return false;
+    if (!landOk(rectSamples(f, a0, a0 + plotW, b0, b0 + d, 1.5))) return false;
+    if (plotIndex.overlaps(ring) || !clearOfRoads(ring)) return false;
+    plotIndex.add(ring);
+    const zi = zoneOf[cc.j * nx + cc.i]!;
+    drafts.push({ ring, f, a0, b0, w: plotW, d, road, zone: zi >= 0 ? zones[zi]!.name : '' });
+    if (road) road.plots += 1;
     return true;
   };
-
-  let villaLand = emptyMask(dem);
-  for (const b of blocks) if (b.typology === 'villas') villaLand = or(villaLand, b.mask);
-
-  // One street through the middle of each run of villa blocks along a grid row.
-  const rows = new Map<string, GridBlock[]>();
-  for (const b of blocks) {
-    if (b.typology !== 'villas') continue;
-    const key = `${b.zone}:${b.k}`;
-    const list = rows.get(key);
-    if (list) list.push(b);
-    else rows.set(key, [b]);
-  }
-  for (const [key, row] of rows) {
-    const [zi] = key.split(':').map(Number) as [number];
-    const zf = zoneFrames[zi]!;
-    const f = zf.f;
-    const vs = zf.v0 + (row[0]!.k + 0.5) * pitch;
-    let rowMask = emptyMask(dem);
-    for (const b of row) rowMask = or(rowMask, b.mask);
-    const land = or(villaLand, network);
-    let umin = Infinity;
-    let umax = -Infinity;
-    for (const b of row) {
-      for (const k of b.cells) {
-        const [x] = toFrame(f, dem.cellCentre(k % nx, Math.floor(k / nx)));
-        umin = Math.min(umin, x);
-        umax = Math.max(umax, x);
-      }
-    }
-    // Runs of the street line through the row's own land.
-    const runs: [number, number][] = [];
-    let start = Number.NaN;
-    for (let x = umin - 1; x <= umax + 2; x += 1) {
-      const cc = dem.cellAt(toWorld(f, x, vs));
-      const inside = cc ? rowMask[cc.j * nx + cc.i] === 1 : false;
-      if (inside && Number.isNaN(start)) start = x;
-      if ((!inside || x > umax + 1) && !Number.isNaN(start)) {
-        runs.push([start, x - 1]);
-        start = Number.NaN;
-      }
-    }
-    for (const [a0, a1] of runs) {
-      if (a1 - a0 < plotW) continue;
-      // Stretch the street to meet the road network at either end, if it is close.
-      let s0 = a0;
-      let s1 = a1;
-      const netNear = (x: number): boolean => {
-        const cc = dem.cellAt(toWorld(f, x, vs));
-        return cc ? network[cc.j * nx + cc.i] === 1 : false;
-      };
-      for (let d = 1; d <= 12 && !netNear(s0); d += 1) if (netNear(a0 - d)) s0 = a0 - d;
-      for (let d = 1; d <= 12 && !netNear(s1); d += 1) if (netNear(a1 + d)) s1 = a1 + d;
-      const joined = netNear(s0) || netNear(s1);
-      const line: Pt[] = [toWorld(f, s0, vs), toWorld(f, s1, vs)];
-      let linkPath: number[] | null = null;
-      if (!joined) {
-        const cost = Float32Array.from(baseCost);
-        for (let k = 0; k < n; k += 1) {
-          if (network[k]) cost[k] = 0.5;
-          else if (Number.isFinite(cost[k]!) && !villaLand[k]) cost[k] = cost[k]! * 2;
-        }
-        const src = [line[0]!, line[1]!]
-          .map((p) => dem.cellAt(p))
-          .filter((cc): cc is { i: number; j: number } => cc !== null)
-          .map((cc) => cc.j * nx + cc.i)
-          .filter((k) => Number.isFinite(cost[k]!));
-        const r = route({ dem, cost, grade: lim.tertiary, overGradePenalty: penalty, sources: src, targets: network });
-        if (!r.path || r.path.length * dem.cell > 400) continue;
-        linkPath = r.path;
-      }
-      const prof = gradeLimitedProfile(dem, line, lim.tertiary);
-      const cor = corridor(dem, line, tw, prof, delta);
-      const streetMask = and(cor.mask, L.terrain.mask);
-      roads.push({
-        id: `tertiary-${roads.filter((r) => r.tier === 'tertiary').length + 1}`,
-        tier: 'tertiary',
-        centreline: line,
-        widthM: tw,
-        geom: toMulti(dem, streetMask),
-        lengthM: lineLength(line),
-        limit: lim.tertiary,
-        terrainMaxGrade: prof.terrainMaxGrade,
-        designMaxGrade: prof.designMaxGrade,
-        withinLimitAsIs: prof.terrainMaxGrade <= lim.tertiary + 1e-6,
-        cutM3: cor.cutM3,
-        fillM3: cor.fillM3,
-        notes: ['villa street along the contours, a row of plots either side'],
-      });
-      network = or(network, streetMask);
-      if (linkPath) {
-        const lk = pathToLine(dem, linkPath);
-        addRoadLine('tertiary', lk, 'links a villa street to the network');
-        addSegs(lk, tw / 2);
-      }
-      // Plots either side, sliding along the street to the first place each fits.
-      for (const side of [1, -1] as const) {
-        const b0 = side > 0 ? vs + tw / 2 + 0.25 : vs - tw / 2 - 0.25 - plotD;
-        for (let x = a0 - plotW / 2; x + plotW <= a1 + plotW / 2; ) {
-          const smp = rectSamples(f, x, x + plotW, b0, b0 + plotD, 1.5);
-          if (landOk(land, smp) && addPlot(f, x, b0)) x += plotW;
-          else x += 1;
-        }
-      }
-      addSegs(line, tw / 2 - 0.3);
-    }
-  }
-
-  // Then the edges: plots fronting the primary, secondary and existing roads
-  // wherever villa land is left along them.
-  const fronts: { line: Pt[]; off: number }[] = [
-    ...roads.filter((r) => r.tier === 'primary' || r.tier === 'secondary').map((r) => ({ line: r.centreline, off: r.widthM / 2 + 0.25 })),
-    ...input.features.filter((f) => f.kind === 'existing_road_edge').flatMap((f) => f.lines.map((line) => ({ line, off: exWidth / 2 + 0.25 }))),
-  ];
-  const villaPlusRoads = or(villaLand, network);
-  let frontageCount = 0;
-  for (const { line, off } of fronts) {
+  const fillAlong = (line: readonly Pt[], half: number, road: RoadRec | null): void => {
+    const off = half + 0.25;
     for (let q = 1; q < line.length; q += 1) {
       const A = line[q - 1]!;
       const B = line[q]!;
@@ -1344,217 +1178,895 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         const f: Frame = side > 0 ? { c: A, u: t, v } : { c: A, u: [-t[0], -t[1]], v };
         for (let x = 0; x + plotW <= len + 1e-6; ) {
           const a0 = side > 0 ? x : -(x + plotW);
-          const smp = rectSamples(f, a0, a0 + plotW, off, off + plotD, 1.5);
-          if (landOk(villaPlusRoads, smp) && addPlot(f, a0, off)) {
-            frontageCount += 1;
-            x += plotW;
-          } else x += 1;
+          let placed = false;
+          for (const d of [...depthsMain, ...depthsCompact]) {
+            if (tryPlot(f, a0, off, d, road)) {
+              placed = true;
+              break;
+            }
+          }
+          x += placed ? plotW : 1;
         }
       }
     }
-  }
-  if (frontageCount > 0) notes.push(`${frontageCount} villa plots front the primary, secondary and existing roads directly`);
+  };
+  // The villa streets first (they were laid for plots), then every other road.
+  for (const r of roads) if (r.kept && r.row) fillAlong(r.centreline, r.widthM / 2, r);
+  for (const r of roads) if (r.kept && !r.row) fillAlong(r.centreline, r.widthM / 2, r);
+  for (const line of existingLines) fillAlong(line, exWidth / 2, null);
 
-  for (const b of blocks) {
-    if (b.typology !== 'villas') continue;
-    const inBlock = plots.filter((p) => p.blockId === b.id);
-    b.builtUpM2 = inBlock.reduce((acc, p) => acc + p.builtUpM2, 0);
-    b.fsi = b.areaM2 > 0 ? b.builtUpM2 / b.areaM2 : 0;
-    if (inBlock.length === 0) {
-      b.typology = 'open';
-      b.why = [...b.why, 'no villa plot fits this block: kept as open space'];
-    } else b.why = [...b.why, `${inBlock.length} plots`];
-  }
+  // Later roads must go round the plots.
+  const plotCells = rasterise(
+    dem,
+    drafts.map((p) => [p.ring]),
+  );
+  for (let k = 0; k < n; k += 1) if (plotCells[k]) baseCost[k] = Number.POSITIVE_INFINITY;
 
-  /* ------------------------------------ 13-14 buildings from the placements */
-  const buildings: PlanBuilding[] = [];
-  let seniorPlaced = 0;
-  let aptPlaced = 0;
-  for (const { parcel, use, placed, fit } of parcels) {
-    if (use === 'senior') {
-      for (const pl of placed) {
-        const u = Math.min(senPerBuilding, seniorUnits - seniorPlaced);
-        if (u <= 0) break;
-        seniorPlaced += u;
-        const pf = platformFor(dem, pl.samples, 0, delta, true);
-        buildings.push({
-          id: `S${buildings.filter((x) => x.typology === 'senior').length + 1}`,
-          blockId: blockOfRing(pl.ring, parcel.blocks),
-          typology: 'senior',
-          ring: pl.ring,
+  /* ----------------------------- 13-14 buildings in their own zones */
+  // A building stands on its zone's buildable land, off every road.
+  const siteLand = (z: ZoneInfo): Mask => minus(zoneLand(z), network);
+  const aspects = pick<number[]>(planning, 'amenities.plate_aspects', [2]);
+  const candidatesIn = (land: Mask, dims: { L: number; D: number }, inset: number): Cand[] => {
+    const cells = cellsOf(land);
+    if (cells.length === 0) return [];
+    const f = frameFor(dem, cells);
+    const ins = erode(dem, land, inset);
+    let umin = Infinity;
+    let umax = -Infinity;
+    let vmin = Infinity;
+    let vmax = -Infinity;
+    for (const k of cells) {
+      const [a, b] = toFrame(f, dem.cellCentre(k % nx, Math.floor(k / nx)));
+      umin = Math.min(umin, a);
+      umax = Math.max(umax, a);
+      vmin = Math.min(vmin, b);
+      vmax = Math.max(vmax, b);
+    }
+    const out: Cand[] = [];
+    for (const along of [true, false]) {
+      const du = along ? dims.L : dims.D;
+      const dv = along ? dims.D : dims.L;
+      for (let a = umin + du / 2; a <= umax - du / 2; a += 2) {
+        for (let b = vmin + dv / 2; b <= vmax - dv / 2; b += 2) {
+          const smp = rectSamples(f, a - du / 2, a + du / 2, b - dv / 2, b + dv / 2, 3);
+          if (!allIn(dem, ins, smp)) continue;
+          let lo = Infinity;
+          let hi = -Infinity;
+          for (const q of smp) {
+            const z = dem.sampleBilinear(q.p);
+            if (!Number.isFinite(z)) continue;
+            lo = Math.min(lo, z);
+            hi = Math.max(hi, z);
+          }
+          if (!Number.isFinite(lo)) continue;
+          out.push({ f, a0: a - du / 2, a1: a + du / 2, b0: b - dv / 2, b1: b + dv / 2, fall: hi - lo + (along ? 0 : 0.5), lo, hi, c: toWorld(f, a, b) });
+        }
+      }
+    }
+    return out;
+  };
+  const ringOf = (cd: Cand): Ring => rectRing(cd.f, cd.a0, cd.a1, cd.b0, cd.b1);
+  /**
+   * Up to `want` buildings as one compact group: the flattest spot first, then
+   * each next one as close to the group as the clear distance allows, on flat
+   * ground. `fixed` are already standing and count for spacing and the group.
+   */
+  const pickCompact = (cands: Cand[], want: number, clear: number, fixed: Placed[] = []): Placed[] => {
+    const chosen: Placed[] = [];
+    const all = (): Placed[] => [...fixed, ...chosen];
+    while (chosen.length < want) {
+      const group = all();
+      const gx = group.length > 0 ? group.reduce((s, p) => s + p.cand.c[0], 0) / group.length : 0;
+      const gy = group.length > 0 ? group.reduce((s, p) => s + p.cand.c[1], 0) / group.length : 0;
+      let best: Cand | null = null;
+      let bestRing: Ring | null = null;
+      let bestS = Infinity;
+      for (const cd of cands) {
+        const s = group.length === 0 ? cd.fall : Math.hypot(cd.c[0] - gx, cd.c[1] - gy) + 10 * cd.fall;
+        if (s >= bestS) continue;
+        const ring = ringOf(cd);
+        if (group.some((o) => ringGap(o.ring, ring) < clear)) continue;
+        best = cd;
+        bestRing = ring;
+        bestS = s;
+      }
+      if (!best || !bestRing) break;
+      chosen.push({ ring: bestRing, cand: best });
+    }
+    return chosen;
+  };
+  const fitAmenity = (
+    z: ZoneInfo,
+    occ: Occupancy,
+    buaM2: number,
+    maxFloors: number,
+    plateMax: number,
+    setback: number,
+    fromFloors = 1,
+  ): { floors: number; wings: Placed[]; wingPlate: number; key: string; coverage: number } | null => {
+    const cf = coverageFsi(input.kmbr, occ);
+    const land = siteLand(z);
+    let floors = Math.max(1, fromFloors);
+    while (floors < maxFloors && buaM2 / floors > (cf.coveragePct / 100) * z.areaM2) floors += 1;
+    for (; floors <= maxFloors; floors += 1) {
+      const plate = buaM2 / floors;
+      const nW = Math.max(1, Math.ceil(plate / plateMax));
+      const wingPlate = plate / nW;
+      for (const asp of aspects) {
+        const wings = pickCompact(candidatesIn(land, plateDims(wingPlate, asp), setback), nW, wingGap);
+        if (wings.length === nW) return { floors, wings, wingPlate, key: cf.key, coverage: cf.coveragePct };
+      }
+    }
+    return null;
+  };
+
+  interface DraftBuilding {
+    zone: ZoneInfo;
+    use: BuildingUse;
+    placed: Placed;
+    footprintM2: number;
+    floors: number;
+    floorH: number;
+    units: number;
+    builtUpM2: number;
+    notes: string[];
+    podium?: { ring: Ring; topRl: number; bottomRl: number };
+    flat: boolean;
+  }
+  const draftsB: DraftBuilding[] = [];
+  let seniorLeft = senNeeded;
+  let aptUnitsLeft = aptUnits;
+  let commercialDone = false;
+  let conventionDone = false as boolean;
+  for (const z of zones) {
+    if (z.cells.length === 0) continue;
+    if (z.use === 'senior' && seniorLeft > 0) {
+      let got: Placed[] = [];
+      for (const asp of [sen.aspect, ...aspects.filter((x) => x !== sen.aspect)]) {
+        const g = pickCompact(candidatesIn(siteLand(z), plateDims(senPlate, asp), sen.setback), seniorLeft, sen.clear);
+        if (g.length > got.length) got = g;
+      }
+      for (const pl of got) {
+        const u = Math.min(senPerBuilding, seniorUnits - (senNeeded - seniorLeft) * senPerBuilding);
+        seniorLeft -= 1;
+        draftsB.push({
+          zone: z,
+          use: 'senior',
+          placed: pl,
           footprintM2: senPlate,
           floors: sen.floors,
-          heightM: sen.floors * sen.fh,
-          baseRl: pf.level(0, 0),
-          units: u,
+          floorH: sen.fh,
+          units: Math.max(0, u),
           builtUpM2: senPlate * sen.floors,
-          platform: platformOnly(pf),
           notes: [
-            `${u} units: ${sen.upf} a floor × ${sen.floors} floors (G+${sen.floors - 1}); plate ${senPlate.toFixed(0)} m² = ${sen.upf} × ${(seniorPlinthM2 * 10.7639).toFixed(0)} sq ft ÷ ${sen.eff}`,
-            `on a level pad; ${sen.clear} m clear of every other senior building`,
+            `${u} units: ${sen.upf} a floor × ${sen.floors} floors (G+${sen.floors - 1}); plate ${senPlate.toFixed(0)} m² = ${sen.upf} × ${sft(seniorPlinthM2)} sq ft ÷ ${sen.eff}`,
+            `in the client's ${z.name} zone, grouped; ${sen.clear} m clear of the others`,
           ],
+          flat: true,
         });
       }
     }
-    if (use === 'apartments') {
-      for (const pl of placed) {
-        const u = Math.min(aptPerTower, aptUnits - aptPlaced);
-        if (u <= 0) break;
-        aptPlaced += u;
-        const podiumRing = scaleRingBy(pl.ring, apt.podium);
-        let lo = Infinity;
-        let hi = -Infinity;
-        for (const smp of ringSamples(podiumRing, 2)) {
-          const z = dem.sampleBilinear(smp);
-          if (!Number.isFinite(z)) continue;
-          lo = Math.min(lo, z);
-          hi = Math.max(hi, z);
+    if (z.use === 'school' && schoolBuaM2 > 0 && !draftsB.some((b) => b.use === 'school')) {
+      const fit = fitAmenity(z, 'B_school', schoolBuaM2, 4, wingMax, amenitySetback);
+      if (!fit) notes.push(`the school's ${sft(schoolBuaM2)} sq ft does not fit in the ${z.name} zone's buildable land`);
+      else {
+        fit.wings.forEach((w, i) =>
+          draftsB.push({
+            zone: z,
+            use: 'school',
+            placed: w,
+            footprintM2: fit.wingPlate,
+            floors: fit.floors,
+            floorH: 4,
+            units: 0,
+            builtUpM2: fit.wingPlate * fit.floors,
+            notes: [
+              `wing ${i + 1} of ${fit.wings.length}: ${sft(schoolBuaM2)} sq ft in all over ${fit.floors} floors, one campus`,
+              `${fit.key}: coverage up to ${fit.coverage}%; wings ${wingGap} m apart (planning_rules.yaml amenities)`,
+            ],
+            flat: true,
+          }),
+        );
+      }
+    }
+    if (z.use === 'clubhouse' && clubBuaM2 > 0 && !draftsB.some((b) => b.use === 'clubhouse')) {
+      const fit = fitAmenity(z, 'D1_recreational', clubBuaM2, 2, wingMax, amenitySetback);
+      if (!fit) notes.push(`the clubhouse does not fit in the ${z.name} zone's buildable land`);
+      else {
+        fit.wings.forEach((w, i) =>
+          draftsB.push({
+            zone: z,
+            use: 'clubhouse',
+            placed: w,
+            footprintM2: fit.wingPlate,
+            floors: fit.floors,
+            floorH: 4,
+            units: 0,
+            builtUpM2: fit.wingPlate * fit.floors,
+            notes: [
+              `wing ${i + 1} of ${fit.wings.length}: ${sft(clubBuaM2)} sq ft in all over ${fit.floors} floors`,
+              `${fit.key}: coverage up to ${fit.coverage}%; the golf course lies round it`,
+            ],
+            flat: true,
+          }),
+        );
+      }
+    }
+    if (z.use === 'commercial' && !commercialDone && commercialBuaM2 > 0) {
+      commercialDone = true;
+      // The commercial blocks and the convention hall beside them: the blocks
+      // go up a floor at a time until the hall fits too.
+      let fit = fitAmenity(z, comm.occ, commercialBuaM2, comm.maxFloors, comm.wingMax, comm.setback);
+      let hall: Placed[] = [];
+      const firstFit = fit;
+      while (fit && conventionHallM2 > 0) {
+        for (const asp of aspects) {
+          hall = pickCompact(candidatesIn(siteLand(z), plateDims(conventionHallM2, asp), comm.setback), 1, wingGap, fit.wings);
+          if (hall.length > 0) break;
         }
-        const podH = Math.max(0, hi - lo);
-        const floors = Math.ceil(u / apt.fpf);
-        buildings.push({
-          id: `T${buildings.filter((x) => x.typology === 'apartments').length + 1}`,
-          blockId: blockOfRing(pl.ring, parcel.blocks),
-          typology: 'apartments',
-          ring: pl.ring,
-          footprintM2: aptPlate,
-          floors,
-          heightM: floors * apt.fh,
-          baseRl: hi,
-          units: u,
-          builtUpM2: aptPlate * floors,
-          podium: { ring: podiumRing, topRl: hi, bottomRl: lo, heightM: podH, levels: Math.ceil(podH / apt.fh) },
-          notes: [
-            `${u} flats: ${apt.fpf} a floor × ${floors} floors; plate ${aptPlate.toFixed(0)} m²`,
-            `podium follows the ground: ${podH.toFixed(1)} m from its low side to the tower floor (${Math.ceil(podH / apt.fh)} levels); no flat platform cut`,
-            `${towerClear.toFixed(0)} m clear of every other tower (client 12 m; KMBR for a ${towerH} m building)`,
-          ],
-        });
+        if (hall.length > 0 || fit.floors >= comm.maxFloors) break;
+        const next = fitAmenity(z, comm.occ, commercialBuaM2, comm.maxFloors, comm.wingMax, comm.setback, fit.floors + 1);
+        if (!next) break;
+        fit = next;
+      }
+      // No floor count makes room for a separate hall: keep the lowest blocks and host it.
+      if (hall.length === 0) fit = firstFit;
+      if (!fit) notes.push(`the commercial ${sft(commercialBuaM2)} sq ft does not fit in the ${z.name} zone within ${comm.maxFloors} floors`);
+      const wings = fit?.wings ?? [];
+      if (fit) {
+        const f0 = fit;
+        wings.forEach((w, i) =>
+          draftsB.push({
+            zone: z,
+            use: 'commercial',
+            placed: w,
+            footprintM2: f0.wingPlate,
+            floors: f0.floors,
+            floorH: 4,
+            units: 0,
+            builtUpM2: f0.wingPlate * f0.floors,
+            notes: [
+              `commercial block ${i + 1} of ${wings.length}: ${sft(commercialBuaM2)} sq ft in all over ${f0.floors} floors`,
+              `${f0.key}: coverage up to ${f0.coverage}%`,
+            ],
+            flat: true,
+          }),
+        );
+      }
+      if (conventionHallM2 > 0) {
+        if (hall[0]) {
+          conventionDone = true;
+          draftsB.push({
+            zone: z,
+            use: 'commercial',
+            placed: hall[0],
+            footprintM2: conventionHallM2,
+            floors: 1,
+            floorH: comm.hallFh,
+            units: 0,
+            builtUpM2: conventionHallM2,
+            notes: [`convention hall ${conventionHallM2.toFixed(0)} m² (programme.yaml convention), one floor ${comm.hallFh} m high`],
+            flat: true,
+          });
+        } else {
+          // No room for it on its own: the programme lets the commercial block
+          // host it (programme.yaml convention host), on its ground floor.
+          const host = draftsB.find((d) => d.zone === z && d.use === 'commercial');
+          if (host) {
+            conventionDone = true;
+            const h = host.floors * host.floorH + comm.hallFh;
+            host.floors += 1;
+            host.floorH = h / host.floors;
+            host.builtUpM2 += conventionHallM2;
+            host.notes.push(
+              `hosts the ${conventionHallM2.toFixed(0)} m² convention hall on its ground floor (${comm.hallFh} m high), the commercial floors above it: no room for a separate hall`,
+            );
+          } else notes.push('the convention hall does not fit in the commercial zone');
+        }
       }
     }
-    if ((use === 'school' || use === 'clubhouse') && fit) {
-      const buaM2 = use === 'school' ? schoolBuaM2 : clubBuaM2;
-      fit.wings.forEach((w, i) => {
-        const pf = platformFor(dem, w.samples, 0, delta, true);
-        buildings.push({
-          id: `${use === 'school' ? 'SCH' : 'CLUB'}-${i + 1}`,
-          blockId: blockOfRing(w.ring, parcel.blocks),
-          typology: use,
-          ring: w.ring,
-          footprintM2: fit.wingPlate,
-          floors: fit.floors,
-          heightM: fit.floors * 4,
-          baseRl: pf.level(0, 0),
+    if (z.use === 'batching' && plantDims.length === 2 && !draftsB.some((b) => b.use === 'batching')) {
+      const cands = candidatesIn(siteLand(z), { L: Math.max(plantDims[0]!, plantDims[1]!), D: Math.min(plantDims[0]!, plantDims[1]!) }, 1);
+      const got = pickCompact(cands, 1, 0);
+      if (got[0]) {
+        draftsB.push({
+          zone: z,
+          use: 'batching',
+          placed: got[0],
+          footprintM2: plantDims[0]! * plantDims[1]!,
+          floors: 1,
+          floorH: plantH,
           units: 0,
-          builtUpM2: fit.wingPlate * fit.floors,
-          platform: platformOnly(pf),
+          builtUpM2: 0,
           notes: [
-            `wing ${i + 1} of ${fit.wings.length}: ${(buaM2 * 10.7639).toFixed(0)} sq ft in all over ${fit.floors} floors`,
-            `${fit.key}: coverage up to ${fit.coverage}%; wings ${wingGap} m apart (planning_rules.yaml amenities)`,
+            `batching plant ${plantDims[0]} × ${plantDims[1]} m, ${plantH} m to the top of the silos (planning_rules.yaml batching_plant, ASSUMPTION)`,
+            'temporary works: the yard is the rest of the zone; it goes when building is done',
           ],
+          flat: true,
         });
+      } else notes.push(`the batching plant does not fit on the ${z.name} zone's buildable land`);
+    }
+    if (z.use === 'apartments' && aptUnitsLeft > 0) {
+      // Towers on the lower ground, spread over the zone, none in another's
+      // view, each under the airport height limit, within FSI on the zone.
+      /** Towers of one plan shape: lower ground first, spread, staggered, under the airport limit. */
+      const planTowers = (dims: { L: number; D: number }): DraftBuilding[] => {
+        const out: DraftBuilding[] = [];
+        let unitsLeft = aptUnitsLeft;
+        const P = apt.podium;
+        const cands = candidatesIn(siteLand(z), dims, apt.setback + P);
+        type T = Cand & { ring: Ring; pod: Ring; pLo: number; pHi: number; floorsCap: number; bc: number };
+        const towers: T[] = [];
+        for (const cd of cands) {
+          const pod = rectRing(cd.f, cd.a0 - P, cd.a1 + P, cd.b0 - P, cd.b1 + P);
+          let pLo = Infinity;
+          let pHi = -Infinity;
+          for (const q of rectSamples(cd.f, cd.a0 - P, cd.a1 + P, cd.b0 - P, cd.b1 + P, 3)) {
+            const zz = dem.sampleBilinear(q.p);
+            if (!Number.isFinite(zz)) continue;
+            pLo = Math.min(pLo, zz);
+            pHi = Math.max(pHi, zz);
+          }
+          if (!Number.isFinite(pHi)) continue;
+          const floorsCap = Math.min(apt.maxFloors, Math.floor((capRl - pHi - air.roof) / apt.fh));
+          if (floorsCap < apt.minFloors) continue;
+          towers.push({ ...cd, ring: ringOf(cd), pod, pLo, pHi, floorsCap, bc: (cd.b0 + cd.b1) / 2 });
+        }
+        const minHi = towers.reduce((m, t) => Math.min(m, t.pHi), Infinity);
+        const spreadCap = 2 * (dims.L + 2 * P) + towerClear;
+        let budget = apt.fsi * z.areaM2;
+        const chosen: T[] = [];
+        for (;;) {
+          if (unitsLeft <= 0) break;
+          let best: T | null = null;
+          let bestS = -Infinity;
+          for (const t of towers) {
+            let minD = Infinity;
+            let bad = false;
+            for (const o of chosen) {
+              // Podiums may run together (KMBR: no gap rule between buildings on
+              // one podium); the towers keep their clear distance.
+              if (ringGap(o.ring, t.ring) < towerClear) {
+                bad = true;
+                break;
+              }
+              // The view: within the view depth up or down the slope, towers are
+              // staggered, overlapping along the contours by no more than the share allowed.
+              const overlapU = Math.min(t.a1, o.a1) - Math.max(t.a0, o.a0);
+              if (overlapU > apt.viewOverlap * Math.min(t.a1 - t.a0, o.a1 - o.a0) && Math.abs(t.bc - o.bc) < apt.viewDepth) {
+                bad = true;
+                break;
+              }
+              minD = Math.min(minD, Math.hypot(t.c[0] - o.c[0], t.c[1] - o.c[1]));
+            }
+            if (bad) continue;
+            // Spread counts up to the spacing that leaves room for another tower
+            // between; beyond it the lower ground wins, so the zone still fills.
+            const s = chosen.length === 0 ? -t.pHi : Math.min(minD, spreadCap) - 2 * (t.pHi - minHi);
+            if (s > bestS) {
+              bestS = s;
+              best = t;
+            }
+          }
+          if (!best) break;
+          const floors = Math.min(best.floorsCap, Math.floor(budget / aptPlate), Math.ceil(unitsLeft / apt.fpf));
+          if (floors < apt.minFloors) break;
+          chosen.push(best);
+          budget -= aptPlate * floors;
+          const u = Math.min(unitsLeft, floors * apt.fpf);
+          unitsLeft -= u;
+          const podH = Math.max(0, best.pHi - best.pLo);
+          const capped = floors === best.floorsCap && best.floorsCap < apt.maxFloors;
+          out.push({
+            zone: z,
+            use: 'apartments',
+            placed: { ring: best.ring, cand: best },
+            footprintM2: dims.L * dims.D,
+            floors,
+            floorH: apt.fh,
+            units: u,
+            builtUpM2: aptPlate * floors,
+            notes: [
+              `${u} flats: ${apt.fpf} a floor × ${floors} floors; plate ${aptPlate.toFixed(0)} m²`,
+              capped
+                ? `held to ${floors} floors by the airport limit: top ${(best.pHi + floors * apt.fh + air.roof).toFixed(1)} RL against ${capRl.toFixed(1)} RL (${air.amsl} m AMSL)`
+                : `top ${(best.pHi + floors * apt.fh + air.roof).toFixed(1)} RL, under the airport limit of ${capRl.toFixed(1)} RL (${air.amsl} m AMSL)`,
+              `podium follows the ground: ${podH.toFixed(1)} m from its low side to the tower floor; no flat platform cut`,
+              `on the lower ground of the zone; staggered: within ${apt.viewDepth} m up or down the slope no tower hides more than ${Math.round(apt.viewOverlap * 100)}% of its width; ${towerClear.toFixed(0)} m clear of the others`,
+            ],
+            podium: { ring: best.pod, topRl: best.pHi, bottomRl: best.pLo },
+            flat: false,
+          });
+        }
+        return out;
+      };
+      let bestPlan: DraftBuilding[] = [];
+      for (const asp of [apt.aspect, ...aspects.filter((x) => x !== apt.aspect && x >= 1.5)]) {
+        const got = planTowers(plateDims(aptPlate, asp));
+        if (got.reduce((s, b) => s + b.units, 0) > bestPlan.reduce((s, b) => s + b.units, 0)) bestPlan = got;
+      }
+      for (const b of bestPlan) {
+        draftsB.push(b);
+        aptUnitsLeft -= b.units;
+      }
+    }
+  }
+  if (seniorLeft > 0) notes.push(`${seniorLeft} senior buildings (G+${sen.floors - 1}) do not fit in the senior living zone's buildable land`);
+
+  // A drive to every building that no road reaches.
+  const reachM = 12;
+  for (const b of draftsB) {
+    const ring = b.podium?.ring ?? b.placed.ring;
+    const own = rasterise(dem, [[ring]]);
+    const near = cellsOf(dilate(dem, own, reachM));
+    if (nearNetwork(near, 0)) continue;
+    const target = and(dilate(dem, own, 3), terrain);
+    const cost = Float32Array.from(baseCost);
+    for (let k = 0; k < n; k += 1) if (target[k]) cost[k] = Math.min(Number.isFinite(cost[k]!) ? cost[k]! : 5, 5);
+    const r = route({ dem, cost, grade: lim.secondary, overGradePenalty: penalty, sources: networkCells(), targets: target });
+    if (!r.path) {
+      notes.push(`no drive can be built to a ${b.use} building in ${b.zone.name}`);
+      continue;
+    }
+    const rd = addRoad('secondary', pathToLine(dem, r.path), `drive to the ${b.use} building${b.use === 'apartments' ? "'s podium" : ''} in ${b.zone.name}`);
+    if (rd) {
+      rd.access = true;
+      for (const k of rd.cells) baseCost[k] = Math.min(baseCost[k]!, c.road);
+    }
+  }
+
+  /* ------------------------------------- tidy: no roads to nowhere */
+  {
+    const minPlots = num(planning, 'roads.min_plots_per_street');
+    let bMask = emptyMask(dem);
+    for (const b of draftsB) bMask = or(bMask, rasterise(dem, [[b.podium?.ring ?? b.placed.ring]]));
+    const nearBuildings = dilate(dem, bMask, 25);
+    const serves = (r: RoadRec): boolean => {
+      if (r.access) return true;
+      if (r.plots >= (r.row ? minPlots : 1)) return true;
+      for (const k of r.cells) if (nearBuildings[k]) return true;
+      return false;
+    };
+    const owner = new Map<number, number[]>();
+    roads.forEach((r, ri) => {
+      for (const k of r.cells) {
+        const list = owner.get(k);
+        if (list) list.push(ri);
+        else owner.set(k, [ri]);
+      }
+    });
+    const neighbours = (ri: number): Set<number> => {
+      const out = new Set<number>();
+      for (const k of roads[ri]!.cells) {
+        const i = k % nx;
+        const j = (k - i) / nx;
+        for (let dj = -1; dj <= 1; dj += 1) {
+          for (let di = -1; di <= 1; di += 1) {
+            const a = i + di;
+            const b = j + dj;
+            if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+            const q = b * nx + a;
+            if (L.existingRoads.mask[q]) out.add(-1);
+            for (const o of owner.get(q) ?? []) if (o !== ri && roads[o]!.kept) out.add(o);
+          }
+        }
+      }
+      return out;
+    };
+    let removed = 0;
+    for (let changed = true; changed; ) {
+      changed = false;
+      roads.forEach((r, ri) => {
+        if (!r.kept || serves(r)) return;
+        if (neighbours(ri).size <= 1) {
+          r.kept = false;
+          removed += 1;
+          changed = true;
+        }
       });
     }
-  }
-  for (const b of blocks) {
-    if (b.typology === 'villas' || b.typology === 'open') continue;
-    const inBlock = buildings.filter((x) => x.blockId === b.id);
-    b.builtUpM2 = inBlock.reduce((acc, x) => acc + x.builtUpM2, 0);
-    b.fsi = b.areaM2 > 0 ? b.builtUpM2 / b.areaM2 : 0;
-  }
-
-  /** Which of a parcel's blocks holds most of a ring. */
-  function blockOfRing(ring: Ring, group: GridBlock[]): string {
-    const c = ring.reduce((acc, p) => [acc[0] + p[0] / ring.length, acc[1] + p[1] / ring.length] as Pt, [0, 0] as Pt);
-    const cc = dem.cellAt(c);
-    if (cc) {
-      const bi = blockIndex[cc.j * nx + cc.i]!;
-      if (bi >= 0) return blocks[bi]!.id;
+    if (removed > 0) {
+      notes.push(`${removed} roads that served nothing (a villa street with under ${minPlots} plots, a link or primary to land left unused) taken out; their land is green`);
+      rebuildNetwork();
     }
-    return group[0]?.id ?? '';
+  }
+  const keptDrafts = drafts.filter((p) => !p.road || p.road.kept);
+  if (keptDrafts.length < drafts.length) notes.push(`${drafts.length - keptDrafts.length} plots on streets taken out went with them`);
+
+  /* ------------------------------------------------------------ golf */
+  const golfMax = parseRatio(pick(planning, 'clubhouse.golf.max_grade', null), 'clubhouse.golf.max_grade');
+  const golfReach = num(planning, 'clubhouse.golf.reach_from_zone_m');
+  const golfMin = num(planning, 'clubhouse.golf.min_patch_m2');
+  let golf = emptyMask(dem);
+  let clubZoneMask = emptyMask(dem);
+  for (const z of zones) if (z.use === 'clubhouse') clubZoneMask = or(clubZoneMask, z.mask);
+  if (count(clubZoneMask) > 0) {
+    let clubBuild = emptyMask(dem);
+    for (const b of draftsB) if (b.use === 'clubhouse') clubBuild = or(clubBuild, rasterise(dem, [[b.placed.ring]]));
+    const clubParcel = dilate(dem, clubBuild, amenitySetback + wingGap / 2);
+    // Open space: ground no zone can build on, and land outside every zone.
+    const open = maskFrom(dem, (k) => terrain[k] === 1 && (!buildable[k] || zoneOf[k]! < 0));
+    let cand = or(clubZoneMask, and(open, dilate(dem, clubZoneMask, golfReach)));
+    cand = minus(cand, network, L.drains.mask, L.nonBuildable.mask, clubParcel, plotCells);
+    cand = and(cand, maskFrom(dem, (k) => analysis.gradient[k]! <= golfMax));
+    const touch = dilate(dem, clubZoneMask, dem.cell);
+    for (const p of patches(dem, cand)) {
+      if (p.length * cellArea < golfMin || !p.some((k) => touch[k])) continue;
+      for (const k of p) golf[k] = 1;
+    }
+  }
+  const golfArea = count(golf) * cellArea;
+  const golfIn = count(and(golf, clubZoneMask)) * cellArea;
+  const golfWet = count(and(golf, L.waterlogging.mask)) * cellArea;
+
+  /* ------------------------------------------- blocks: the land by use */
+  type BlockDraft = PlanBlock & { cells: number[] };
+  const blocks: BlockDraft[] = [];
+  const blockOf = new Int32Array(n).fill(-1);
+  const tierAt = new Int8Array(n).fill(-1); // 0 existing, 1 primary, 2 secondary, 3 tertiary
+  const tierCode: Record<RoadTier, number> = { existing: 0, primary: 1, secondary: 2, tertiary: 3 };
+  for (let k = 0; k < n; k += 1) if (L.existingRoads.mask[k]) tierAt[k] = 0;
+  for (const r of roads) {
+    if (!r.kept) continue;
+    for (const k of r.cells) if (tierAt[k]! < 0 || tierAt[k]! > tierCode[r.tier]) tierAt[k] = tierCode[r.tier];
+  }
+  const tierNames: RoadTier[] = ['existing', 'primary', 'secondary', 'tertiary'];
+  const gradeText = (g: number): string => `1:${(1 / Math.max(g, 1e-3)).toFixed(0)}`;
+  const addBlock = (cells: number[], typology: Typology, zone: string | null, why: string[]): void => {
+    if (cells.length * cellArea < 16) return;
+    const mask = emptyMask(dem);
+    for (const k of cells) mask[k] = 1;
+    let g = 0;
+    let gn = 0;
+    let steep = 0;
+    const front = new Set<number>();
+    for (const k of cells) {
+      const v = analysis.gradient[k]!;
+      if (Number.isFinite(v)) {
+        g += v;
+        gn += 1;
+        if (v > plotLimit) steep += 1;
+      }
+      const i = k % nx;
+      const j = (k - i) / nx;
+      for (const [di, dj] of N4) {
+        const a = i + di;
+        const b = j + dj;
+        if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+        const t = tierAt[b * nx + a]!;
+        if (t >= 0 && t <= 2) front.add(t);
+      }
+    }
+    const id = `B${blocks.length + 1}`;
+    for (const k of cells) blockOf[k] = blocks.length;
+    blocks.push({
+      id,
+      cells,
+      geom: toMulti(dem, mask, true),
+      areaM2: cells.length * cellArea,
+      meanGrade: gn > 0 ? g / gn : 0,
+      steepShare: gn > 0 ? steep / gn : 0,
+      frontage: [...front].sort().map((t) => tierNames[t]!),
+      centroid: centroidOf(dem, mask),
+      typology,
+      zone,
+      why,
+      builtUpM2: 0,
+      fsi: 0,
+    });
+  };
+  const taken = Uint8Array.from(network);
+  for (let k = 0; k < n; k += 1) if (golf[k]) taken[k] = 1;
+  const keptPlotCells = rasterise(
+    dem,
+    keptDrafts.map((p) => [p.ring]),
+  );
+  // Zone land, by the zone's use.
+  for (const z of zones) {
+    if (z.cells.length === 0) continue;
+    const land = minus(zoneLand(z), taken);
+    for (const piece of patches(dem, land)) {
+      let typ: Typology = z.use;
+      const why = [`client zoning plan: ${z.name}`];
+      if (z.use === 'villas') {
+        const hasPlot = piece.some((k) => keptPlotCells[k]);
+        if (!hasPlot) {
+          typ = 'open';
+          why.push('villa land no plot fits or no road reaches: green');
+        } else why.push('villa plots along the streets');
+      } else if (z.use === 'reserved') why.push('reserved for the hospital, deferred until the land is acquired: nothing placed');
+      else if (z.use === 'batching') why.push('batching plant yard: temporary works for construction');
+      for (const k of piece) taken[k] = 1;
+      addBlock(piece, typ, z.name, why);
+    }
+  }
+  for (const piece of patches(dem, golf)) {
+    const zi = zoneOf[piece[0]!]!;
+    addBlock(piece, 'golf', zi >= 0 ? zones[zi]!.name : null, [
+      'golf course, part of the clubhouse (owner 25 Sep)',
+      `gentle ground only: no steeper than ${gradeText(golfMax)} (planning_rules.yaml clubhouse.golf)`,
+    ]);
+  }
+  // Everything else is open space, with the reason it could not be built on.
+  const rest = minus(terrain, taken);
+  for (const piece of patches(dem, rest)) {
+    let wet = 0;
+    let steepC = 0;
+    let drain = 0;
+    let outside = 0;
+    for (const k of piece) {
+      if (L.waterlogging.mask[k]) wet += 1;
+      else if (L.nonBuildable.mask[k]) steepC += 1;
+      else if (L.drains.mask[k]) drain += 1;
+      else if (zoneOf[k]! < 0) outside += 1;
+    }
+    const why =
+      wet >= Math.max(steepC, drain, outside) && wet > 0
+        ? `waterlogged at the peak of the ${analysis.stormMm} mm storm (Rule 22(3)): open space`
+        : steepC >= Math.max(drain, outside) && steepC > 0
+          ? `${analysis.limits.nonBuildableLabel}: open space`
+          : drain >= outside && drain > 0
+            ? 'natural drain kept clear (Rule 22(4)): open space'
+            : outside > 0
+              ? 'outside every client zone: open space'
+              : 'land left over: open space';
+    const zi = zoneOf[piece[0]!]!;
+    addBlock(piece, 'open', zi >= 0 ? zones[zi]!.name : null, [why]);
   }
 
-  /* ------------------------------------------------ 13 FSI per parcel */
-  const parcelSummary: PlanParcel[] = parcels.map((pc) => {
-    const ids = new Set(pc.parcel.blocks.map((b) => b.id));
-    const inside = buildings.filter((x) => ids.has(x.blockId));
-    const area = pc.parcel.blocks.reduce((acc, b) => acc + b.areaM2, 0);
-    const built = inside.reduce((acc, x) => acc + x.builtUpM2, 0);
+  /* ------------------------- 10-11, 13 plots and buildings on the ground */
+  const delta = new Float32Array(n);
+  const plots: PlanPlot[] = keptDrafts.map((d, i) => {
+    const smp = rectSamples(d.f, d.a0, d.a0 + d.w, d.b0, d.b0 + d.d, 1);
+    const pf = platformFor(dem, smp, plotLimit, delta);
+    const area = d.w * d.d;
+    const centre = toWorld(d.f, d.a0 + d.w / 2, d.b0 + d.d / 2);
+    const cc = dem.cellAt(centre);
+    const bi = cc ? blockOf[cc.j * nx + cc.i]! : -1;
     return {
-      id: pc.parcel.id,
-      use: pc.use,
-      blockIds: [...ids],
+      id: `P${i + 1}`,
+      blockId: bi >= 0 ? blocks[bi]!.id : '',
+      zone: d.zone,
+      kind: area >= mainMinM2 - 0.5 ? 'standard' : 'compact',
+      roadId: '',
+      ring: d.ring,
       areaM2: area,
-      builtUpM2: built,
-      fsi: area > 0 ? built / area : 0,
-      buildings: inside.length,
+      widthM: d.w,
+      depthM: d.d,
+      platform: platformOnly(pf),
+      baseRl: pf.level(d.a0 + d.w / 2, d.b0 + d.d / 2),
+      groundFloor: scaleRing(d.ring, Math.sqrt(gfShare)),
+      upperFloor: scaleRing(d.ring, Math.sqrt(ffShare)),
+      builtUpM2: area * (gfShare + ffShare),
+      fsi: gfShare + ffShare,
+      floorHeightM: vfh,
     };
   });
-  for (const b of blocks) {
-    if (b.typology !== 'villas') continue;
-    const inBlock = plots.filter((x) => x.blockId === b.id);
-    if (inBlock.length === 0) continue;
-    parcelSummary.push({
-      id: `villas-${b.id}`,
-      use: 'villas',
-      blockIds: [b.id],
-      areaM2: inBlock.reduce((acc, x) => acc + x.areaM2, 0),
-      builtUpM2: inBlock.reduce((acc, x) => acc + x.builtUpM2, 0),
-      fsi: gfShare + ffShare,
-      buildings: inBlock.length,
-    });
+
+  const counters: Record<BuildingUse, number> = { school: 0, clubhouse: 0, senior: 0, apartments: 0, commercial: 0, batching: 0 };
+  const prefix: Record<BuildingUse, string> = { school: 'SCH', clubhouse: 'CLUB', senior: 'S', apartments: 'T', commercial: 'COM', batching: 'BP' };
+  const buildings: PlanBuilding[] = draftsB.map((b) => {
+    counters[b.use] += 1;
+    const cc = dem.cellAt(b.placed.cand.c);
+    const bi = cc ? blockOf[cc.j * nx + cc.i]! : -1;
+    const id = `${prefix[b.use]}${b.use === 'senior' || b.use === 'apartments' ? '' : '-'}${counters[b.use]}`;
+    const heightM = b.floors * b.floorH;
+    if (b.podium) {
+      const topRl = b.podium.topRl + heightM + air.roof;
+      const podH = Math.max(0, b.podium.topRl - b.podium.bottomRl);
+      return {
+        id,
+        blockId: bi >= 0 ? blocks[bi]!.id : '',
+        zone: b.zone.name,
+        typology: b.use,
+        ring: b.placed.ring,
+        footprintM2: b.footprintM2,
+        floors: b.floors,
+        heightM,
+        baseRl: b.podium.topRl,
+        topRl,
+        topAmslM: toAmsl(topRl),
+        units: b.units,
+        builtUpM2: b.builtUpM2,
+        podium: { ring: b.podium.ring, topRl: b.podium.topRl, bottomRl: b.podium.bottomRl, heightM: podH, levels: Math.ceil(podH / b.floorH) },
+        notes: b.notes,
+      };
+    }
+    const pf = platformFor(dem, rectSamples(b.placed.cand.f, b.placed.cand.a0, b.placed.cand.a1, b.placed.cand.b0, b.placed.cand.b1, 1), 0, delta, b.flat);
+    const baseRl = pf.level(0, 0);
+    const topRl = baseRl + heightM + (b.use === 'batching' ? 0 : air.roof);
+    return {
+      id,
+      blockId: bi >= 0 ? blocks[bi]!.id : '',
+      zone: b.zone.name,
+      typology: b.use,
+      ring: b.placed.ring,
+      footprintM2: b.footprintM2,
+      floors: b.floors,
+      heightM,
+      baseRl,
+      topRl,
+      topAmslM: toAmsl(topRl),
+      units: b.units,
+      builtUpM2: b.builtUpM2,
+      platform: platformOnly(pf),
+      notes: b.notes,
+    };
+  });
+  for (const b of buildings) {
+    if (b.topRl > capRl + 1e-6) notes.push(`${b.id} reaches ${b.topAmslM.toFixed(1)} m AMSL, over the airport limit of ${air.amsl} m`);
   }
 
+  // Roads: ids in order, their earthwork into the total where it is the larger.
+  const keptRoads = roads.filter((r) => r.kept);
+  const tierCount: Record<string, number> = {};
+  for (const r of keptRoads) {
+    tierCount[r.tier] = (tierCount[r.tier] ?? 0) + 1;
+    r.id = `${r.tier}-${tierCount[r.tier]}`;
+    for (let q = 0; q < r.dzCells.length; q += 1) {
+      const k = r.dzCells[q]!;
+      const d = r.dz[q]!;
+      if (Math.abs(d) > Math.abs(delta[k]!)) delta[k] = d;
+    }
+  }
+  keptDrafts.forEach((d, i) => {
+    plots[i]!.roadId = d.road?.id ?? 'existing';
+  });
+
+  for (const b of blocks) {
+    const inPlots = plots.filter((p) => p.blockId === b.id);
+    const inBuildings = buildings.filter((x) => x.blockId === b.id);
+    b.builtUpM2 = inPlots.reduce((s, p) => s + p.builtUpM2, 0) + inBuildings.reduce((s, x) => s + x.builtUpM2, 0);
+    b.fsi = b.areaM2 > 0 ? b.builtUpM2 / b.areaM2 : 0;
+    if (b.typology === 'villas') {
+      b.why = [...b.why.filter((w) => w !== 'villa plots along the streets'), `${inPlots.length} plots; mean ground ${gradeText(b.meanGrade)}`];
+      if (inPlots.length === 0) {
+        b.typology = 'open';
+        b.why.push('no plot lies in it: green');
+      }
+    }
+  }
+
+  /* --------------------------------------------- FSI per zone parcel */
+  const parcels: PlanParcel[] = [];
+  for (const z of zones) {
+    if (z.cells.length === 0 || z.use === 'open' || z.use === 'reserved') continue;
+    const ids = new Set(blocks.filter((b) => b.zone === z.name).map((b) => b.id));
+    if (z.use === 'villas') {
+      const ps = plots.filter((p) => p.zone === z.name);
+      if (ps.length === 0) continue;
+      parcels.push({
+        id: z.name,
+        use: 'villas',
+        blockIds: [...ids],
+        areaM2: ps.reduce((s, p) => s + p.areaM2, 0),
+        builtUpM2: ps.reduce((s, p) => s + p.builtUpM2, 0),
+        fsi: gfShare + ffShare,
+        buildings: ps.length,
+      });
+      continue;
+    }
+    const bs = buildings.filter((b) => b.zone === z.name);
+    const built = bs.reduce((s, b) => s + b.builtUpM2, 0);
+    parcels.push({ id: z.name, use: z.use, blockIds: [...ids], areaM2: z.areaM2, builtUpM2: built, fsi: z.areaM2 > 0 ? built / z.areaM2 : 0, buildings: bs.length });
+  }
+
+  /* ------------------------------------------------- zone reports */
+  const newRoadMask = minus(network, L.existingRoads.mask);
+  const zoneReports: ZoneReport[] = zones.filter((z) => z.cells.length > 0).map((z) => {
+    const inZ = (m: Mask): number => {
+      let s = 0;
+      for (const k of z.cells) if (m[k]) s += 1;
+      return s * cellArea;
+    };
+    const ps = plots.filter((p) => p.zone === z.name);
+    const bs = buildings.filter((b) => b.zone === z.name);
+    let holds: string;
+    if (z.use === 'villas') {
+      const std = ps.filter((p) => p.kind === 'standard').length;
+      holds = `${ps.length} villa plots (${std} standard, ${ps.length - std} compact)`;
+    } else if (z.use === 'reserved') holds = 'reserved (hospital, deferred)';
+    else if (z.use === 'clubhouse') holds = `${bs.length} clubhouse wings; golf ${ac(inZ(golf))} in the zone`;
+    else if (bs.length === 0) holds = z.cells.length === 0 ? 'outside the parcel' : 'nothing placed';
+    else {
+      const u = bs.reduce((s, b) => s + b.units, 0);
+      holds = `${bs.length} buildings${u > 0 ? `, ${u} units` : ''}, ${sft(bs.reduce((s, b) => s + b.builtUpM2, 0))} sq ft built up`;
+    }
+    return {
+      name: z.name,
+      use: z.use,
+      areaM2: z.areaM2,
+      buildableM2: inZ(buildable),
+      waterM2: inZ(L.waterlogging.mask),
+      steepM2: inZ(minus(L.nonBuildable.mask, L.waterlogging.mask)),
+      drainM2: inZ(minus(L.drains.mask, L.waterlogging.mask, L.nonBuildable.mask)),
+      roadsM2: inZ(newRoadMask),
+      holds,
+    };
+  });
+
   /* ------------------------------------------------------ programme */
-  const villaPlaced = plots.length;
+  const std = plots.filter((p) => p.kind === 'standard').length;
   const seniorBuilt = buildings.filter((x) => x.typology === 'senior').reduce((s, x) => s + x.units, 0);
   const aptBuilt = buildings.filter((x) => x.typology === 'apartments').reduce((s, x) => s + x.units, 0);
+  const towers = buildings.filter((x) => x.typology === 'apartments');
+  const aptParcel = parcels.find((p) => p.use === 'apartments');
+  const has = (u: BuildingUse): boolean => buildings.some((x) => x.typology === u);
+  // The convention hall is counted on its own line, whether it stands alone or a block hosts it.
+  const commercialBuilt =
+    buildings.filter((x) => x.typology === 'commercial').reduce((s, x) => s + x.builtUpM2, 0) - (conventionDone ? conventionHallM2 : 0);
   const programme: ProgrammeRow[] = [
     {
       use: 'Villas',
       asked: `${villaUnits} units`,
-      placed: `${villaPlaced} plots`,
-      met: villaPlaced >= villaUnits,
-      note: `${plotW} × ${plotD.toFixed(1)} m plots, ${(plotArea * 10.7639).toFixed(0)} sq ft built (FSI ${vFsi})`,
+      placed: `${plots.length} plots`,
+      met: plots.length >= villaUnits,
+      note: `${std} standard (${sft(mainMinM2)}-${sft(mainMaxM2)} sq ft), ${plots.length - std} compact (${sft(compactD * plotW)} sq ft); in the villa and phase zones`,
     },
     {
       use: 'Senior living',
       asked: `${seniorUnits} units`,
       placed: `${seniorBuilt} units in ${buildings.filter((x) => x.typology === 'senior').length} buildings`,
       met: seniorBuilt >= seniorUnits,
-      note: `G+${sen.floors - 1}, ${sen.upf} units a floor`,
+      note: `G+${sen.floors - 1}, ${sen.upf} units a floor, in the senior living zone`,
     },
     {
       use: 'Apartments',
       asked: `${aptUnits} units`,
-      placed: `${aptBuilt} units in ${buildings.filter((x) => x.typology === 'apartments').length} towers`,
+      placed: `${aptBuilt} units in ${towers.length} towers`,
       met: aptBuilt >= aptUnits,
-      note: `${apt.fpf} flats a floor, up to ${apt.maxFloors} floors, FSI ≤ ${apt.fsi} per block`,
+      note: `FSI ${aptParcel ? aptParcel.fsi.toFixed(2) : '0'} of ${apt.fsi} on the apartment zone; tallest ${towers.reduce((m, t) => Math.max(m, t.floors), 0)} floors, airport limit ${air.amsl} m AMSL`,
     },
     {
       use: 'School',
-      asked: `${(schoolBuaM2 * 10.7639).toFixed(0)} sq ft`,
-      placed: buildings.some((x) => x.typology === 'school') ? 'placed' : 'not placed',
-      met: buildings.some((x) => x.typology === 'school'),
-      note: `${schoolLandAc} ac campus`,
+      asked: `${sft(schoolBuaM2)} sq ft`,
+      placed: has('school') ? 'placed, one campus' : 'not placed',
+      met: has('school'),
+      note: `in the school zone; ${schoolLandAc} ac core campus asked`,
     },
     {
-      use: 'Clubhouse',
-      asked: `${(clubBuaM2 * 10.7639).toFixed(0)} sq ft`,
-      placed: buildings.some((x) => x.typology === 'clubhouse') ? 'placed' : 'not placed',
-      met: buildings.some((x) => x.typology === 'clubhouse'),
-      note: 'mini golf in the public space beside it',
+      use: 'Clubhouse and golf',
+      asked: `${sft(clubBuaM2)} sq ft`,
+      placed: has('clubhouse') ? `placed; golf ${ac(golfArea)}` : 'not placed',
+      met: has('clubhouse'),
+      note: `golf on gentle open ground: ${ac(golfIn)} in the clubhouse zone, ${ac(golfArea - golfIn)} of open space beside it (${ac(golfWet)} of it waterlogged at the peak)`,
+    },
+    {
+      use: 'Commercial',
+      asked: `${sft(commercialBuaM2)} sq ft`,
+      placed: has('commercial') ? `${sft(commercialBuilt)} sq ft` : 'not placed',
+      met: commercialBuilt >= commercialBuaM2 - 1,
+      note: 'in the commercial and convention zone',
+    },
+    {
+      use: 'Convention hall',
+      asked: conventionHallM2 > 0 ? `${conventionHallM2.toFixed(0)} m²` : '—',
+      placed: conventionDone ? 'placed' : 'not placed',
+      met: conventionDone || conventionHallM2 === 0,
+      note: buildings.some((b) => b.notes.some((t) => t.includes('convention hall on its ground floor')))
+        ? 'on the ground floor of a commercial block (no room for its own building)'
+        : 'its own building beside the commercial blocks',
+    },
+    {
+      use: 'Batching plant',
+      asked: 'the client zone',
+      placed: has('batching') ? 'placed' : 'not placed',
+      met: has('batching'),
+      note: 'temporary works yard',
     },
   ];
-  const skipped = ['commercial', 'hotel', 'office', 'hospital', 'convention'].filter((u) => byUse(u).length > 0);
-  if (skipped.length > 0) {
+  const unzoned = ['hotel', 'office'].filter((u) => byUse(u).length > 0);
+  if (unzoned.length > 0) {
     programme.push({
-      use: 'Not placed by the pipeline',
-      asked: skipped.join(', '),
+      use: 'Not placed',
+      asked: unzoned.map((u) => (u === 'office' ? 'business hub' : u)).join(', '),
       placed: '—',
       met: false,
-      note: 'outside the owner workflow (planning_rules.yaml typology_priority)',
+      note: 'the client zoning plan has no zone for them',
     });
+  }
+  if (byUse('hospital').length > 0) {
+    programme.push({ use: 'Hospital', asked: 'deferred', placed: 'zone reserved', met: true, note: 'waits for the deferred land (programme.yaml)' });
   }
 
   let cut = 0;
@@ -1567,23 +2079,29 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
 
   const ms = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
   return {
-    roads,
-    blocks: blocks.map((b) => ({
-      id: b.id,
-      geom: b.geom,
-      areaM2: b.areaM2,
-      meanGrade: b.meanGrade,
-      steepShare: b.steepShare,
-      frontage: b.frontage,
-      centroid: b.centroid,
-      typology: b.typology,
-      why: b.why,
-      builtUpM2: b.builtUpM2,
-      fsi: b.fsi,
+    roads: keptRoads.map((r) => ({
+      id: r.id,
+      tier: r.tier,
+      centreline: r.centreline,
+      widthM: r.widthM,
+      geom: r.geom,
+      lengthM: r.lengthM,
+      limit: r.limit,
+      terrainMaxGrade: r.terrainMaxGrade,
+      designMaxGrade: r.designMaxGrade,
+      withinLimitAsIs: r.withinLimitAsIs,
+      cutM3: r.cutM3,
+      fillM3: r.fillM3,
+      plots: plots.filter((p) => p.roadId === r.id).length,
+      notes: r.notes,
     })),
+    blocks: blocks.map(({ cells: _c, ...b }) => b),
     plots,
     buildings,
-    parcels: parcelSummary,
+    parcels,
+    zones: zoneReports,
+    golf: { areaM2: golfArea, inZoneM2: golfIn, outsideZoneM2: golfArea - golfIn, onWaterloggedM2: golfWet, maxGrade: golfMax },
+    airport: { capAmslM: air.amsl, capRl, tbmAmslM: air.tbmAmsl, rooftopM: air.roof },
     earthwork: delta,
     cutM3: cut,
     fillM3: fill,
@@ -1645,65 +2163,4 @@ function centroidOf(dem: Dem, mask: Mask): Pt {
   return c > 0 ? [sx / c, sy / c] : [0, 0];
 }
 
-/** A road's corridor as a mask, rebuilt from its centreline and width. */
-function maskFromGeom(dem: Dem, r: PlanRoad, within: Mask): Mask {
-  const { nx } = dem.meta;
-  const centre = emptyMask(dem);
-  for (let i = 1; i < r.centreline.length; i += 1) {
-    const a = r.centreline[i - 1]!;
-    const b = r.centreline[i]!;
-    const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (dem.cell / 2)));
-    for (let t = 0; t <= steps; t += 1) {
-      const cc = dem.cellAt([a[0] + ((b[0] - a[0]) * t) / steps, a[1] + ((b[1] - a[1]) * t) / steps]);
-      if (cc) centre[cc.j * nx + cc.i] = 1;
-    }
-  }
-  return and(dilate(dem, centre, r.widthM / 2), within);
-}
-
-/** A ring grown outward by `d` metres, keeping its rectangle shape. */
-function scaleRingBy(r: Ring, d: number): Ring {
-  // Each corner moves out along both of its edges, so every side moves out by d.
-  const out: Pt[] = [];
-  for (let i = 0; i < r.length; i += 1) {
-    const p = r[i]!;
-    const prev = r[(i - 1 + r.length) % r.length]!;
-    const next = r[(i + 1) % r.length]!;
-    const e1 = norm([p[0] - prev[0], p[1] - prev[1]]);
-    const e2 = norm([p[0] - next[0], p[1] - next[1]]);
-    out.push([p[0] + (e1[0] + e2[0]) * d, p[1] + (e1[1] + e2[1]) * d]);
-  }
-  return out;
-}
-
-const norm = (v: Pt): Pt => {
-  const L = Math.hypot(v[0], v[1]) || 1;
-  return [v[0] / L, v[1] / L];
-};
-
-function ringSamples(r: Ring, step: number): Pt[] {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const [x, y] of r) {
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-  }
-  const inside = (p: Pt): boolean => {
-    let hit = false;
-    for (let i = 0, j = r.length - 1; i < r.length; j = i, i += 1) {
-      const A = r[i]!;
-      const B = r[j]!;
-      if (A[1] > p[1] !== B[1] > p[1] && p[0] < ((B[0] - A[0]) * (p[1] - A[1])) / (B[1] - A[1]) + A[0]) hit = !hit;
-    }
-    return hit;
-  };
-  const out: Pt[] = [];
-  for (let y = minY; y <= maxY; y += step) for (let x = minX; x <= maxX; x += step) if (inside([x, y])) out.push([x, y]);
-  return out;
-}
-
-export const _test = { ringGap, platformFor, plateDims, scaleRingBy, ringArea, maskFrom, areaM2 };
+export const _test = { ringGap, platformFor, plateDims, ringArea, areaM2 };

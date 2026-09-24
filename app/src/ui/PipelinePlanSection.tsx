@@ -67,6 +67,7 @@ export default function PipelinePlanSection(): React.ReactElement {
     const ps = plan.plots;
     return {
       n: ps.length,
+      standard: ps.filter((p) => p.kind === 'standard').length,
       asIs: ps.filter((p) => p.platform.withinLimitAsIs).length,
       cut: ps.reduce((s, p) => s + p.platform.cutM3, 0),
       fill: ps.reduce((s, p) => s + p.platform.fillM3, 0),
@@ -95,7 +96,8 @@ export default function PipelinePlanSection(): React.ReactElement {
         ) : (
           <div className="flex flex-col gap-1 text-[11px]">
             <div className="text-[10px] text-muted">
-              Planned in {(planMs / 1000).toFixed(1)} s. Every block's use and every road's line come from the layers above.
+              Planned in {(planMs / 1000).toFixed(1)} s. Every use sits in its zone of the client's zoning plan; the water and
+              the slope above take ground from a zone only to give it to open space.
             </div>
 
             <div className="mt-1 font-semibold text-fg">What the programme asked, and what fits</div>
@@ -110,6 +112,36 @@ export default function PipelinePlanSection(): React.ReactElement {
                 ))}
               </tbody>
             </table>
+
+            <div className="mt-2 font-semibold text-fg">The client's zones</div>
+            <table className="w-full text-[10px]">
+              <tbody>
+                {plan.zones.map((z) => (
+                  <tr
+                    key={z.name}
+                    className="border-b border-line/30 align-top"
+                    title={`${(z.buildableM2 / AC).toFixed(2)} ac buildable; taken for open space: waterlogged ${(z.waterM2 / AC).toFixed(2)} ac, Rule 22 slope ${(z.steepM2 / AC).toFixed(2)} ac, drains ${(z.drainM2 / AC).toFixed(2)} ac; new roads ${(z.roadsM2 / AC).toFixed(2)} ac`}
+                  >
+                    <td className="py-0.5 pr-1">
+                      <span className="mr-1 inline-block h-2 w-2 rounded-sm" style={{ background: rgba(TYPOLOGY_RGB[z.use], 0.9) }} />
+                      <span className="text-fg">{z.name.toLowerCase()}</span>
+                    </td>
+                    <td className="py-0.5 pr-1 text-right font-mono text-muted">{(z.areaM2 / AC).toFixed(1)} ac</td>
+                    <td className="py-0.5 text-right text-muted">{z.holds}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <Row
+              label="Golf (clubhouse)"
+              value={`${(plan.golf.areaM2 / AC).toFixed(2)} ac`}
+              hint={`${(plan.golf.inZoneM2 / AC).toFixed(2)} ac in the clubhouse zone, ${(plan.golf.outsideZoneM2 / AC).toFixed(2)} ac of open space beside it; ${(plan.golf.onWaterloggedM2 / AC).toFixed(2)} ac of it is waterlogged at the peak; nothing steeper than 1:${Math.round(1 / plan.golf.maxGrade)}`}
+            />
+            <Row
+              label="Airport height limit"
+              value={`${plan.airport.capAmslM} m AMSL = RL ${plan.airport.capRl.toFixed(1)}`}
+              hint={`AAI colour-coded zoning map, grid C9; TBM (RL 100) taken as ${plan.airport.tbmAmslM} m AMSL, an SRTM estimate (±10 m) until surveyed; ${plan.airport.rooftopM} m allowed over the top floor. Highest building top: ${Math.max(...plan.buildings.map((b) => b.topAmslM), 0).toFixed(1)} m AMSL`}
+            />
 
             <div className="mt-2 font-semibold text-fg">Step 8 · roads</div>
             <Row
@@ -140,7 +172,11 @@ export default function PipelinePlanSection(): React.ReactElement {
             {plotStats && (
               <>
                 <div className="mt-2 font-semibold text-fg">Steps 9–11 · villa plots</div>
-                <Row label="Plots" value={`${plotStats.n}`} hint="2,850 sq ft built on a 15 m wide plot; FSI 1.0" />
+                <Row
+                  label="Plots"
+                  value={`${plotStats.n} · ${plotStats.standard} standard, ${plotStats.n - plotStats.standard} compact`}
+                  hint="standard 2,500-3,000 sq ft, compact 2,000-2,500 where a standard one will not fit; 15 m wide at least; FSI 1.0; on both sides of every road through villa land"
+                />
                 <Row
                   label="Within 1:5 as the ground lies"
                   value={`${plotStats.asIs} of ${plotStats.n}`}
@@ -160,7 +196,7 @@ export default function PipelinePlanSection(): React.ReactElement {
               .map((p) => (
                 <Row
                   key={p.id}
-                  label={`${TYPOLOGY_LABEL[p.use]} · ${p.buildings} bldg`}
+                  label={`${p.id.toLowerCase()} · ${p.buildings} bldg`}
                   value={`FSI ${p.fsi.toFixed(2)} on ${(p.areaM2 / AC).toFixed(1)} ac`}
                   hint={`${fmt(p.builtUpM2)} m² built over ${fmt(p.areaM2)} m² of parcel`}
                 />

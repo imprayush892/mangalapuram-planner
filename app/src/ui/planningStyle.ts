@@ -41,6 +41,10 @@ export const TYPOLOGY_RGB: Record<import('../engine/pipeline/plan').Typology, [n
   apartments: [225, 110, 105],
   school: [110, 165, 225],
   clubhouse: [120, 200, 125],
+  golf: [70, 160, 80],
+  commercial: [225, 130, 190],
+  batching: [165, 135, 100],
+  reserved: [200, 200, 200],
   open: [150, 160, 165],
 };
 
@@ -50,7 +54,11 @@ export const TYPOLOGY_LABEL: Record<import('../engine/pipeline/plan').Typology, 
   apartments: 'Apartments',
   school: 'School',
   clubhouse: 'Clubhouse',
-  open: 'Open space (no plot fits)',
+  golf: 'Golf (clubhouse)',
+  commercial: 'Commercial and convention',
+  batching: 'Batching plant yard',
+  reserved: 'Reserved (hospital)',
+  open: 'Open space',
 };
 
 export const TIER_RGB: Record<import('../engine/pipeline/plan').RoadTier, [number, number, number]> = {

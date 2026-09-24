@@ -87,6 +87,12 @@ export interface AnalysisResult {
   /** Slopes as rise/run: non-buildable over this, plots at most plotMax. */
   limits: { nonBuildable: number; nonBuildableLabel: string; plotMax: number };
   rule22: Rule22Check[];
+  /** The waterlogging the plan counts, and what it ignores, with the water in each (at the peak). */
+  water: {
+    counted: { areaM2: number; volumeM3: number; meanDepthM: number };
+    ignoredChannels: { areaM2: number; volumeM3: number; widthM: number };
+    ignoredPatches: { areaM2: number; volumeM3: number; underM2: number };
+  };
   ms: number;
 }
 
@@ -124,6 +130,7 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
   const minDepth = need(planning, 'hydrology.waterlogging_min_depth_m', 'planning_rules.yaml');
   const offset = need(planning, 'hydrology.building_offset_from_waterlogging_m', 'planning_rules.yaml');
   const minWaterPatch = need(planning, 'hydrology.min_waterlogging_patch_m2', 'planning_rules.yaml');
+  const narrowChannel = need(planning, 'hydrology.ignore_channels_narrower_than_m', 'planning_rules.yaml');
   const hp = hydrologyParams(input.assumptions);
   const model = waterModelFor(dem, input.features, hp.pondingDepthM);
   const c = stormRunoffCoeff(hp, stormMm);
@@ -131,7 +138,17 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
 
   const flowPaths = and(parcel, storm.channel);
   /* ------------------------------------------------------- 3 waterlogging */
-  const wet = dropSmall(dem, and(parcel, maskFrom(dem, (k) => storm.peakDepthM[k]! >= minDepth)), minWaterPatch);
+  // Owner, 25 Sep: water running in channels narrower than `narrowChannel` goes
+  // to the storm drains, and fragments under `minWaterPatch` are ignored, so the
+  // land either side joins up into one usable piece. The ponds stay.
+  const wetRaw = and(parcel, maskFrom(dem, (k) => storm.peakDepthM[k]! >= minDepth));
+  const wetOpen = narrowChannel > 0 ? openToWidth(dem, wetRaw, narrowChannel) : wetRaw;
+  const wet = dropSmall(dem, wetOpen, minWaterPatch);
+  const vol = (m: Mask): number => {
+    let v = 0;
+    for (let k = 0; k < m.length; k += 1) if (m[k]) v += storm.peakDepthM[k]! * dem.cell * dem.cell;
+    return v;
+  };
   const keepClear = offset > 0 ? and(parcel, dilate(dem, wet, offset)) : wet;
   const safe = minus(parcel, keepClear);
 
@@ -223,7 +240,8 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
       step,
       title,
       mask,
-      geom: toMulti(dem, mask),
+      // Areas are drawn without the 2 m staircase; one-cell lines stay as traced.
+      geom: toMulti(dem, mask, id !== 'flowPaths' && id !== 'drains'),
       areaM2: a,
       share: parcelArea > 0 ? a / parcelArea : 0,
       pieces: patches(dem, mask).length,
@@ -249,7 +267,8 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
     ]),
     waterlogging: make('waterlogging', 3, 'Waterlogging', wet, [
       `under at least ${minDepth} m of water at the peak of the ${stormMm} mm storm: ponds risen over their rims and water running in the swales`,
-      `${storm.pondsFull} of ${storm.pondsTotal} ponds fill to the rim; patches under ${minWaterPatch} m² dropped as puddles`,
+      `${storm.pondsFull} of ${storm.pondsTotal} ponds fill to the rim`,
+      `${ha(areaM2(dem, minus(wetRaw, wet)))} of it ignored: channels narrower than ${narrowChannel} m (carried in the storm drains) and patches under ${minWaterPatch} m² (planning_rules.yaml hydrology, owner 25 Sep)`,
       offset > 0
         ? `building kept ${offset} m clear of it (planning_rules.yaml hydrology.building_offset_from_waterlogging_m)`
         : 'no extra building offset set (planning_rules.yaml hydrology.building_offset_from_waterlogging_m = 0)',
@@ -270,7 +289,7 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
         `slope ${nonBuildableLabel}, a ${(nonBuildableRatio * 100).toFixed(0)}% gradient`,
         `${ha(areaM2(dem, steepSurvey))} from the raw survey TIN (15-Sept, facet slope), ${ha(areaM2(dem, steepMesh))} from the terrain mesh; the mesh is smoothed and flattens the steepest faces, so both count`,
         minSteepPatch > 0
-          ? `patches under ${minSteepPatch} m² left to plot-level cut and fill (${ha(areaM2(dem, minus(steepRaw, steep)))} of them)`
+          ? `specks under ${minSteepPatch} m² ignored and left to plot-level cut and fill (${ha(areaM2(dem, minus(steepRaw, steep)))} of them; owner 25 Sep)`
           : 'every cell over the limit counts: it is a statutory limit',
         'goes to the public-space network as landscape',
       ],
@@ -320,6 +339,11 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
     stormMm,
     gradient,
     limits: { nonBuildable: nonBuildableRatio, nonBuildableLabel, plotMax: plotMaxRatio },
+    water: {
+      counted: { areaM2: areaM2(dem, wet), volumeM3: vol(wet), meanDepthM: areaM2(dem, wet) > 0 ? vol(wet) / areaM2(dem, wet) : 0 },
+      ignoredChannels: { areaM2: areaM2(dem, minus(wetRaw, wetOpen)), volumeM3: vol(minus(wetRaw, wetOpen)), widthM: narrowChannel },
+      ignoredPatches: { areaM2: areaM2(dem, minus(wetOpen, wet)), volumeM3: vol(minus(wetOpen, wet)), underM2: minWaterPatch },
+    },
     rule22: [
       {
         clause: '22(3)',

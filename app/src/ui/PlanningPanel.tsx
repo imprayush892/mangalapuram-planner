@@ -5,6 +5,7 @@ import { Panel } from './primitives';
 import { LAYER_STYLE, rgba } from './planningStyle';
 import type { LayerId } from '../engine/pipeline/analysis';
 import PipelinePlanSection from './PipelinePlanSection';
+import WaterBalancePanel from './WaterBalancePanel';
 
 const AC = 4046.8564224;
 
@@ -20,11 +21,11 @@ export default function PlanningPanel(): React.ReactElement {
   const setLayer = useSite((s) => s.setLayer);
   const [open, setOpen] = useState<LayerId | null>(null);
 
-  // The client's hand-drawn zones are what this replaces: out of the way the
-  // first time, one tick away for comparison.
+  // The client's zoning plan leads the plan (owner, 25 Sep): its zones are
+  // shown the first time, without labels, under the plan's own blocks.
   useEffect(() => {
     if (zoningHidden) return;
-    setLayer('zones', false);
+    setLayer('zones', true);
     setLayer('zoneLabels', false);
     markZoningHidden();
   }, [zoningHidden, setLayer, markZoningHidden]);
@@ -73,6 +74,8 @@ export default function PlanningPanel(): React.ReactElement {
           ))}
         </ul>
       </Panel>
+
+      <WaterBalancePanel analysis={analysis} />
 
       <Panel title="Layers">
         <ul className="flex flex-col">

@@ -5,6 +5,7 @@ import type { AnalysisResult } from '../pipeline/analysis';
 import { runPlan } from '../pipeline/plan';
 import type { PlanResult } from '../pipeline/plan';
 import { sftToM2 } from '../units';
+import { and, maskFrom, minus, patches, rasterise } from '../pipeline/mask';
 
 /**
  * Planning steps 8-16 against the owner's rules (config/planning_rules.yaml).
@@ -27,7 +28,7 @@ async function plan(): Promise<{ a: AnalysisResult; p: PlanResult; s: Awaited<Re
       kmbr: c.kmbr,
     });
     const p = runPlan(
-      { dem: s.dem, features: s.features, kmbr: c.kmbr, client: c.client, assumptions: c.assumptions, planning: c.planning, programme: c.programme },
+      { dem: s.dem, features: s.features, zones: s.zones.map((z) => ({ name: z.name, geom: z.geom })), kmbr: c.kmbr, client: c.client, assumptions: c.assumptions, planning: c.planning, programme: c.programme },
       a,
     );
     cache = { a, p };
@@ -63,12 +64,14 @@ describe('step 8 roads', () => {
 });
 
 describe('steps 9-11 villa plots', () => {
-  it('cuts plots of 2,700-3,000 sq ft, no side under 15 m, aspect 1:1 to 1:2.5', async () => {
+  it('cuts plots of 2,500-3,000 sq ft, compact ones of 2,000-2,500 where those will not fit; no side under 15 m, aspect 1:1 to 1:2.5', async () => {
     const { p } = await plan();
-    expect(p.plots.length).toBeGreaterThan(50);
+    expect(p.plots.length).toBeGreaterThan(250);
     for (const pl of p.plots) {
-      expect(pl.areaM2).toBeGreaterThanOrEqual(sftToM2(2700) - 0.5);
+      expect(pl.areaM2).toBeGreaterThanOrEqual(sftToM2(2000) - 0.5);
       expect(pl.areaM2).toBeLessThanOrEqual(sftToM2(3000) + 0.5);
+      if (pl.kind === 'standard') expect(pl.areaM2).toBeGreaterThanOrEqual(sftToM2(2500) - 0.5);
+      else expect(pl.areaM2).toBeLessThanOrEqual(sftToM2(2500) + 0.5);
       const a = side(pl.ring, 0);
       const b = side(pl.ring, 1);
       expect(Math.min(a, b)).toBeGreaterThanOrEqual(15 - 1e-6);
@@ -122,12 +125,15 @@ describe('steps 9-11 villa plots', () => {
     }
   });
 
-  it('puts plots only on plotable land', async () => {
+  it('puts plots only on buildable land in the villa zones of the client zoning plan', async () => {
     const { a, p, s } = await plan();
+    const L = a.layers;
     for (const pl of p.plots) {
+      expect(/VILLA|PHASE/i.test(pl.zone), `${pl.id} in ${pl.zone}`).toBe(true);
       const c = pl.ring.reduce((s2, q) => [s2[0] + q[0] / 4, s2[1] + q[1] / 4], [0, 0]);
       const cell = s.dem.cellAt([c[0], c[1]])!;
-      expect(a.layers.plotable.mask[cell.j * s.dem.meta.nx + cell.i]).toBe(1);
+      const k = cell.j * s.dem.meta.nx + cell.i;
+      expect(L.waterlogging.mask[k] || L.nonBuildable.mask[k] || L.drains.mask[k], pl.id).toBe(0);
     }
   });
 });
@@ -181,6 +187,84 @@ describe('steps 12-14 typologies, FSI and placement', () => {
     const { p } = await plan();
     expect(p.cutM3).toBeGreaterThan(0);
     expect(p.fillM3).toBeGreaterThan(0);
+  });
+});
+
+describe('the client zoning plan leads (owner, 25 Sep)', () => {
+  it('keeps every building in the client zone for its use', async () => {
+    const { p } = await plan();
+    const zoneFor: Record<string, RegExp> = {
+      school: /SCHOOL/i,
+      clubhouse: /CLUBHOUSE/i,
+      senior: /SENIOR/i,
+      apartments: /APARTMENT/i,
+      commercial: /COMMERCIAL/i,
+      batching: /BATCHING/i,
+    };
+    for (const b of p.buildings) expect(zoneFor[b.typology]!.test(b.zone), `${b.id} in ${b.zone}`).toBe(true);
+    for (const z of p.zones) if (/HOSPITAL/i.test(z.name)) expect(p.buildings.some((b) => b.zone === z.name)).toBe(false);
+  });
+
+  it('builds the school as one campus no road runs through', async () => {
+    const { p, s } = await plan();
+    const school = s.zones.find((z) => /SCHOOL/i.test(z.name))!;
+    const land = minus(and(rasterise(s.dem, school.geom), maskFrom(s.dem, () => true)), p.roadMask);
+    const wings = p.buildings.filter((b) => b.typology === 'school');
+    expect(wings.length).toBeGreaterThan(0);
+    const pieceOf = new Map<number, number>();
+    patches(s.dem, land).forEach((piece, i) => piece.forEach((k) => pieceOf.set(k, i)));
+    const pieces = new Set(
+      wings.map((w) => {
+        const c = w.ring.reduce((a2, q) => [a2[0] + q[0] / 4, a2[1] + q[1] / 4], [0, 0]);
+        const cell = s.dem.cellAt([c[0], c[1]])!;
+        return pieceOf.get(cell.j * s.dem.meta.nx + cell.i);
+      }),
+    );
+    expect(pieces.size).toBe(1);
+  });
+
+  it('keeps every building under the airport limit, the towers apart', async () => {
+    const { p } = await plan();
+    for (const b of p.buildings) expect(b.topAmslM, b.id).toBeLessThanOrEqual(p.airport.capAmslM + 1e-6);
+    const towers = p.buildings.filter((b) => b.typology === 'apartments');
+    expect(towers.length).toBeGreaterThan(0);
+    for (let i = 0; i < towers.length; i += 1) {
+      for (let j = i + 1; j < towers.length; j += 1) {
+        const gap = Math.min(...towers[i]!.ring.flatMap((q) => towers[j]!.ring.map((r) => Math.hypot(q[0] - r[0], q[1] - r[1]))));
+        expect(gap).toBeGreaterThanOrEqual(12 - 1e-6);
+      }
+    }
+  });
+
+  it('lays golf only on gentle ground, as part of the clubhouse', async () => {
+    const { a, p, s } = await plan();
+    expect(p.golf.areaM2).toBeGreaterThan(0);
+    const golf = p.blocks.filter((b) => b.typology === 'golf');
+    expect(golf.length).toBeGreaterThan(0);
+    for (const b of golf) {
+      const m = rasterise(s.dem, b.geom);
+      let steep = 0;
+      let n = 0;
+      for (let k = 0; k < m.length; k += 1) {
+        if (!m[k] || !Number.isFinite(a.gradient[k]!)) continue;
+        n += 1;
+        if (a.gradient[k]! > p.golf.maxGrade + 0.05) steep += 1;
+      }
+      // Outlines are drawn smoothed, so a few edge cells may fall outside.
+      expect(steep / Math.max(1, n), b.id).toBeLessThan(0.05);
+    }
+  });
+
+  it('closes the water balance: rain = loss + held + outflow, ponds and channels add up', async () => {
+    const { a } = await plan();
+    const w = a.storm.balance;
+    expect(Math.abs(w.rainM3 - w.lossM3 - w.heldM3 - w.outflowM3)).toBeLessThan(1e-6 * w.rainM3 + 1);
+    expect(Math.abs(w.heldInPondsM3 + w.heldInShallowHollowsM3 - w.heldM3)).toBeLessThan(1);
+    const ponds = w.ponds.reduce((acc, q) => acc + q.peakVolumeM3, 0);
+    expect(Math.abs(ponds - w.peak.pondVolumeM3)).toBeLessThan(1);
+    for (const q of w.ponds) expect(q.meanDepthM * q.areaM2).toBeCloseTo(q.peakVolumeM3, 3);
+    expect(w.peak.channelMeanWidthM * w.peak.channelLengthM).toBeCloseTo(w.peak.channelAreaM2, 3);
+    expect(w.peak.channelMeanDepthM * w.peak.channelAreaM2).toBeCloseTo(w.peak.channelVolumeM3, 3);
   });
 });
 

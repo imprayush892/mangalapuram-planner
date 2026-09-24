@@ -192,6 +192,69 @@ export interface StormResult {
   pondsFull: number;
   pondsTotal: number;
   catchments: Map<number, CatchmentStorm>;
+  /** Where the water goes, and the ponds and channels it stands in, so the volumes can be checked. */
+  balance: WaterBalance;
+}
+
+/** One pond at the storm's peak (and what its hollows hold when the rain stops). */
+export interface PondBalance {
+  id: number;
+  /** Cell nearest the middle of the pond, for labelling. */
+  centre: number;
+  areaM2: number;
+  meanDepthM: number;
+  maxDepthM: number;
+  /** Water in it at the peak, m³: area × mean depth. */
+  peakVolumeM3: number;
+  /** Held in its hollows when the rain stops, m³. */
+  endVolumeM3: number;
+  /** What its hollows hold full to the rim, m³. */
+  capacityM3: number;
+  full: boolean;
+}
+
+export interface WaterBalance {
+  /** The day's water, m³: rain = loss + runoff; runoff = held + outflow (closure is what is left over). */
+  rainM3: number;
+  lossM3: number;
+  runoffM3: number;
+  heldM3: number;
+  heldInPondsM3: number;
+  heldInShallowHollowsM3: number;
+  outflowM3: number;
+  closureM3: number;
+  /** Water on the ground at the peak, counted where it is at least the drawing depth. */
+  peak: {
+    pondAreaM2: number;
+    pondVolumeM3: number;
+    pondMeanDepthM: number;
+    pondMaxDepthM: number;
+    /** Every flow line carrying at least the channel flow, m, along the flow. */
+    flowLineLengthM: number;
+    /** The channels proper: flow lines running at least the drawing depth at the peak, m. */
+    channelLengthM: number;
+    /** The water on their banks, cell by cell as drawn (each cell once), m2 and m3. */
+    channelAreaM2: number;
+    channelVolumeM3: number;
+    /** Wetted area over channel length, m; volume over area, m. */
+    channelMeanWidthM: number;
+    channelMeanDepthM: number;
+    channelMaxDepthM: number;
+    /**
+     * Width of the Manning section cut across each channel cell to find its
+     * water level (median and 90th percentile by length), m. On flat valley
+     * floors neighbouring flow lines cut sections across the same floodplain,
+     * so these are the hydraulic widths, not a second count of the water.
+     */
+    sectionMedianWidthM: number;
+    sectionP90WidthM: number;
+    shallowAreaM2: number;
+    shallowVolumeM3: number;
+    outflowM3s: number;
+  };
+  ponds: PondBalance[];
+  /** Per cell at the peak: 0 dry, 1 pond, 2 channel, 3 shallow hollow. */
+  kind: Uint8Array;
 }
 
 /**
@@ -350,12 +413,40 @@ export function simulateStorm(dem: Dem, model: WaterModel, p: HydrologyParams, r
   }
   // A full hollow passes its outflow over the rim, which takes a head of water:
   // the pond stands at the stage its exit runs at, and spreads to match.
+  const beforeSpread = Float32Array.from(peakDepthM);
   depressions.forEach((dep, id) => {
     if (dep.maxDepthM < p.pondingDepthM || held[id]! < dep.capacityM3 * 0.999) return;
     const L = stage[dep.exit]!;
     if (!(L > dep.spillLevel)) return;
     spreadPond(dem, dep.cells, dep.spillLevel, L, model.filledLevel, peakDepthM, nx, ny);
   });
+  // Channel sections at the peak: width and water area across each channel cell.
+  let flowLineLength = 0;
+  let chLen = 0;
+  let chDepthMax = 0;
+  const widths: { w: number; l: number }[] = [];
+  for (let k = 0; k < n; k += 1) {
+    if (channel[k] !== 1 || !Number.isFinite(stage[k]!)) continue;
+    const r = receiver[k]!;
+    if (r < 0) continue;
+    const step = dem.cell * Math.hypot((r % nx) - (k % nx), Math.floor(r / nx) - Math.floor(k / nx));
+    flowLineLength += step;
+    const depth = stage[k]! - dem.values[k]!;
+    if (!(depth >= p.standingWaterShowM)) continue;
+    const sec = section.sectionAt(k, r, stage[k]!);
+    chLen += step;
+    chDepthMax = Math.max(chDepthMax, depth);
+    widths.push({ w: sec.width, l: step });
+  }
+  widths.sort((a, b) => a.w - b.w);
+  const widthAtShare = (share: number): number => {
+    let acc = 0;
+    for (const x of widths) {
+      acc += x.l;
+      if (acc >= share * chLen) return x.w;
+    }
+    return widths.length > 0 ? widths[widths.length - 1]!.w : 0;
+  };
 
   const peakWet = new Uint8Array(n);
   let peakWetCells = 0;
@@ -375,6 +466,137 @@ export function simulateStorm(dem: Dem, model: WaterModel, p: HydrologyParams, r
   }
 
   const rainM3 = (Math.max(0, rainMm) / 1000) * cellsModelled * cellArea;
+
+  /* ------------------------------------------------------ water balance */
+  // Each wet cell at the peak is a pond (a real hollow, or ground a full pond
+  // rises over), a channel (the running water's banks) or a shallow hollow.
+  const kind = new Uint8Array(n);
+  for (let k = 0; k < n; k += 1) {
+    if (!(peakDepthM[k]! > 0)) continue;
+    const d = depression[k]!;
+    if (peakDepthM[k]! > beforeSpread[k]! + 1e-6) kind[k] = 1;
+    else if (d >= 0 && depressions[d]!.maxDepthM >= p.pondingDepthM) kind[k] = 1;
+    else if (d >= 0 && waterDepthM[k]! >= peakDepthM[k]! - 1e-6) kind[k] = 3;
+    else kind[k] = 2;
+  }
+  const show = p.standingWaterShowM;
+  let pondArea = 0;
+  let pondVol = 0;
+  let pondMax = 0;
+  let chArea = 0;
+  let chVol = 0;
+  let chMax = 0;
+  let shArea = 0;
+  let shVol = 0;
+  for (let k = 0; k < n; k += 1) {
+    const h = peakDepthM[k]!;
+    if (!(h >= show)) continue;
+    if (kind[k] === 1) {
+      pondArea += cellArea;
+      pondVol += h * cellArea;
+      pondMax = Math.max(pondMax, h);
+    } else if (kind[k] === 2) {
+      chArea += cellArea;
+      chVol += h * cellArea;
+      chMax = Math.max(chMax, h);
+    } else if (kind[k] === 3) {
+      shArea += cellArea;
+      shVol += h * cellArea;
+    }
+  }
+  // Ponds one by one: the connected pond cells at the peak.
+  const pondId = new Int32Array(n).fill(-1);
+  const ponds: PondBalance[] = [];
+  for (let k0 = 0; k0 < n; k0 += 1) {
+    if (kind[k0] !== 1 || !(peakDepthM[k0]! >= show) || pondId[k0]! >= 0) continue;
+    const id = ponds.length;
+    const stack = [k0];
+    pondId[k0] = id;
+    let area = 0;
+    let vol = 0;
+    let max = 0;
+    let sx = 0;
+    let sy = 0;
+    const members: number[] = [];
+    while (stack.length > 0) {
+      const k = stack.pop()!;
+      members.push(k);
+      const h = peakDepthM[k]!;
+      area += cellArea;
+      vol += h * cellArea;
+      max = Math.max(max, h);
+      const i = k % nx;
+      const j = (k - i) / nx;
+      sx += i;
+      sy += j;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const a = i + di;
+        const b = j + dj;
+        if (a < 0 || b < 0 || a >= nx || b >= ny) continue;
+        const q = b * nx + a;
+        if (pondId[q]! >= 0 || kind[q] !== 1 || !(peakDepthM[q]! >= show)) continue;
+        pondId[q] = id;
+        stack.push(q);
+      }
+    }
+    const ci = Math.round(sx / members.length);
+    const cj = Math.round(sy / members.length);
+    let centre = members[0]!;
+    let bestD = Infinity;
+    for (const k of members) {
+      const d2 = ((k % nx) - ci) ** 2 + (Math.floor(k / nx) - cj) ** 2;
+      if (d2 < bestD) {
+        bestD = d2;
+        centre = k;
+      }
+    }
+    ponds.push({ id, centre, areaM2: area, meanDepthM: vol / area, maxDepthM: max, peakVolumeM3: vol, endVolumeM3: 0, capacityM3: 0, full: false });
+  }
+  let heldInPonds = 0;
+  depressions.forEach((dep, id) => {
+    if (dep.maxDepthM < p.pondingDepthM) return;
+    heldInPonds += held[id]!;
+    const pid = pondId[dep.lowest]!;
+    if (pid < 0) return;
+    const pond = ponds[pid]!;
+    const first = pond.capacityM3 === 0;
+    pond.endVolumeM3 += held[id]!;
+    pond.capacityM3 += dep.capacityM3;
+    const full = held[id]! >= dep.capacityM3 * 0.999;
+    pond.full = first ? full : pond.full && full;
+  });
+  ponds.sort((a, b) => b.areaM2 - a.areaM2);
+  const runoffM3 = cellsModelled * own;
+  const balance: WaterBalance = {
+    rainM3,
+    lossM3: rainM3 - runoffM3,
+    runoffM3,
+    heldM3: heldTotal,
+    heldInPondsM3: heldInPonds,
+    heldInShallowHollowsM3: heldTotal - heldInPonds,
+    outflowM3: outflowTotal,
+    closureM3: runoffM3 - heldTotal - outflowTotal,
+    peak: {
+      pondAreaM2: pondArea,
+      pondVolumeM3: pondVol,
+      pondMeanDepthM: pondArea > 0 ? pondVol / pondArea : 0,
+      pondMaxDepthM: pondMax,
+      flowLineLengthM: flowLineLength,
+      channelLengthM: chLen,
+      channelAreaM2: chArea,
+      channelVolumeM3: chVol,
+      channelMeanWidthM: chLen > 0 ? chArea / chLen : 0,
+      channelMeanDepthM: chArea > 0 ? chVol / chArea : 0,
+      channelMaxDepthM: Math.max(chDepthMax, chMax),
+      sectionMedianWidthM: widthAtShare(0.5),
+      sectionP90WidthM: widthAtShare(0.9),
+      shallowAreaM2: shArea,
+      shallowVolumeM3: shVol,
+      outflowM3s: 0,
+    },
+    ponds,
+    kind,
+  };
   return {
     rainMm,
     runoffCoeff,
@@ -397,6 +619,7 @@ export function simulateStorm(dem: Dem, model: WaterModel, p: HydrologyParams, r
     pondsFull,
     pondsTotal,
     catchments,
+    balance: { ...balance, peak: { ...balance.peak, outflowM3s: peakOutflowM3s } },
   };
 }
 
@@ -582,6 +805,31 @@ function crossSections(dem: Dem, p: HydrologyParams) {
   };
 
   return {
+    /** Wetted width (m) and water area (m2) across the flow at cell k with the water at `level`. */
+    sectionAt(k: number, r: number, level: number): { width: number; area: number } {
+      if (r < 0) return { width: 0, area: 0 };
+      const i = k % nx;
+      const j = (k - i) / nx;
+      const ri = r % nx;
+      const rj = (r - ri) / nx;
+      const len = Math.hypot(ri - i, rj - j);
+      if (len === 0) return { width: 0, area: 0 };
+      const px = -(rj - j) / len;
+      const py = (ri - i) / len;
+      const cx = dem.meta.x0 + dem.cell * (i + 0.5);
+      const cy = dem.meta.y0 + dem.cell * (j + 0.5);
+      let w = 0;
+      let a = 0;
+      for (const dir of [1, -1]) {
+        for (let s = dir > 0 ? 0 : 1; s <= half; s += 1) {
+          const z = dem.sampleBilinear([cx + px * s * dir, cy + py * s * dir]);
+          if (!(z < level)) break;
+          w += 1;
+          a += level - z;
+        }
+      }
+      return { width: w, area: a };
+    },
     stageAt(k: number, r: number, q: number, level: Float32Array): number {
       const i = k % nx;
       const j = (k - i) / nx;

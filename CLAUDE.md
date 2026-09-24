@@ -14,7 +14,9 @@ You are building a **browser web app** for ONÈO's client: a site-driven plannin
 - Every planning decision is derived from the analysis layer before it (terrain → hydrology at the
   300 mm planning storm → waterlogging/safe → public space → slope → non-buildable (KMBR Rule 22) →
   plotable → roads → plots → plot slope ≤ 1:5 → cut/fill → typologies → FSI → placement → 3D).
-  Never place first and justify afterwards; the client zoning plan is for comparison only.
+  Never place first and justify afterwards.
+- Owner, 25 Sep: the client zoning plan sets where each use goes; the plan deviates from a zone
+  only where water or terrain require it (waterlogging, Rule 22 slope, drains -> open space).
 - `config/planning_rules.yaml` overrides `config/client_rules.yaml` where they overlap; the rest of the
   client rules stand; KMBR is still checked on top. Existing roads are fixed.
 - Pipeline code: `app/src/engine/pipeline/`. Terrain comes from `data/processed/terrain_mesh.obj`

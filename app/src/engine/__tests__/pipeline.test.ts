@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Dem } from '../terrain/dem';
 import type { DemMeta } from '../terrain/dem';
 import { multiPolyArea } from '../geom/planar';
-import { and, areaM2, count, erode, maskFrom, openToWidth, rasterise, toMulti } from '../pipeline/mask';
+import { and, areaM2, count, erode, maskFrom, openToWidth, patches, rasterise, toMulti } from '../pipeline/mask';
+import { pick } from '../data/config';
 import { parseRatio, runAnalysis } from '../pipeline/analysis';
 import type { AnalysisResult } from '../pipeline/analysis';
 import { config, expected, site } from './fixtures';
@@ -129,14 +130,19 @@ describe('planning steps 1-7 on the site', () => {
     }
   });
 
-  it('classes non-buildable ground by Rule 22: over 45 degrees on the mesh or the raw survey, and nothing else', async () => {
+  it('classes non-buildable ground by Rule 22: over 45 degrees on the mesh or the raw survey, less the specks the owner ignores', async () => {
     const { r, s } = await analysis();
+    const c = await config();
+    const minSpeck = pick<number>(c.planning, 'slope.min_non_buildable_patch_m2', 0);
     const m = r.layers.nonBuildable.mask;
     const parcel = r.layers.terrain.mask;
     const survey = s.surveySlopeDeg!;
-    for (let k = 0; k < m.length; k += 1) {
-      if (!parcel[k]) continue;
-      expect(m[k] === 1, `cell ${k}`).toBe(r.gradient[k]! > 1 || survey[k]! > 45);
+    const over = maskFrom(s.dem, (k) => parcel[k] === 1 && (r.gradient[k]! > 1 || survey[k]! > 45));
+    for (let k = 0; k < m.length; k += 1) if (m[k]) expect(over[k], `cell ${k}`).toBe(1);
+    // Every over-45 cell left out lies in a patch smaller than the owner's speck size.
+    for (const p of patches(s.dem, over)) {
+      const kept = p.some((k) => m[k] === 1);
+      expect(kept, `patch of ${p.length * 4} m2`).toBe(p.length * s.dem.cell * s.dem.cell >= minSpeck);
     }
   });
 
@@ -148,8 +154,8 @@ describe('planning steps 1-7 on the site', () => {
     for (let k = 0; k < survey.length; k += 1) if (survey[k]! > 45) cells += 1;
     const ac = (cells * s.dem.cell * s.dem.cell) / 4046.8564224;
     expect(Math.abs(ac - g.survey_over_45_ac.value)).toBeLessThanOrEqual((g.survey_over_45_ac.value * g.survey_over_45_ac.tol_pct) / 100 + 0.01);
-    // Most of it is in the parcel, and all of that is non-buildable.
-    expect(r.layers.nonBuildable.areaM2 / 4046.8564224).toBeGreaterThan(0.8);
+    // What is left after the owner's speck rule is non-buildable; it can only be less.
+    expect(r.layers.nonBuildable.areaM2 / 4046.8564224).toBeLessThanOrEqual(ac + 0.01);
   });
 
   it('keeps the natural drains clear (Rule 22(4))', async () => {
@@ -185,10 +191,16 @@ describe('planning steps 1-7 on the site', () => {
   });
 
   it('traces outlines whose area matches the cells', async () => {
-    const { r } = await analysis();
+    const { r, s } = await analysis();
     for (const id of r.order) {
       const layer = r.layers[id];
-      expect(Math.abs(multiPolyArea(layer.geom) - layer.areaM2), id).toBeLessThan(1e-3 * Math.max(1, layer.areaM2));
+      // Lines are traced exactly; areas are drawn smoothed: corners cut back by
+      // under a cell, so the area moves by less than a quarter metre per metre of outline.
+      const perimeter = toMulti(s.dem, layer.mask)
+        .flat()
+        .reduce((acc, ring) => acc + ring.reduce((q, p, i) => q + Math.hypot(ring[(i + 1) % ring.length]![0] - p[0], ring[(i + 1) % ring.length]![1] - p[1]), 0), 0);
+      const tol = id === 'flowPaths' || id === 'drains' ? 1e-3 * Math.max(1, layer.areaM2) : Math.max(1, 0.25 * perimeter);
+      expect(Math.abs(multiPolyArea(layer.geom) - layer.areaM2), id).toBeLessThan(tol);
     }
   });
 

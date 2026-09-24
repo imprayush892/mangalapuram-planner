@@ -11,7 +11,29 @@
 #   plot slope (<= 1:5) -> cut and fill -> typologies -> FSI + footprints ->
 #   placement + spacing -> 3D massing.
 # Every decision is generated from the layers before it, never drawn first.
-version: 2026-09-24
+#
+# Owner, 25 Sep: the client's zoning plan sets where each use goes. The plan departs
+# from it only where the water or the terrain makes it (waterlogging, Rule 22 slope,
+# natural drains), and then only to hand that ground to open space.
+version: 2026-09-25
+
+zoning:
+  source: client                           # data/processed/zones_client_registered.geojson
+  # Zone name -> use, first match wins (case-insensitive substring of the zone name).
+  uses:
+    - {match: "SCHOOL", use: school}
+    - {match: "CLUBHOUSE", use: clubhouse}
+    - {match: "SENIOR", use: senior}
+    - {match: "APARTMENT", use: apartments}
+    - {match: "VILLA", use: villas}
+    - {match: "COMMERCIAL", use: commercial}
+    - {match: "BATCHING", use: batching}
+    - {match: "HOSPITAL", use: reserved}   # deferred until the land is acquired: kept, nothing placed
+    # DEFAULT pending owner (asked 25 Sep): the client's PHASE 2 and PHASE 3 zones carry no
+    # use in the zoning plan. They take villas, the use furthest short of its programme.
+    - {match: "PHASE", use: villas}
+  # Land outside every client zone (the gaps the zoning plan leaves for circulation) is
+  # where the primary roads prefer to run; what they do not use is open space.
 
 hydrology:
   # The storm itself is config/assumptions.yaml hydrology.design_storm_mm, which
@@ -23,8 +45,14 @@ hydrology:
   # Extra margin kept between waterlogged ground and building land. 0 = none set;
   # the owner has not asked for a freeboard strip.
   building_offset_from_waterlogging_m: 0
-  # Waterlogged patches smaller than this are puddles on a 2 m grid, not zones.
-  min_waterlogging_patch_m2: 20
+  # Owner, 25 Sep: small fragments of waterlogging are ignored so the land round them
+  # joins into one usable piece; the high ground above takes the water to the drains.
+  # Patches smaller than this are ignored (was 20 m2, puddles only).
+  min_waterlogging_patch_m2: 1000
+  # ASSUMPTION (owner 25 Sep direction): water running in a channel narrower than this
+  # is carried by the storm-water drains, not left as a waterlogged strip. 0 = off.
+  # The surveyed natural drains (Rule 22(4)) are kept clear regardless.
+  ignore_channels_narrower_than_m: 6
 
 public_space:
   may_overlap_waterlogging: true         # landscape, recreation, ecological infrastructure
@@ -39,8 +67,9 @@ slope:
   # Owner's stricter "steeper than 1:4" limit, SUSPENDED 2026-09-24 in favour of Rule 22.
   # Set non_buildable to "1:4" to bring it back.
   suspended_non_buildable_steeper_than: "1:4"
-  # Statutory: every cell over the Rule 22 limit counts, however small the patch.
-  min_non_buildable_patch_m2: 0
+  # Owner, 25 Sep: specks of a few tens of cells over 45 degrees are mesh noise, not
+  # slopes; they are ignored (buildable, taken by plot cut and fill). Larger faces count.
+  min_non_buildable_patch_m2: 200
   plot_max: "1:5"                          # per plot, after cut and fill
 
 roads:
@@ -63,6 +92,17 @@ roads:
   # ASSUMPTION: a cross street whose grading to 1:7 would move more than this (m3 per metre of
   # street) is left out and its blocks merge; 30 m3/m is a 7 m road in about 4 m of cut.
   cross_street_max_earthwork_m3_per_m: 30
+  # A villa street with fewer plots than this, serving nothing else, is taken out and its
+  # land given to green (owner 25 Sep: no roads to nowhere).
+  min_plots_per_street: 2
+  # Routing through a zone: along its edge costs 1 a metre, through its middle this much,
+  # so primaries follow the gaps and edges the zoning plan leaves. ASSUMPTION.
+  zone_interior_cost: {villas: 2.5, apartments: 2.5, commercial: 2.5, batching: 2.5, senior: 25, school: 25, clubhouse: 25, reserved: 25}
+  zone_edge_band_m: 10                     # ASSUMPTION: what counts as the edge of a zone
+  outside_zones_cost: 0.8                  # the zoning plan's own gaps between zones
+  # A buildable piece of a zone at least this big gets its own primary road; smaller pieces
+  # are reached by the villa streets or become green. ASSUMPTION.
+  primary_serves_pieces_over_m2: 2000
 
 plotable:
   # A plotable zone must fit the smallest plot: nothing narrower than this survives.
@@ -70,7 +110,10 @@ plotable:
   min_area_m2: 251                         # = the smallest villa plot (2,700 sq ft)
 
 villas:                                    # replaces client_rules villa_plots sizing (18 m side, 45% footprint, 20/30/50 plot sizing)
-  built_area_sft: {min: 2700, max: 3000}   # never over 3,000 sq ft
+  built_area_sft: {min: 2500, max: 3000}   # main type (owner 25 Sep: 2,500-3,000); never over 3,000 sq ft
+  # Owner 25 Sep: where the main type will not fit, a smaller plot rather than wasted land.
+  # With the 15 m minimum side the smallest plot is 15 x 15 m = 2,422 sq ft.
+  compact_built_area_sft: {min: 2000, max: 2500}
   design_built_area_sft: 2850              # ASSUMPTION: the plots are cut at the middle of the range
   floor_height_m: 3.0                      # ASSUMPTION, as assumptions.yaml floor_to_floor_m.apartments
   fsi: 1.0                                 # built area = plot area
@@ -101,24 +144,58 @@ apartments:
   min_clear_between_buildings_m: 12        # client_rules apartments.spacing.min_clear_m
   setback_m: 6.0                           # client_rules apartments.spacing.joining.joined_block_inside
   podium_margin_m: 6.0                     # podium runs this far past the tower on every side
+  # Owner 25 Sep: no tower stacked behind another. A tower may not stand in front of or
+  # behind another (overlapping it along the contours) within this distance up or down
+  # the slope, so every tower keeps its view out. ASSUMPTION.
+  view_clear_depth_m: 100
+  # ASSUMPTION: within that depth towers are staggered; one may overlap another along the
+  # contours by at most this share of its length, so the view passes between them.
+  view_max_overlap_share: 0.34
+  min_floors: 6                            # ASSUMPTION: under this the airport limit leaves too little to build
   floor_height_m: 3.0                      # assumptions.yaml floor_to_floor_m.apartments
   terrain_response: podium                 # podium height follows the ground; no forced flat platform
   method: "FSI -> built-up area -> floors -> floor plate -> footprint -> podium -> terrain response"
 
-special_zones: [clubhouse, school]         # sited from the layers, joined to roads and paths
-
-# Which use takes land first when the programme wants more than the plotable land holds.
-# DEFAULT pending owner: amenities, then senior and apartments, and villas take what is left.
-# Commercial, hotel, business hub and hospital are not placed by this pipeline (reported).
-typology_priority: [school, clubhouse, senior, apartments, villas]
+# Airport height limit. KMBR Rule 24(2): a building near an airport is limited by the AAI
+# colour-coded zoning map, measured to its highest point with no exemptions.
+airport:
+  # AAI CCZM Thiruvananthapuram (DRG AAI/16A-CCZM(GRID)/THIRUVANANTHAPURAM/2016, draft v1.0):
+  # the site is in grid C9, 16.8 km from the ARP: permissible top elevation 140 m AMSL.
+  # An AAI NOC is still needed (KMBR Rule 5 table, item 14: within 20 km of the ARP).
+  permissible_top_amsl_m: 140
+  # ESTIMATE, not surveyed: the TBM is an assumed RL 100 with no MSL value (DECISIONS 17 Sep).
+  # SRTM 30 m heights at 100 points on the site sit a median 29.4 m below the survey RLs
+  # (interquartile 27.2-31.5 m, correlation 0.98), so RL 100 is about 70.6 m AMSL, +/- 10 m.
+  # Replace with the surveyor's MSL value when it comes.
+  tbm_amsl_m: 70.6
+  tbm_rl: 100
+  rooftop_allowance_m: 6                   # ASSUMPTION: lift machine room, tank and parapet above the top floor
 
 school:
   land_ac_from: core_campus                # programme.yaml school land_ac.core_campus
   max_mean_grade: "1:8"                    # a campus wants gentle ground
 clubhouse:
-  building_land_ac: 1.0                    # programme clubhouse_annex land; the golf lies in the public space beside it
+  building_land_ac: 1.0                    # programme clubhouse_annex land
+  # Owner 25 Sep: the flooded land is open space, and part of it can be the golf course,
+  # which belongs to the clubhouse; golf cannot go on steep land.
+  golf:
+    max_grade: "1:8"                       # ASSUMPTION: gentle ground only for play
+    reach_from_zone_m: 50                  # ASSUMPTION: open space this close to the clubhouse zone can be golf
+    min_patch_m2: 1000                     # ASSUMPTION: a playable piece, not a verge
+
+commercial:                                # the client's COMMERCIAL & CONVENTION CENTRE zone
+  occupancy: F_commercial
+  max_floors: 10                           # ASSUMPTION
+  max_wing_plate_m2: 2500                  # ASSUMPTION
+  setback_m: 3.0                           # KMBR Table 4 front average; height-driven yards to be checked
+  convention_floor_height_m: 8             # ASSUMPTION: one hall-height floor for the programme's convention hall
+
+batching_plant:                            # the client's BATCHING PLANT zone: a temporary works yard
+  plant_footprint_m: [30, 20]              # ASSUMPTION: mixer, silos and aggregate bins
+  height_m: 18                             # ASSUMPTION: silo height
 
 amenities:                                 # school and clubhouse buildings
   max_wing_plate_m2: 1200                  # ASSUMPTION: a big programme is built as wings no larger than this a floor
   min_clear_between_wings_m: 12            # ASSUMPTION: as the senior and apartment spacing
+  plate_aspects: [2, 1.5, 1, 3]            # ASSUMPTION: wing shapes tried, long side : short side, first that fits
   setback_m: 3.0                           # KMBR Table 4 front average; height-driven yards to be checked

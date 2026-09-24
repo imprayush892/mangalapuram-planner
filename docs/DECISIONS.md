@@ -244,3 +244,15 @@ Each of these is a switch or an editable assumption, not a silent decision.
 43. **Interpolated ground is shaded.** The 3D mesh tints each vertex by its
     distance from a real reading, so a continuous mesh cannot be mistaken for a
     complete survey.
+
+## 25 Sep 2026 — owner, on the pipeline plan
+- Follow the client's zoning plan; deviate only where hydrology or terrain require it, no major changes.
+- All flooded land is open space; part of it can be the golf course, which belongs to the clubhouse; no golf on steep land.
+- Small waterlogged fragments are ignored so the land round them joins into one usable piece.
+- Specks of a few tens of cells over 45 degrees are ignored (buildable).
+- One consolidated school campus; no road through it.
+- Streets that serve nothing go; their land is green.
+- Apartment towers must not stand behind one another; spread them over the zone, on the lower ground (airport limit).
+- Plots on both sides of every road; two villa plot types: 2,500-3,000 sq ft (main) and 2,000-2,500 sq ft (fill-in).
+- Place the commercial and convention zone and the batching plant.
+- Water: report pond areas and depths, channel widths and depths, and the volumes, so they can be checked against each other.
