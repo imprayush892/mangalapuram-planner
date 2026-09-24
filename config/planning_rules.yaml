@@ -60,6 +60,9 @@ roads:
   # Villa streets run along the contours; secondary cross streets run up the slope every
   # this many plots (ASSUMPTION), which sets the block length.
   cross_street_every_plots: 8
+  # ASSUMPTION: a cross street whose grading to 1:7 would move more than this (m3 per metre of
+  # street) is left out and its blocks merge; 30 m3/m is a 7 m road in about 4 m of cut.
+  cross_street_max_earthwork_m3_per_m: 30
 
 plotable:
   # A plotable zone must fit the smallest plot: nothing narrower than this survives.

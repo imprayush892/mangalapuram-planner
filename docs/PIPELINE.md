@@ -18,7 +18,7 @@ checked on top. Values marked DEFAULT / ASSUMPTION there await the owner.
 | 5 | Slope | per cell against the 1:5 plot limit and the Rule 22 45° limit | built |
 | 6 | Non-buildable | KMBR Rule 22(3): slope over 45° on the mesh or the raw survey TIN, flood-liable land; 22(4): natural drains kept clear. (Owner 1:4 limit suspended 24 Sep, switchable in planning_rules.yaml) | built |
 | 7 | Plotable zones | safe, not Rule 22 ground, clear of drains, off the existing roads, reachable by a 15 m plot | built |
-| 8 | Roads | existing roads fixed and checked against 1:8; primary roads (1:8) join every plotable zone to the network by least-cost routes; in each zone a contour-aligned grid: villa streets along the contours (tertiary, 1:6) and cross streets every 8 plots (secondary, 1:7) climbing at the angle whose rise is the limit. A grade-limited profile gives each road its cut and fill | built |
+| 8 | Roads | existing roads fixed and checked against 1:8; primary roads (1:8) join every plotable zone to the network by least-cost routes; in each zone a contour-aligned grid: villa streets along the contours (tertiary, 1:6) and cross streets every 8 plots (secondary, 1:7) climbing at the angle whose rise is the limit, left out where grading them would cost over 30 m³ a metre. A grade-limited profile gives each road its cut and fill | built |
 | 12 | Typologies | grid blocks grouped and given a use in `typology_priority` order: school (gentlest block with primary frontage, grown to the campus), clubhouse (beside the largest public space, central), senior (gentle, near the clubhouse), apartments (undulating ground), villas (the rest). A group grows only until its buildings fit; blocks no building needs go back to the villas | built |
 | 9 | Plot subdivision | villa plots 15 × 17.7 m = 2,850 sq ft (FSI 1.0: plot = built area) along the villa streets and the road frontage; side ≥ 15 m, aspect 1:1.2 | built |
 | 10 | Plot slope | every plot's ground fitted with a plane; checked against 1:5 | built |
@@ -32,9 +32,10 @@ because a plot's size depends on what it is for.
 
 ## What the plan does not do yet
 - Commercial, hotel, business hub and the (deferred) hospital are not placed.
-- Cross streets are straight lines at a fixed angle per zone; where a zone spans a
-  ridge they still need deep cuts (reported per road). Switchback alignment would
-  cut that down.
+- Cross streets are straight lines at a fixed angle per zone. One whose grading to
+  1:7 would move more than `roads.cross_street_max_earthwork_m3_per_m` (30 m³/m) is
+  left out and its blocks merge (5 streets, ~60,000 m³, on this site); switchback
+  alignment could bring some of them back.
 - Plot rows are cut on the grid only; odd corners of blocks go to open space rather
   than to bespoke plot shapes.
 - Setbacks are checked as a flat inset (3 m, 6 m for towers); height-driven KMBR

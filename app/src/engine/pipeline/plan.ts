@@ -684,6 +684,12 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   };
   const blocks: GridBlock[] = [];
   const zoneFrames: { f: Frame; v0: number; w0: number; cot: number; cells: number[] }[] = [];
+  // A cross street whose grading would move more earth than this per metre is
+  // left out: the blocks either side join into one longer block, still
+  // reached along the contour streets.
+  const maxCrossEarth = num(planning, 'roads.cross_street_max_earthwork_m3_per_m');
+  let droppedCross = 0;
+  let droppedEarth = 0;
   const reached = dilate(dem, network, dem.cell * 2);
   zones.forEach((zone, zi) => {
     if (zone.length * cellArea < minBlock) return;
@@ -725,13 +731,28 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         if (inside && Number.isNaN(start)) start = y;
         if ((!inside || y > vmax + 1) && !Number.isNaN(start)) {
           if (y - start >= 20) {
-            addRoadLine('secondary', [toWorld(f, wc + start * cot, start), toWorld(f, wc + (y - 1) * cot, y - 1)], why);
+            const line: Pt[] = [toWorld(f, wc + start * cot, start), toWorld(f, wc + (y - 1) * cot, y - 1)];
+            const prof = gradeLimitedProfile(dem, line, lim.secondary);
+            let earth = 0;
+            for (let q = 1; q < prof.s.length; q += 1) {
+              earth += Math.abs(prof.design[q]! - prof.terrain[q]!) * (prof.s[q]! - prof.s[q - 1]!) * width.secondary;
+            }
+            if (earth / lineLength(line) <= maxCrossEarth) addRoadLine('secondary', line, why);
+            else {
+              droppedCross += 1;
+              droppedEarth += earth;
+            }
           }
           start = Number.NaN;
         }
       }
     }
   });
+  if (droppedCross > 0) {
+    notes.push(
+      `${droppedCross} cross streets left out: grading them to 1:${Math.round(1 / lim.secondary)} would move ${Math.round(droppedEarth).toLocaleString()} m³ (over ${maxCrossEarth} m³ a metre)`,
+    );
+  }
   // Cells into blocks by their grid cell, less the roads.
   const byKey = new Map<string, number[]>();
   zones.forEach((zone, zi) => {
@@ -945,9 +966,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     seedRank: (b: GridBlock) => number,
     why: (p: Parcel) => string[],
   ): boolean => {
-    const seeds = blocks.filter(isFree).sort((a, b) => seedRank(a) - seedRank(b)).slice(0, 12);
+    const seeds = blocks.filter(isFree).sort((a, b) => seedRank(a) - seedRank(b));
     for (const seed of seeds) {
-      for (const target of [landM2, landM2 * 1.5, landM2 * 2.2]) {
+      for (const target of [landM2, landM2 * 1.5, landM2 * 2.2, landM2 * 3.5]) {
         const group = grow(seed, target, (b) => b.meanGrade);
         const p = parcelOf(group, `${use}`);
         const fit = fitAmenity(p, occ, buaM2, maxFloors);
@@ -996,7 +1017,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     if (use === 'senior' && senNeeded > 0) {
       let left = senNeeded;
       const perBuilding = (senDims.L + sen.clear) * (senDims.D + sen.clear);
-      for (let round = 0; round < 12 && left > 0; round += 1) {
+      for (let round = 0; round < 60 && left > 0; round += 1) {
         const cc = clubCentroid;
         const seed = blocks
           .filter(isFree)
@@ -1030,7 +1051,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         (aptPlate * apt.maxFloors) / apt.fsi,
         (aptDims.L + 2 * apt.podium + towerClear) * (aptDims.D + 2 * apt.podium + towerClear),
       );
-      for (let round = 0; round < 20 && left > 0; round += 1) {
+      for (let round = 0; round < 80 && left > 0; round += 1) {
         const seed = blocks
           .filter(isFree)
           .sort((a, b) => {
@@ -1057,6 +1078,18 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       if (left > 0) notes.push(`${left} apartment towers found no room`);
     }
   }
+  // Every parcel must reach a road: one with no frontage gets a secondary
+  // connector from the network, held to 1:7.
+  for (const pc of parcels) {
+    const touch = count(and(pc.parcel.mask, dilate(dem, network, dem.cell * 1.5))) > 0;
+    if (touch) continue;
+    const sources: number[] = [];
+    for (let k = 0; k < n; k += 1) if (network[k]) sources.push(k);
+    const r = route({ dem, cost: baseCost, grade: lim.secondary, overGradePenalty: penalty, sources, targets: pc.parcel.mask });
+    if (r.path) addRoad('secondary', r.path, `gives the ${pc.use} parcel its road access`);
+    else notes.push(`the ${pc.use} parcel ${pc.parcel.id} has no road access that can be built`);
+  }
+
   // A group grows until its buildings fit; blocks no building stands on go
   // back to the villas, keeping the land each use must hold on its own:
   // FSI for apartments, the campus for the school, the building land for
