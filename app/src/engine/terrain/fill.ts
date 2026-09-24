@@ -3,6 +3,7 @@ import type { ContourLine } from '../site/types';
 import type { MultiPoly, Pt } from '../geom/types';
 import { bboxOfMulti, pointInMulti } from '../geom/planar';
 import { growMulti } from '../geom/offset';
+import { M2_PER_ACRE } from '../units';
 
 /**
  * A continuous surface over ground the survey did not reach.
@@ -33,6 +34,12 @@ export const enum LevelSource {
   Harvested = 2,
   /** Interpolated between measurements. */
   Interpolated = 3,
+  /**
+   * The terrain modeller's mesh, on ground no survey point stands behind.
+   * A surface someone drew, not a reading: trusted less the further it sits
+   * from one.
+   */
+  Mesh = 4,
 }
 
 export interface FilledDem {
@@ -45,6 +52,8 @@ export interface FilledDem {
   measuredCells: number;
   harvestedCells: number;
   interpolatedCells: number;
+  /** Cells whose level is the modeller's mesh, not a measurement. */
+  meshCells: number;
   /** Largest distance any filled cell sits from real data. */
   maxFillDistanceM: number;
   /** Iterations the solve took, and how far it still moved on the last one. */
@@ -61,6 +70,8 @@ export interface FillInput {
   contours?: readonly ContourLine[];
   /** x, y, rl triples from the spot level survey. */
   spotLevels?: readonly (readonly [number, number, number])[];
+  /** 1 where a survey point stands behind the DEM level; see SiteModel.measured. */
+  measured?: Uint8Array;
   /** Stop when no cell moves more than this, or at `maxIterations`. */
   toleranceM?: number;
   maxIterations?: number;
@@ -90,7 +101,8 @@ export function fillDem(input: FillInput): FilledDem {
   for (let k = 0; k < n; k += 1) {
     const z = dem.values[k]!;
     values[k] = z;
-    source[k] = Number.isFinite(z) ? LevelSource.Survey : LevelSource.None;
+    if (!Number.isFinite(z)) source[k] = LevelSource.None;
+    else source[k] = input.measured && input.measured[k] === 0 ? LevelSource.Mesh : LevelSource.Survey;
   }
 
   /* ----------------------------------------------------------- 1. harvest */
@@ -102,7 +114,9 @@ export function fillDem(input: FillInput): FilledDem {
     const c = dem.cellAt(p);
     if (!c) return;
     const k = c.j * nx + c.i;
-    if (source[k] === LevelSource.Survey) return;
+    // Only ground with no level at all takes a harvested one: a mesh cell
+    // keeps the mesh, which is the surface everything is computed on.
+    if (source[k] !== LevelSource.None) return;
     const row = sums.get(k) ?? { total: 0, count: 0 };
     row.total += rl;
     row.count += 1;
@@ -207,7 +221,11 @@ export function fillDem(input: FillInput): FilledDem {
           const nk = nj * nx + ni;
           if (seen.has(nk)) continue;
           seen.add(nk);
-          if (source[nk] === LevelSource.Survey || source[nk] === LevelSource.Harvested) {
+          if (
+            source[nk] === LevelSource.Survey ||
+            source[nk] === LevelSource.Harvested ||
+            source[nk] === LevelSource.Mesh
+          ) {
             const p = dem.cellCentre(ni, nj);
             sample.push([p[0], p[1], values[nk]!]);
           } else {
@@ -321,9 +339,11 @@ export function fillDem(input: FillInput): FilledDem {
 
   let maxFill = 0;
   let measured = 0;
+  let mesh = 0;
   for (let k = 0; k < n; k += 1) {
     if (source[k] === LevelSource.Survey) measured += 1;
-    if (source[k] === LevelSource.Interpolated) {
+    if (source[k] === LevelSource.Mesh) mesh += 1;
+    if (source[k] === LevelSource.Interpolated || source[k] === LevelSource.Mesh) {
       const d = distanceToMeasuredM[k]!;
       if (Number.isFinite(d) && d > maxFill) maxFill = d;
     }
@@ -337,6 +357,7 @@ export function fillDem(input: FillInput): FilledDem {
     measuredCells: measured,
     harvestedCells: harvested,
     interpolatedCells: solve.length,
+    meshCells: mesh,
     maxFillDistanceM: maxFill,
     iterations,
     residualM: residualMoved,
@@ -355,15 +376,40 @@ export function confidenceAt(distanceM: number, halfDistanceM = 25): number {
   return 1 / (1 + distanceM / halfDistanceM);
 }
 
-/** Share of a set of cells that is interpolated rather than measured. */
+/** Share of a set of cells whose level is inferred (interpolated or modelled) rather than measured. */
 export function interpolatedShare(filled: FilledDem, cells: Iterable<number>): number {
   let total = 0;
   let inferred = 0;
   for (const k of cells) {
     total += 1;
-    if (filled.source[k] === LevelSource.Interpolated) inferred += 1;
+    const s = filled.source[k];
+    if (s === LevelSource.Interpolated || s === LevelSource.Mesh) inferred += 1;
   }
   return total > 0 ? inferred / total : 0;
+}
+
+/**
+ * Acres inside `within` whose level no survey point stands behind: cells with
+ * no level, or a modelled one. What the plan should hold as uncertain.
+ */
+export function unmeasuredAcIn(dem: Dem, measured: Uint8Array | null, within: MultiPoly): number {
+  const { nx, ny } = dem.meta;
+  const b = bboxOfMulti(within);
+  const cell = dem.cell;
+  const i0 = Math.max(0, Math.floor((b.minX - dem.meta.x0) / cell));
+  const j0 = Math.max(0, Math.floor((b.minY - dem.meta.y0) / cell));
+  const i1 = Math.min(nx - 1, Math.ceil((b.maxX - dem.meta.x0) / cell));
+  const j1 = Math.min(ny - 1, Math.ceil((b.maxY - dem.meta.y0) / cell));
+  let cells = 0;
+  for (let j = j0; j <= j1; j += 1) {
+    for (let i = i0; i <= i1; i += 1) {
+      if (!pointInMulti(dem.cellCentre(i, j), within)) continue;
+      const k = j * nx + i;
+      const known = Number.isFinite(dem.values[k]!) && (!measured || measured[k] === 1);
+      if (!known) cells += 1;
+    }
+  }
+  return (cells * cell * cell) / M2_PER_ACRE;
 }
 
 

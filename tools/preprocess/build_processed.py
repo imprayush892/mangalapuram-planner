@@ -83,43 +83,9 @@ json.dump({"method": "similarity fit of Level_Datum BD boundary onto Zoning_plan
            "missing": "PHASE 5 hatch not recovered; commercial/batching/project-1 split approximate (±1 ac)"},
           open(f'{OUT}/zoning_registration.json', 'w'), indent=2)
 
-# terrain: spot levels + DEM
-V = []; Fc = []
-for l in open(f'{RAW}/mangalapuram_terrain_15_sept.obj'):
-    if l.startswith('v '): V.append(list(map(float, l.split()[1:4])))
-    elif l.startswith('f '): Fc.append([int(t.split('/')[0]) - 1 for t in l.split()[1:]])
-V = np.array(V); Fc = np.array(Fc)
-with open(f'{OUT}/spot_levels.csv', 'w', newline='') as f:
-    w = csv.writer(f); w.writerow(['x_local', 'y_local', 'utm_e', 'utm_n', 'lon', 'lat', 'rl'])
-    for x, y, z in V:
-        lon, lat = tf.transform(x + E0, y + N0)
-        w.writerow([f'{x:.3f}', f'{y:.3f}', f'{x+E0:.3f}', f'{y+N0:.3f}', f'{lon:.7f}', f'{lat:.7f}', f'{z:.3f}'])
-tri = Triangulation(V[:, 0], V[:, 1], Fc)
-interp = LinearTriInterpolator(tri, V[:, 2])
-cell = 2.0
-x0, y0 = 0.0, -10.0; nx, ny = 460, 345  # covers x 0..920, y -10..680
-xs = x0 + cell * (np.arange(nx) + 0.5); ys = y0 + cell * (np.arange(ny) + 0.5)
-X, Y = np.meshgrid(xs, ys)
-Z = interp(X, Y).filled(np.nan).astype('<f4')
-Z.tofile(f'{OUT}/dem_2m.f32')
-json.dump({"format": "raw little-endian float32, row-major, row 0 = southernmost row (y0)", "nodata": "NaN (unsurveyed)",
-           "cell_m": cell, "x0": x0, "y0": y0, "nx": nx, "ny": ny,
-           "cell_centre": "x = x0 + cell*(i+0.5), y = y0 + cell*(j+0.5)", "coords": "local metres (see site_origin.json)",
-           "source": "linear interpolation of mangalapuram_terrain_15_sept.obj (parcel-clipped TIN)",
-           "valid_cells": int(np.isfinite(Z).sum()), "rl_min": float(np.nanmin(Z)), "rl_max": float(np.nanmax(Z))},
-          open(f'{OUT}/dem_2m.json', 'w'), indent=2)
-
-# contours
-d = ezdxf.readfile(f'{RAW}/mangalapuram_contours_1m.dxf')
-F = []
-for e in d.modelspace():
-    try:
-        pts = [(v.dxf.location.x - E0, v.dxf.location.y - N0) for v in e.vertices]
-    except Exception:
-        continue
-    if len(pts) > 1:
-        rl = int(e.dxf.layer.split('_')[1])
-        F.append({"type": "Feature", "properties": {"rl": rl, "major": rl % 5 == 0},
-                  "geometry": {"type": "LineString", "coordinates": [[round(a, 2), round(b, 2)] for a, b in pts]}})
-json.dump(fc(F, "contours_1m"), open(f'{OUT}/contours_1m.geojson', 'w'))
-print('done', len(V), 'pts', int(np.isfinite(Z).sum()), 'dem cells', len(F), 'contours')
+# terrain: DEM, measured mask and contours now come from the terrain mesh via
+# build_terrain.py (python build_terrain.py <mesh.obj> [--yup]). spot_levels.csv
+# is the survey itself (7,488 points, MANGALAPURAM_CSV_FINAL_1209.csv after
+# cleaning); it was written from the 15-Sept survey TIN, which is in git
+# history, and is not regenerated here.
+print('done: parcel, features, zones; run build_terrain.py for the terrain')

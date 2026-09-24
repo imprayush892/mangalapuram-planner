@@ -1,8 +1,6 @@
 import type { Dem } from '../engine/terrain/dem';
 import type { RasterMode } from '../state/store';
-import { useSite } from '../state/store';
-import { channelThresholdCells, waterModelFor } from '../engine/terrain/hydrology';
-import type { WaterModel } from '../engine/terrain/water';
+import type { StormResult } from '../engine/terrain/hydrology';
 
 export interface RasterLayer {
   canvas: HTMLCanvasElement;
@@ -49,6 +47,12 @@ function sample(ramp: Ramp, t: number): [number, number, number] {
   return ramp[ramp.length - 1]!.rgb;
 }
 
+/** Shallow to deep standing water. */
+const WATER_RAMP: Ramp = [
+  { stop: 0, rgb: [120, 200, 240] },
+  { stop: 1, rgb: [24, 92, 170] },
+];
+
 const rgbCss = ([r, g, b]: [number, number, number]): string => `rgb(${r},${g},${b})`;
 
 /**
@@ -59,8 +63,8 @@ export function buildRaster(
   dem: Dem,
   mode: RasterMode,
   unbuildableSlopeDeg: number,
-  /** Storm being looked at against the report's design storm; 1 when unknown. */
-  stormScale = 1,
+  /** The storm the hydrology view draws; the same one the panel reports. */
+  storm: StormResult | null = null,
 ): RasterLayer | null {
   if (mode === 'none') return null;
   const { nx, ny, x0, y0, cell_m } = dem.meta;
@@ -74,12 +78,6 @@ export function buildRaster(
   const stats = dem.stats();
   const slope = mode === 'slope' || mode === 'buildable' ? dem.slopeGrid() : null;
   const fall = mode === 'fall' ? dem.windowFallGrid(11.4, 14.2, 0.75) : null;
-  let waterModel: WaterModel | null = null;
-  if (mode === 'hydrology') {
-    const site = useSite.getState().site;
-    if (site) waterModel = waterModelFor(dem, site.features);
-  }
-  const channelCells = channelThresholdCells(stormScale);
 
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
@@ -104,16 +102,15 @@ export function buildRaster(
       } else if (mode === 'fall' && fall) {
         const f = fall[k]!;
         if (Number.isFinite(f)) rgb = sample(SLOPE_RAMP, f / 4);
-      } else if (mode === 'hydrology' && waterModel) {
-        // The same two rules as the 3D view: a pond is a hollow at least the
-        // ponding depth deep; a channel carries the threshold's upslope cells.
-        const upslope = waterModel.flowAccumulation[k]!;
-        if (waterModel.ponding[k]) {
-          rgb = [64, 164, 223];
-          alpha = 180 + Math.min(75, waterModel.depressionDepthM[k]! * 50);
-        } else if (upslope >= channelCells) {
+      } else if (mode === 'hydrology' && storm) {
+        // Water at the storm's peak and the thinner flows, cell for cell what
+        // the panel counts.
+        if (storm.peakWet[k] === 1) {
+          rgb = sample(WATER_RAMP, storm.peakDepthM[k]! / 1.5);
+          alpha = 230;
+        } else if (storm.channel[k] === 1) {
           rgb = [20, 80, 150];
-          alpha = Math.min(255, 100 + (upslope / channelCells) * 20);
+          alpha = Math.min(255, 110 + 40 * Math.log10(storm.flowM3[k]! / storm.channelFlowM3 + 1));
         }
       }
 
@@ -129,7 +126,7 @@ export function buildRaster(
   }
   ctx.putImageData(img, 0, 0);
 
-  const legend = buildLegend(mode, stats.rlMin, stats.rlMax, unbuildableSlopeDeg);
+  const legend = buildLegend(mode, stats.rlMin, stats.rlMax, unbuildableSlopeDeg, storm);
   return { canvas, x0, y0, widthM: nx * cell_m, heightM: ny * cell_m, legend };
 }
 
@@ -138,6 +135,7 @@ function buildLegend(
   rlMin: number,
   rlMax: number,
   unbuildable: number,
+  storm: StormResult | null,
 ): RasterLayer['legend'] {
   if (mode === 'rl') {
     return {
@@ -176,12 +174,11 @@ function buildLegend(
   }
   if (mode === 'hydrology') {
     return {
-      label: 'Water: channels at the chosen storm, ponds ≥ 0.25 m deep',
-      unit: '',
-      stops: [
-        { value: 0, colour: 'rgb(20,80,150)' },
-        { value: 1, colour: 'rgb(64,164,223)' },
-      ],
+      label: storm
+        ? `Water at the peak of ${storm.rainMm} mm in 24 h (C ${storm.runoffCoeff.toFixed(2)}); dark lines are shallower flow`
+        : 'Hydrology: loading',
+      unit: 'm deep',
+      stops: [0, 0.5, 1, 1.5].map((v) => ({ value: v, colour: rgbCss(sample(WATER_RAMP, v / 1.5)) })),
     };
   }
   return null;

@@ -104,7 +104,15 @@ export function parseScenario(text: string, currentVersions: Scenario['configVer
       client: String(s.configVersions?.client ?? ''),
       programme: String(s.configVersions?.programme ?? ''),
     },
-    overrides: s.overrides ?? { kmbr: {}, client: {}, programme: {}, assumptions: {}, siting: {} },
+    // Scenarios saved before the planning rules existed carry no overrides for them.
+    overrides: {
+      kmbr: s.overrides?.kmbr ?? {},
+      client: s.overrides?.client ?? {},
+      programme: s.overrides?.programme ?? {},
+      assumptions: s.overrides?.assumptions ?? {},
+      siting: s.overrides?.siting ?? {},
+      planning: s.overrides?.planning ?? {},
+    },
     switches: s.switches ?? {},
     zoneUses: s.zoneUses ?? {},
     layouts: s.layouts ?? {},

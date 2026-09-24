@@ -7,8 +7,8 @@ import { ringSignedArea } from '../geom/planar';
 import { confidenceAt } from '../terrain/fill';
 import type { FilledDem } from '../terrain/fill';
 import type { WaterModel } from '../terrain/water';
-import type { SiteFeature } from '../site/types';
-import { channelThresholdCells, waterModelFor } from '../terrain/hydrology';
+import type { StormResult } from '../terrain/hydrology';
+import type { Tin } from '../terrain/tin';
 
 /**
  * GLB massing: the terrain mesh plus extruded plots, towers and blocks, in
@@ -26,16 +26,38 @@ export interface GlbOptions {
   /** Levels with the survey's holes closed, so the mesh is continuous. */
   filled?: FilledDem;
   /**
-   * Draw the water: ponds, channels and flow lines for a storm, on the same
-   * rules as the panel and the 2D raster. Off when absent.
+   * The terrain mesh as delivered. When given, the terrain is drawn from its
+   * own triangles rather than resampled from the 2 m grid, so what is on
+   * screen is the mesh itself.
+   */
+  tin?: Tin;
+  /**
+   * Draw a storm's water: standing water at its own level and the channels
+   * carrying flow, from the same simulation the panel and the 2D raster use.
+   * Off when absent.
    */
   water?: WaterOptions;
+  overlay?: TerrainOverlay;
+}
+
+/**
+ * Planning layers laid on the terrain: an image in plan (north up, covering
+ * x0..x0+widthM, y0..y0+heightM) draped over the terrain mesh, and zone
+ * outlines traced along the ground. Tinted ground and lines, never solids, so
+ * they read apart from the building masses.
+ */
+export interface TerrainOverlay {
+  image: TexImageSource;
+  x0: number;
+  y0: number;
+  widthM: number;
+  heightM: number;
+  outlines: { rings: Ring[]; colour: number }[];
 }
 
 export interface WaterOptions {
-  features: SiteFeature[];
-  /** The storm being looked at against the report's design storm; 1 is the design storm. */
-  stormScale: number;
+  model: WaterModel;
+  storm: StormResult;
 }
 
 const COLOURS = {
@@ -53,10 +75,29 @@ export function buildMassingScene(opts: GlbOptions): THREE.Scene {
   const scene = new THREE.Scene();
   scene.name = 'Mangalapuram massing';
 
-  const terrain = buildTerrainMesh(opts.dem, opts.terrainStep ?? 2, opts.filled, opts.water);
+  const terrain = opts.tin
+    ? buildTinMesh(opts.tin, opts.dem, opts.filled)
+    : buildTerrainMesh(opts.dem, opts.terrainStep ?? 2, opts.filled);
   if (terrain) {
     terrain.name = 'Terrain';
     scene.add(terrain);
+  }
+  if (opts.overlay && terrain) {
+    const group = new THREE.Group();
+    group.name = 'Planning layers';
+    group.add(buildDrape(terrain.geometry, opts.overlay));
+    const lines = buildOutlines(opts.dem, opts.overlay, opts.filled);
+    if (lines) group.add(lines);
+    scene.add(group);
+  }
+  if (opts.water) {
+    const water = new THREE.Group();
+    water.name = 'Water';
+    const surface = buildWaterSurface(opts.dem, opts.water.storm);
+    if (surface) water.add(surface);
+    const lines = buildFlowLines(opts.dem, opts.water.model, opts.water.storm);
+    if (lines) water.add(lines);
+    scene.add(water);
   }
 
   const massing = new THREE.Group();
@@ -96,7 +137,7 @@ export function buildMassingScene(opts: GlbOptions): THREE.Scene {
  * from a real measurement. A continuous mesh that does not say which parts are
  * measured would be the whole point of the fill thrown away.
  */
-export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem, water?: WaterOptions): THREE.Object3D | null {
+export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem): THREE.Mesh | null {
   const { nx, ny, x0, y0, cell_m } = dem.meta;
   const stride = Math.max(1, Math.round(step / cell_m));
   const cols = Math.floor((nx - 1) / stride) + 1;
@@ -109,9 +150,6 @@ export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem, water?:
 
   const surveyed = new THREE.Color(COLOURS.terrain);
   const inferred = new THREE.Color(COLOURS.inferredTerrain);
-  
-  const waterModel: WaterModel | null = water ? waterModelFor(dem, water.features) : null;
-  const channelCells = water ? channelThresholdCells(water.stormScale) : Infinity;
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -124,41 +162,10 @@ export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem, water?:
       // three.js is Y-up: local x -> x, RL -> y, local y -> -z.
       positions.push(x0 + cell_m * (i + 0.5), z, -(y0 + cell_m * (j + 0.5)));
 
-      let rCol = surveyed.r, gCol = surveyed.g, bCol = surveyed.b;
       if (filled) {
         const conf = confidenceAt(filled.distanceToMeasuredM[k] ?? 0);
         const tint = surveyed.clone().lerp(inferred, 1 - conf);
-        rCol = tint.r; gCol = tint.g; bCol = tint.b;
-      }
-      
-      if (waterModel) {
-        // The same rules as the 2D raster and the panel: a pond is a hollow
-        // at least the ponding depth deep, and a channel carries the storm's
-        // threshold of upslope cells. Wet ground in between is the wetness
-        // index the scoring already uses.
-        const depthM = waterModel.depressionDepthM[k] ?? 0;
-        const upslope = waterModel.flowAccumulation[k] ?? 0;
-        const wet = waterModel.wetness[k] ?? Number.NaN;
-        if (waterModel.ponding[k] === 1) {
-          const t = Math.min(1, depthM / 1.0);
-          rCol = 0.08;
-          gCol = 0.40 + 0.20 * (1 - t);
-          bCol = 0.65 + 0.35 * t;
-        } else if (upslope >= channelCells) {
-          const t = Math.min(1, Math.log(upslope / channelCells + 1) / Math.log(50));
-          rCol = 0.08 + 0.10 * (1 - t);
-          gCol = 0.45 + 0.25 * t;
-          bCol = 0.70 + 0.25 * t;
-        } else if (Number.isFinite(wet) && waterModel.maxWetness > 0 && wet > waterModel.maxWetness * 0.7) {
-          const t = (wet - waterModel.maxWetness * 0.7) / (waterModel.maxWetness * 0.3);
-          rCol = rCol * (1 - t * 0.25);
-          gCol = gCol * (1 - t * 0.1) + t * 0.1;
-          bCol = Math.min(1, bCol + t * 0.2);
-        }
-      }
-
-      if (filled || waterModel) {
-        colours.push(rCol, gCol, bCol);
+        colours.push(tint.r, tint.g, tint.b);
       }
     }
   }
@@ -183,7 +190,7 @@ export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem, water?:
   }
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(
+  return new THREE.Mesh(
     geometry,
     new THREE.MeshStandardMaterial({
       color: colours.length > 0 ? 0xffffff : COLOURS.terrain,
@@ -193,32 +200,196 @@ export function buildTerrainMesh(dem: Dem, step = 2, filled?: FilledDem, water?:
       side: THREE.DoubleSide,
     }),
   );
-  
-  if (waterModel && water) {
-    const group = new THREE.Group();
-    group.name = 'Terrain and water';
-    group.add(mesh);
-    const flowLines = buildFlowLines(waterModel, dem, channelThresholdCells(water.stormScale));
-    if (flowLines) group.add(flowLines);
-    return group;
+}
+
+/** The overlay image on a copy of the terrain surface, a hair above it. */
+function buildDrape(terrain: THREE.BufferGeometry, o: TerrainOverlay): THREE.Mesh {
+  const geometry = new THREE.BufferGeometry();
+  const pos = terrain.getAttribute('position') as THREE.BufferAttribute;
+  geometry.setAttribute('position', pos);
+  if (terrain.index) geometry.setIndex(terrain.index);
+  const uv = new Float32Array(pos.count * 2);
+  for (let v = 0; v < pos.count; v++) {
+    // three.js is Y-up: local x = x, local y = -z.
+    uv[v * 2] = (pos.getX(v) - o.x0) / o.widthM;
+    uv[v * 2 + 1] = (-pos.getZ(v) - o.y0) / o.heightM;
   }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geometry.computeVertexNormals();
+  const texture = new THREE.Texture(o.image);
+  texture.needsUpdate = true;
+  texture.magFilter = THREE.NearestFilter;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      roughness: 0.9,
+      metalness: 0,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    }),
+  );
+  mesh.name = 'Planning layers on the ground';
   return mesh;
 }
 
-function buildFlowLines(waterModel: WaterModel, dem: Dem, channelCells: number): THREE.LineSegments | null {
-  const { nx, ny, x0, y0, cell_m } = dem.meta;
-  const { flowAccumulation, receiver, filledLevel } = waterModel;
+/** Zone outlines traced along the ground, every metre, half a metre up. */
+function buildOutlines(dem: Dem, o: TerrainOverlay, filled?: FilledDem): THREE.LineSegments | null {
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const level = (x: number, y: number): number => {
+    const z = dem.sampleBilinear([x, y]);
+    if (Number.isFinite(z)) return z;
+    const c = dem.cellAt([x, y]);
+    return c && filled ? filled.values[c.j * dem.meta.nx + c.i] ?? Number.NaN : Number.NaN;
+  };
+  for (const { rings, colour } of o.outlines) {
+    const col = new THREE.Color(colour);
+    for (const ring of rings) {
+      for (let a = 0; a < ring.length; a++) {
+        const p = ring[a]!;
+        const q = ring[(a + 1) % ring.length]!;
+        const steps = Math.max(1, Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1])));
+        for (let s = 0; s < steps; s++) {
+          const x1 = p[0] + ((q[0] - p[0]) * s) / steps;
+          const y1 = p[1] + ((q[1] - p[1]) * s) / steps;
+          const x2 = p[0] + ((q[0] - p[0]) * (s + 1)) / steps;
+          const y2 = p[1] + ((q[1] - p[1]) * (s + 1)) / steps;
+          const z1 = level(x1, y1);
+          const z2 = level(x2, y2);
+          if (!Number.isFinite(z1) || !Number.isFinite(z2)) continue;
+          positions.push(x1, z1 + 0.5, -y1, x2, z2 + 0.5, -y2);
+          colors.push(col.r, col.g, col.b, col.r, col.g, col.b);
+        }
+      }
+    }
+  }
+  if (positions.length === 0) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ vertexColors: true }));
+  lines.name = 'Zone outlines';
+  return lines;
+}
 
-  // One segment per channel cell to its receiver, drawn on the filled surface
-  // so a line crosses a pond at its water level rather than diving into it.
+/**
+ * The terrain mesh from its own triangles. Vertices are tinted like the grid
+ * mesh: the terrain colour where a survey point stands behind the level,
+ * paler the further the nearest reading is.
+ */
+export function buildTinMesh(tin: Tin, dem: Dem, filled?: FilledDem): THREE.Mesh | null {
+  if (tin.faceCount === 0) return null;
+  const positions = new Float32Array(tin.vertexCount * 3);
+  const colours = new Float32Array(tin.vertexCount * 3);
+  const surveyed = new THREE.Color(COLOURS.terrain);
+  const inferred = new THREE.Color(COLOURS.inferredTerrain);
+  for (let v = 0; v < tin.vertexCount; v++) {
+    const [x, y, z] = tin.vertex(v);
+    // three.js is Y-up: local x -> x, RL -> y, local y -> -z.
+    positions[v * 3] = x;
+    positions[v * 3 + 1] = z;
+    positions[v * 3 + 2] = -y;
+    let tint = surveyed;
+    if (filled) {
+      const c = dem.cellAt([x, y]);
+      const d = c ? filled.distanceToMeasuredM[c.j * dem.meta.nx + c.i] ?? 0 : 0;
+      tint = surveyed.clone().lerp(inferred, 1 - confidenceAt(d));
+    }
+    colours[v * 3] = tint.r;
+    colours[v * 3 + 1] = tint.g;
+    colours[v * 3 + 2] = tint.b;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+  geometry.setIndex(new THREE.BufferAttribute(Uint32Array.from(tin.faces), 1));
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      roughness: 0.95,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    }),
+  );
+}
+
+/**
+ * Water at the storm's peak: one flat quad per wet cell at the level the water
+ * stands or runs at, full-resolution, so a pond or a flooded swale reads as a
+ * surface rather than a tint on the terrain.
+ */
+function buildWaterSurface(dem: Dem, storm: StormResult): THREE.Mesh | null {
+  const { nx, ny, x0, y0, cell_m } = dem.meta;
+  const half = cell_m / 2;
+  const positions: number[] = [];
+  const colours: number[] = [];
+  const shallow = new THREE.Color(0x78c8f0);
+  const deep = new THREE.Color(0x185caa);
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const k = j * nx + i;
+      if (storm.peakWet[k] !== 1) continue;
+      const depth = storm.peakDepthM[k]!;
+      const level = dem.values[k]! + depth;
+      const x = x0 + cell_m * (i + 0.5);
+      const zc = -(y0 + cell_m * (j + 0.5));
+      const a: [number, number] = [x - half, zc - half];
+      const b: [number, number] = [x + half, zc - half];
+      const c: [number, number] = [x + half, zc + half];
+      const d: [number, number] = [x - half, zc + half];
+      for (const p of [a, d, b, b, d, c]) positions.push(p[0], level, p[1]);
+      const tint = shallow.clone().lerp(deep, Math.min(1, depth / 1.5));
+      for (let v = 0; v < 6; v++) colours.push(tint.r, tint.g, tint.b);
+    }
+  }
+  if (positions.length === 0) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      roughness: 0.2,
+      metalness: 0,
+      side: THREE.DoubleSide,
+      // Shallow water sits within centimetres of the ground: keep it on top.
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    }),
+  );
+  mesh.name = 'Water at the peak';
+  return mesh;
+}
+
+/**
+ * The channels carrying flow in the storm: a segment from each channel cell to
+ * where its water goes next, brighter the more passes. Drawn on the flooded
+ * surface so a line crossing a full pond runs across its water level.
+ */
+function buildFlowLines(dem: Dem, model: WaterModel, storm: StormResult): THREE.LineSegments | null {
+  const { nx, ny, x0, y0, cell_m } = dem.meta;
+  const { receiver, filledLevel } = model;
   const positions: number[] = [];
   const colors: number[] = [];
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const k = j * nx + i;
-      const upslope = flowAccumulation[k] ?? 0;
       const r = receiver[k] ?? -1;
-      if (upslope < channelCells || r < 0) continue;
+      if (storm.channel[k] !== 1 || r < 0) continue;
       const z1 = filledLevel[k]!;
       const z2 = filledLevel[r]!;
       if (!Number.isFinite(z1) || !Number.isFinite(z2)) continue;
@@ -226,7 +397,7 @@ function buildFlowLines(waterModel: WaterModel, dem: Dem, channelCells: number):
       const rj = (r - ri) / nx;
       positions.push(x0 + cell_m * (i + 0.5), z1 + 0.35, -(y0 + cell_m * (j + 0.5)));
       positions.push(x0 + cell_m * (ri + 0.5), z2 + 0.35, -(y0 + cell_m * (rj + 0.5)));
-      const t = Math.min(1, Math.log(upslope / channelCells + 1) / Math.log(80));
+      const t = Math.min(1, Math.log10(storm.flowM3[k]! / storm.channelFlowM3 + 1) / 3);
       const red = 0.05 + 0.15 * (1 - t);
       const green = 0.55 + 0.35 * t;
       const blue = 0.85 + 0.15 * t;
@@ -237,7 +408,10 @@ function buildFlowLines(waterModel: WaterModel, dem: Dem, channelCells: number):
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 }));
+  const lines = new THREE.LineSegments(
+    geo,
+    new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8 }),
+  );
   lines.name = 'Flow lines';
   return lines;
 }

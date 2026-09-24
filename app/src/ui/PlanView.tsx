@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSite } from '../state/store';
 import type { RasterLayer } from './raster';
 import { buildRaster } from './raster';
+import { useStormForViews } from '../state/hydrologyStore';
+import { useAnalysisForViews, usePlanning } from '../state/planningStore';
+import { LAYER_STYLE, rgba } from './planningStyle';
 import { fitView, screenToWorld } from './view';
 import type { View } from './view';
 import { bboxOfMulti, pointInMulti } from '../engine/geom/planar';
@@ -61,9 +64,27 @@ export default function PlanView(): React.ReactElement {
 
   const unbuildableSlope = pick<number>(config?.kmbr, 'rule22_site_suitability.no_building_slope_deg_over', 45);
 
+  const storm = useStormForViews();
+  const analysis = useAnalysisForViews();
+  const planningVisible = usePlanning((s) => s.visible);
+  const planning = useMemo(() => {
+    if (!analysis) return [];
+    return analysis.order
+      .filter((id) => planningVisible.includes(id))
+      .map((id) => {
+        const st = LAYER_STYLE[id];
+        return {
+          geom: analysis.layers[id].geom,
+          fill: st.fill > 0 ? rgba(st.rgb, st.fill) : undefined,
+          stroke: st.outline > 0 ? rgba(st.rgb, 0.95) : undefined,
+          width: st.outline,
+          dashed: st.dashed,
+        };
+      });
+  }, [analysis, planningVisible]);
   const raster = useMemo<RasterLayer | null>(
-    () => (site ? buildRaster(site.dem, rasterMode, unbuildableSlope) : null),
-    [site, rasterMode, unbuildableSlope],
+    () => (site ? buildRaster(site.dem, rasterMode, unbuildableSlope, rasterMode === 'hydrology' ? storm : null) : null),
+    [site, rasterMode, unbuildableSlope, storm],
   );
 
   const activeLayout = options[activeOptionIndex] ?? null;
@@ -125,6 +146,7 @@ export default function PlanView(): React.ReactElement {
       layouts,
       circulation: masterPlan?.circulation.roads,
       splays: masterPlan?.junctions.splays,
+      planning,
       selectedZoneId,
       background: '#0f1518',
       zoneColours,
@@ -140,6 +162,7 @@ export default function PlanView(): React.ReactElement {
     site,
     raster,
     layers,
+    planning,
     selectedZoneId,
     layouts,
     masterPlan,

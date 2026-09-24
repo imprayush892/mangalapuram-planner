@@ -7,3 +7,4 @@ coverage/
 .vite/
 app/dist/
 app/smoke*.png
+__pycache__/

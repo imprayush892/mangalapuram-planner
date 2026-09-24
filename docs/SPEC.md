@@ -3,6 +3,12 @@
 Status: authoritative build spec, 17 Sep 2026. Where this file and the PRD differ, **this file wins**.
 Live PRD (reference, human-facing): https://claude.ai/code/artifact/1941dd4e-3a91-4ca0-839f-8d79abe85bb0
 
+> **Update 24 Sep 2026 — planning workflow.** The owner's layered workflow in `docs/PIPELINE.md`
+> now drives planning: analysis first (hydrology → waterlogging → slope → plotable land → roads →
+> plots → typologies → FSI → placement), with the rules in `config/planning_rules.yaml` overriding
+> `client_rules.yaml` where they overlap. Sections 6–7 below describe the earlier zone-first flow,
+> which is kept for comparison; where they conflict with PIPELINE.md, PIPELINE.md wins.
+
 ## 1. What we are building
 
 A browser web app that tells the developer, for the 73.54 ac in scope at Mangalapuram (Thiruvananthapuram), **what to build, how much, where and why**, and — most importantly — **lays out each zone**:

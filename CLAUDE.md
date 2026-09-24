@@ -10,6 +10,16 @@ You are building a **browser web app** for ONÈO's client: a site-driven plannin
 5. At the end of each milestone, run `npm run test` and `npm run build`, fix failures, and print a short status: what works, test results, what's next, any assumption you added.
 6. Keep going to the next milestone unless something truly blocks you. If blocked, stop and ask one precise question.
 
+## Planning workflow (owner, 24 Sep 2026) — read `docs/PIPELINE.md` first
+- Every planning decision is derived from the analysis layer before it (terrain → hydrology at the
+  300 mm planning storm → waterlogging/safe → public space → slope → non-buildable (KMBR Rule 22) →
+  plotable → roads → plots → plot slope ≤ 1:5 → cut/fill → typologies → FSI → placement → 3D).
+  Never place first and justify afterwards; the client zoning plan is for comparison only.
+- `config/planning_rules.yaml` overrides `config/client_rules.yaml` where they overlap; the rest of the
+  client rules stand; KMBR is still checked on top. Existing roads are fixed.
+- Pipeline code: `app/src/engine/pipeline/`. Terrain comes from `data/processed/terrain_mesh.obj`
+  (`tools/preprocess/build_terrain.py`); modelled ground is flagged via `dem_2m_measured.u8`.
+
 ## Non-negotiable rules
 - **Priority is Level 2 (inside-zone layouts): villa plots + internal roads, apartment tower sizing/placement.** Don't gold-plate Level 1 before M3/M4 work.
 - **Never invent regulation values.** Read them from `config/kmbr_rules.yaml`. If a value is missing, check `docs/kmbr_source/*.txt`, add it to the YAML with `verified:` status and a clause reference.

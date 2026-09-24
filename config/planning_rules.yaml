@@ -1,0 +1,74 @@
+# PLANNING RULES — owner overrides, 2026-09-24.
+#
+# Where a rule here and client_rules.yaml speak to the same thing, this file wins.
+# Everything else in client_rules.yaml stands, and KMBR (kmbr_rules.yaml) is still
+# checked on top of the result. Slopes are written rise:run ("1:4" = 1 m of rise in
+# 4 m = 25% = 14.04 degrees).
+#
+# The planning order these rules feed (app/src/engine/pipeline):
+#   terrain -> hydrology -> waterlogging + safe zones -> public space -> slope ->
+#   non-buildable (> 1:4) -> plotable zones -> roads + road slopes -> plots ->
+#   plot slope (<= 1:5) -> cut and fill -> typologies -> FSI + footprints ->
+#   placement + spacing -> 3D massing.
+# Every decision is generated from the layers before it, never drawn first.
+version: 2026-09-24
+
+hydrology:
+  # The storm itself is config/assumptions.yaml hydrology.design_storm_mm, which
+  # is set to this planning basis so the Hydrology panel and the plan agree.
+  planning_storm_mm: 300
+  # Waterlogging = ground under water at the peak of the planning storm (ponds risen
+  # over their rims plus water running in the swales), at least this deep.
+  waterlogging_min_depth_m: 0.05
+  # Extra margin kept between waterlogged ground and building land. 0 = none set;
+  # the owner has not asked for a freeboard strip.
+  building_offset_from_waterlogging_m: 0
+  # Waterlogged patches smaller than this are puddles on a 2 m grid, not zones.
+  min_waterlogging_patch_m2: 20
+
+public_space:
+  may_overlap_waterlogging: true         # landscape, recreation, ecological infrastructure
+  includes_non_buildable_slope: true
+  includes_natural_drains: true          # Rule 22(4): kept unobstructed
+
+slope:
+  # Non-buildable ground is KMBR Rule 22(3) (2025 amendment): no development on a slope over
+  # 45 degrees (kmbr_rules.yaml rule22_site_suitability.no_building_slope_deg_over), on land
+  # liable to be flooded, and (22(4)) nothing may obstruct a natural drain or stream.
+  non_buildable: kmbr_rule22
+  # Owner's stricter "steeper than 1:4" limit, SUSPENDED 2026-09-24 in favour of Rule 22.
+  # Set non_buildable to "1:4" to bring it back.
+  suspended_non_buildable_steeper_than: "1:4"
+  # Statutory: every cell over the Rule 22 limit counts, however small the patch.
+  min_non_buildable_patch_m2: 0
+  plot_max: "1:5"                          # per plot, after cut and fill
+
+roads:
+  existing: fixed                          # built roads: kept exactly, checked against the limits below and reported
+  max_gradient: {primary: "1:8", secondary: "1:7", tertiary: "1:6"}   # replaces client/assumptions road_gradient
+
+plotable:
+  # A plotable zone must fit the smallest plot: nothing narrower than this survives.
+  min_width_m: 15                          # = villas.min_plot_side_m
+  min_area_m2: 251                         # = the smallest villa plot (2,700 sq ft)
+
+villas:                                    # replaces client_rules villa_plots sizing (18 m side, 45% footprint, 20/30/50 plot sizing)
+  built_area_sft: {min: 2700, max: 3000}   # never over 3,000 sq ft
+  fsi: 1.0                                 # built area = plot area
+  floors: 2                                # G+1
+  ground_floor_share_of_plot: 0.60         # footprint = the plot's own shape scaled to 60% of its area
+  first_floor_share_of_plot: 0.40          # 0.60 + 0.40 = FSI 1.0
+  plot_aspect_ratio: {min: 1.0, max: 2.5}
+  min_plot_side_m: 15                      # applies to the plot, not the villa
+
+senior_living:                             # replaces client "senior = villa-style plots"
+  min_floors: 4                            # G+3 minimum
+  min_clear_between_buildings_m: 12
+  method: "units -> floors -> units per floor -> floor plate -> footprint -> placement"
+
+apartments:
+  fsi_max: 3.0
+  terrain_response: podium                 # podium height follows the ground; no forced flat platform
+  method: "FSI -> built-up area -> floors -> floor plate -> footprint -> podium -> terrain response"
+
+special_zones: [clubhouse, school]         # sited from the layers, joined to roads and paths

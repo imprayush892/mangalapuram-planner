@@ -8,8 +8,12 @@ import { bboxOfMulti, bboxUnion } from '../engine/geom/planar';
 import type { Bbox } from '../engine/geom/types';
 import { useEditedSite } from '../state/useEditedSite';
 import { useSite } from '../state/store';
-import { useActiveHydrology } from '../state/hydrologyStore';
-import { channelThresholdCells, waterModelFor } from '../engine/terrain/hydrology';
+import { useActiveStorm } from '../state/hydrologyStore';
+import { useAnalysisForViews, usePlanning } from '../state/planningStore';
+import { buildTerrainOverlay } from './layerOverlay';
+import { buildRaster } from './raster';
+import { useRules } from '../state/useRules';
+import { pick } from '../engine/data/config';
 
 /**
  * 3D terrain and massing. The same scene the GLB export writes, so what is on
@@ -23,8 +27,13 @@ export default function ThreeView(): React.ReactElement {
   const activeIndex = useLayout((s) => s.activeOptionIndex);
   const plan = useMasterPlan((s) => s.plan);
   const rasterMode = useSite((s) => s.raster);
-  // The storm the water is drawn for, against the report's design storm.
-  const stormScale = useActiveHydrology()?.scale ?? 1;
+  // The storm the water is drawn for: the one the Hydrology panel reports.
+  const active = useActiveStorm();
+  const water = rasterMode === 'hydrology' && active && 'natural' in active ? active : null;
+  const analysis = useAnalysisForViews();
+  const planningVisible = usePlanning((s) => s.visible);
+  const rules = useRules();
+  const unbuildableSlope = pick<number>(rules?.kmbr, 'rule22_site_suitability.no_building_slope_deg_over', 45);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -46,7 +55,19 @@ export default function ThreeView(): React.ReactElement {
       layouts,
       parcel: site.parcel,
       terrainStep: 4,
-      water: rasterMode === 'hydrology' ? { features: site.features, stormScale } : undefined,
+      tin: site.tin ?? undefined,
+      water: water ? { model: water.model, storm: water.natural } : undefined,
+      // The Site panel's terrain raster, draped as in 2D. Hydrology draws its
+      // own water surfaces and flow lines instead.
+      overlay:
+        buildTerrainOverlay(
+          site.dem,
+          rasterMode !== 'none' && rasterMode !== 'hydrology'
+            ? buildRaster(site.dem, rasterMode, unbuildableSlope)?.canvas ?? null
+            : null,
+          analysis,
+          planningVisible,
+        ) ?? undefined,
     });
     scene.background = new THREE.Color(0x0f1518);
     scene.fog = new THREE.Fog(0x0f1518, 900, 2400);
@@ -91,8 +112,8 @@ export default function ThreeView(): React.ReactElement {
     controls.update();
 
     // Water particles: drops that follow the same receivers, on the same
-    // filled surface, as the flow lines and the report. They start on the
-    // channel network the chosen storm fills and leave where it does.
+    // flooded surface, as the flow lines. They start on the channels this
+    // storm runs and leave where the water leaves the site.
     let sim: {
       receiver: Int32Array;
       level: Float32Array;
@@ -101,16 +122,15 @@ export default function ThreeView(): React.ReactElement {
       points: THREE.Points;
     } | null = null;
 
-    if (rasterMode === 'hydrology') {
-      const waterModel = waterModelFor(site.dem, site.features);
-      const { nx, ny } = site.dem.meta;
-      const threshold = channelThresholdCells(stormScale);
+    if (water) {
+      const { receiver, filledLevel } = water.model;
+      const { channel } = water.natural;
       const spawn: number[] = [];
-      for (let k = 0; k < nx * ny; k += 1) {
-        if ((waterModel.flowAccumulation[k] ?? 0) >= threshold && waterModel.receiver[k]! >= 0) spawn.push(k);
+      for (let k = 0; k < channel.length; k += 1) {
+        if (channel[k] === 1 && receiver[k]! >= 0) spawn.push(k);
       }
       if (spawn.length > 0) {
-        const count = Math.min(15000, spawn.length * 8);
+        const count = Math.min(15000, spawn.length * 4);
         const positions = new Float32Array(count * 3);
         const colors = new Float32Array(count * 3);
         const particles = [];
@@ -129,23 +149,15 @@ export default function ThreeView(): React.ReactElement {
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         const points = new THREE.Points(
           geo,
-          new THREE.PointsMaterial({
-            size: Math.min(4.5, 2.0 + Math.sqrt(stormScale) * 0.8),
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.85,
-            sizeAttenuation: true,
-          }),
+          new THREE.PointsMaterial({ size: 2.5, vertexColors: true, transparent: true, opacity: 0.85, sizeAttenuation: true }),
         );
         points.position.y = 1.0; // just above the surface
         scene.add(points);
-        sim = { receiver: waterModel.receiver, level: waterModel.filledLevel, spawn, particles, points };
+        sim = { receiver, level: filledLevel, spawn, particles, points };
       }
     }
 
     const { nx, x0, y0, cell_m } = site.dem.meta;
-    // A bigger storm moves water faster; the sqrt keeps it watchable.
-    const speedMultiplier = Math.min(8, Math.max(0.2, Math.sqrt(stormScale)));
 
     let frame = 0;
     const tick = (): void => {
@@ -155,7 +167,7 @@ export default function ThreeView(): React.ReactElement {
         const positions = sim.points.geometry.attributes.position!.array as Float32Array;
         for (let p = 0; p < sim.particles.length; p += 1) {
           const d = sim.particles[p]!;
-          d.progress += d.speed * speedMultiplier;
+          d.progress += d.speed;
           if (d.progress >= 1) {
             const next = sim.receiver[d.k]!;
             d.progress -= 1;
@@ -221,7 +233,10 @@ export default function ThreeView(): React.ReactElement {
     activeIndex,
     plan,
     rasterMode,
-    stormScale,
+    water,
+    analysis,
+    planningVisible,
+    unbuildableSlope,
   ]);
 
   return (

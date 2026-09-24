@@ -19,3 +19,40 @@ plot_fall_thresholds_m: {build_as_drawn: 0.5, absorb_in_plinth: 1.0, stepped_pli
 sprinklered_towers: true    # affects travel-distance limit (45 m vs 30 m)
 aai_height_cap_m: null      # unknown — slider
 tbm_msl_offset_m: null      # unknown — blocks outfall design
+
+# Hydrology. The app (app/src/engine/terrain/hydrology.ts) and the offline report
+# (tools/preprocess/hydrology_analysis.py) both read this block, so the drawn water
+# and the reported numbers use the same inputs.
+hydrology:
+  annual_rainfall_mm: 2700         # design benchmark: the upper end, rounded, of the 2024 observed range for Thiruvananthapuram
+                                   # district, 2,078.4-2,674.9 mm (CWRDM/KSCSTE, Kerala Water Resources Assessment 2024, published
+                                   # 2025, Ch.1 s.1.3, p.4 / flipbook P:16). One year's range, not a long-term normal.
+  design_storm_mm: 300             # PLANNING BASIS set by the owner, 2026-09-24 (config/planning_rules.yaml). Above every
+                                   # sourced estimate: KSDMA 100-year 168.1 mm (TVM CDMP 2016 Table 3.1, Nedumangad, 1986-2013)
+                                   # and the IMD Thiruvananthapuram 24 h record, 239.5 mm (28-Sep-1930).
+  design_return_period_yr: 100     # of the sourced 100-yr estimate; the 300 mm planning basis is a chosen margin above it
+  storm_presets:                   # one click in the Hydrology panel; the design storm above is the default
+    - {label: "IMD 2024 max", mm: 152.5, note: "IMD Thiruvananthapuram 42379, 24 h max 2024 (28 Jul)"}
+    - {label: "100-yr KSDMA", mm: 168.1, note: "KSDMA TVM CDMP 2016 Table 3.1, Nedumangad, 1986-2013"}
+    - {label: "Climate allowance", mm: 200, note: "project design allowance; NOT an official return-period value"}
+    - {label: "IMD record", mm: 239.5, note: "IMD Thiruvananthapuram 42379, all-time 24 h record, 28-Sep-1930"}
+    - {label: "Planning basis", mm: 300, note: "owner planning storm, config/planning_rules.yaml, 2026-09-24"}
+    - {label: "CWC 100-yr", mm: 320, note: "CWC subzone 5(b) isopluvial, via NHAI DPR NH-66 (SMEC 2020) Table 8.1"}
+  storm_runoff_coeff: null         # null = the CWC/RBF-16 coastal formula below, applied to the storm being looked at
+  runoff_formula: {a: 0.332, b: 0.2, area_reduction_factor: 1.0}
+                                   # C = a (R F)^b, R = 24 h rainfall in cm (RBF-16, quoted in the NHAI DPR above). F = 1: the site
+                                   # is 0.3 km2, so point rainfall applies. 168.1 mm gives C = 0.58.
+  annual_runoff_coeff: 0.25        # UNVERIFIED: no local source found. Share of a year's rain that leaves as surface runoff.
+  impervious_share_developed: 0.40 # assumption: roofs, roads and paving as a share of the site when built out
+  impervious_runoff_coeff: 0.90    # rational-method value for roofs and paving
+  ponding_depth_m: 0.25            # a hollow shallower than this at its deepest is 2 m DEM noise, not a pond
+  standing_water_show_m: 0.05      # water is drawn and counted where at least this deep
+  channel_flow_lps: 1.0            # a flow path is drawn as a channel where the storm's mean flow over 24 h reaches this
+  peak_flow:                       # how deep flowing water gets at the storm's peak
+    short_duration_exponent: 0.3333  # IMD short-duration rule P_t = P_24 (t/24)^(1/3), t in hours
+    kirpich: {a: 0.0195, b: 0.77, c: 0.385}   # time of concentration tc (min) = a L^b S^-c, L in m along the longest path
+    tc_min_minutes: 10             # floor on tc: nothing peaks faster than this on a site
+    manning_n: 0.05                # natural ground under grass and scrub (Chow, floodplains, light brush 0.035-0.07)
+    min_slope: 0.002               # floor on the friction slope, so flat ground does not read as infinitely deep
+    section_half_width_m: 40       # how far either side of a flow path the cross-section looks for its banks
+    max_depth_m: 8                 # stop searching for a stage beyond this depth

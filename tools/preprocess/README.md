@@ -26,7 +26,18 @@ python zones.py    # writes zones.pkl (parcel from BD lines, zones from hatches 
 ```
 reg.py / zones.py expect lv_flat.json, zp_flat.json in the working directory.
 
-## 4. Build app data
+## 4. Build app data (parcel, features, zones)
 ```bash
 python build_processed.py <workdir> ../../data/processed
+```
+
+## 5. Terrain (DEM, measured mask, contours) from the terrain mesh
+```bash
+python build_terrain.py "kerala_site final_mesh.obj" --yup   # Rhino Y-up export
+```
+Needs numpy + matplotlib. Prints the `terrain_tin` block for tests/expected_values.yaml.
+
+## 6. Hydrology report
+```bash
+python hydrology_analysis.py        # writes data/processed/hydrology_report.json (+ .xlsx with pandas)
 ```

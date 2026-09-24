@@ -5,6 +5,7 @@ import type { RasterMode } from '../state/store';
 import { m2ToAcres } from '../engine/units';
 import { zoneColour } from './draw';
 import { useEditedSite } from '../state/useEditedSite';
+import { unmeasuredAcIn } from '../engine/terrain/fill';
 
 const RASTERS: readonly { value: RasterMode; label: string }[] = [
   { value: 'none', label: 'None' },
@@ -42,8 +43,10 @@ export default function SitePanel(): React.ReactElement {
 
   const meshedAc = tinOrDemAc(terrain);
   const fill = site.filled;
-  const fillAc = fill ? m2ToAcres(fill.interpolatedCells * site.dem.cell * site.dem.cell) : 0;
-  const unsurveyedAc = Math.max(0, site.parcelAreaAc - meshedAc);
+  const cellM2 = site.dem.cell * site.dem.cell;
+  const fillAc = fill ? m2ToAcres(fill.interpolatedCells * cellM2) : 0;
+  const meshOnlyAc = fill ? m2ToAcres(fill.meshCells * cellM2) : 0;
+  const unsurveyedAc = unmeasuredAcIn(site.dem, site.measured, site.parcel);
 
   return (
     <>
@@ -58,11 +61,11 @@ export default function SitePanel(): React.ReactElement {
           />
         ))}
         <Row label="Deferred land" value="26.40 ac" hint="programme.yaml scope.deferred_land_ac — out of scope" />
-        <Row label="Surveyed (meshed)" value={`${meshedAc.toFixed(2)} ac`} hint="parcel-clipped TIN plan area" />
+        <Row label="Terrain mesh" value={`${meshedAc.toFixed(2)} ac`} hint="plan area of the final terrain mesh" />
         <Row
-          label="Unsurveyed"
+          label="Not measured in the parcel"
           value={`${unsurveyedAc.toFixed(2)} ac`}
-          hint="NaN in dem_2m.f32 — allowed but flagged low-confidence"
+          hint="no survey point within 5 m: the level is the modeller's mesh or interpolated — flagged low-confidence"
         />
         {fill && (
           <>
@@ -70,6 +73,11 @@ export default function SitePanel(): React.ReactElement {
               label="Levels recovered"
               value={`${fill.harvestedCells} cells`}
               hint="spot levels and contour vertices on ground the TIN never carried"
+            />
+            <Row
+              label="Levels from the mesh only"
+              value={`${meshOnlyAc.toFixed(2)} ac`}
+              hint="the terrain modeller's surface where the survey took no reading"
             />
             <Row
               label="Levels interpolated"

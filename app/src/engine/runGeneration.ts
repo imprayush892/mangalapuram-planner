@@ -97,6 +97,7 @@ async function loadContext(
       programme: applyOverrides(baseConfig.programme, overrides.programme),
       assumptions: applyOverrides(baseConfig.assumptions, overrides.assumptions),
       siting: applyOverrides(baseConfig.siting, overrides.siting),
+      planning: applyOverrides(baseConfig.planning, overrides.planning ?? {}),
     },
   };
 }

@@ -60,6 +60,40 @@ export interface WaterModel {
   flowAccumulation: Float32Array;
   /** The priority-flood level: ground, or the water surface over a hollow. */
   filledLevel: Float32Array;
+  /**
+   * Cells in the order the flood reached them. Every cell comes after the
+   * cell its water drains to, so walking it backwards visits upslope first:
+   * what routing a storm needs.
+   */
+  popOrder: Int32Array;
+  /** Outlet catchment per cell on the `receiver` graph, -1 off the survey. */
+  flowCatchment: Int32Array;
+  /** The outlet cell of each `flowCatchment` id: where its water leaves the survey. */
+  flowOutlets: Int32Array;
+  /** Depression id per cell, -1 on ground that drains. */
+  depression: Int32Array;
+  /** Every hollow: the flat the flood leaves over it, and what it holds brim-full. */
+  depressions: Depression[];
+}
+
+/**
+ * A hollow, as the flood sees it: a connected patch of ground below one spill
+ * level. Nested pits inside it are part of it; they fill first because the
+ * storm fills from the lowest cell up.
+ */
+export interface Depression {
+  /** Cells below the spill level. */
+  cells: Int32Array;
+  /** The level it spills at, RL. */
+  spillLevel: number;
+  /** Where the overflow goes: the rim cell it was flooded from. */
+  exit: number;
+  /** The lowest cell, where water first stands. */
+  lowest: number;
+  /** m³ held when full to the spill level. */
+  capacityM3: number;
+  /** Deepest point when full, m. */
+  maxDepthM: number;
 }
 
 export interface WaterInput {
@@ -268,13 +302,17 @@ export function buildWaterModel(input: WaterInput): WaterModel {
   const popOrder: number[] = [];
   const heapK: number[] = [];
   const heapV: number[] = [];
+  // Lowest level first, and the lower cell index on a tie: the same order the
+  // Python report's heap pops in, so both route flats identically.
+  const before = (a: number, b: number): boolean =>
+    heapV[a]! < heapV[b]! || (heapV[a] === heapV[b] && heapK[a]! < heapK[b]!);
   const push = (k: number, v: number): void => {
     heapK.push(k);
     heapV.push(v);
     let i = heapK.length - 1;
     while (i > 0) {
       const parent = (i - 1) >> 1;
-      if (heapV[parent]! <= heapV[i]!) break;
+      if (!before(i, parent)) break;
       [heapK[parent], heapK[i]] = [heapK[i]!, heapK[parent]!];
       [heapV[parent], heapV[i]] = [heapV[i]!, heapV[parent]!];
       i = parent;
@@ -292,8 +330,8 @@ export function buildWaterModel(input: WaterInput): WaterModel {
         const l = 2 * i + 1;
         const r = l + 1;
         let small = i;
-        if (l < heapK.length && heapV[l]! < heapV[small]!) small = l;
-        if (r < heapK.length && heapV[r]! < heapV[small]!) small = r;
+        if (l < heapK.length && before(l, small)) small = l;
+        if (r < heapK.length && before(r, small)) small = r;
         if (small === i) break;
         [heapK[small], heapK[i]] = [heapK[i]!, heapK[small]!];
         [heapV[small], heapV[i]] = [heapV[i]!, heapV[small]!];
@@ -380,6 +418,68 @@ export function buildWaterModel(input: WaterInput): WaterModel {
     if (r >= 0) flowAccumulation[r]! += flowAccumulation[k]!;
   }
 
+  // Catchments on the same graph: label the outlets, then hand each label
+  // upslope. popOrder puts every receiver before the cells draining to it.
+  const flowCatchment = new Int32Array(n).fill(-1);
+  const flowOutletList: number[] = [];
+  for (const k of popOrder) {
+    const r = flowReceiver[k]!;
+    if (r < 0) {
+      flowCatchment[k] = flowOutletList.length;
+      flowOutletList.push(k);
+    } else {
+      flowCatchment[k] = flowCatchment[r]!;
+    }
+  }
+
+  /* ---------------------------------------------------------- depressions */
+  // Neighbouring cells under water share one spill level (a lower one would
+  // have flooded the other first), so a hollow is a connected patch of
+  // flooded cells. Its exit is where the flood first reached it from.
+  const depression = new Int32Array(n).fill(-1);
+  const depressions: Depression[] = [];
+  const rank = new Int32Array(n).fill(-1);
+  for (let idx = 0; idx < popOrder.length; idx += 1) rank[popOrder[idx]!] = idx;
+  for (const start of popOrder) {
+    if (depression[start]! >= 0 || !(filled[start]! > dem.values[start]!)) continue;
+    const id = depressions.length;
+    const cells: number[] = [];
+    const stack = [start];
+    depression[start] = id;
+    let first = start;
+    let lowest = start;
+    let capacity = 0;
+    let deepest = 0;
+    while (stack.length > 0) {
+      const k = stack.pop()!;
+      cells.push(k);
+      const depth = filled[k]! - dem.values[k]!;
+      capacity += depth * cellArea;
+      if (depth > deepest) deepest = depth;
+      if (dem.values[k]! < dem.values[lowest]!) lowest = k;
+      if (rank[k]! < rank[first]!) first = k;
+      const i = k % nx;
+      const j = (k - i) / nx;
+      for (const [di, dj] of NEIGHBOURS) {
+        const ni = i + di;
+        const nj = j + dj;
+        if (ni < 0 || nj < 0 || ni >= nx || nj >= ny) continue;
+        const nk = nj * nx + ni;
+        if (depression[nk]! >= 0 || !(filled[nk]! > dem.values[nk]!)) continue;
+        depression[nk] = id;
+        stack.push(nk);
+      }
+    }
+    depressions.push({
+      cells: Int32Array.from(cells),
+      spillLevel: filled[start]!,
+      exit: parent[first]!,
+      lowest,
+      capacityM3: capacity,
+      maxDepthM: deepest,
+    });
+  }
+
   const pondingDepthM = input.pondingDepthM ?? 0.25;
   const ponding = new Uint8Array(n);
   const depressionDepthM = new Float32Array(n);
@@ -409,6 +509,11 @@ export function buildWaterModel(input: WaterInput): WaterModel {
     receiver: flowReceiver,
     flowAccumulation,
     filledLevel: filled,
+    popOrder: Int32Array.from(popOrder),
+    flowCatchment,
+    flowOutlets: Int32Array.from(flowOutletList),
+    depression,
+    depressions,
   };
 }
 

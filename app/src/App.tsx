@@ -22,6 +22,7 @@ import MasterPlanPanel from './ui/MasterPlanPanel';
 import ZonePanel from './ui/ZonePanel';
 import GoalPanel from './ui/GoalPanel';
 import HydrologyPanel from './ui/HydrologyPanel';
+import PlanningPanel from './ui/PlanningPanel';
 import MetricsHud from './ui/MetricsHud';
 import ScenarioDock from './ui/ScenarioDock';
 import LeverStrip from './ui/LeverStrip';
@@ -38,6 +39,7 @@ const ThreeView = lazy(() => import('./ui/ThreeView'));
  * sentence is the whole tooltip, and it is the thing the old tab bar never had.
  */
 const RAIL: readonly RailItem[] = [
+  { id: 'planning', glyph: '▥', label: 'Planning layers', does: 'Steps 1-7: water, slope and the land left to plot, each worked out from the one before. Tick a layer to see it in 2D and on the 3D terrain.' },
   { id: 'goal', glyph: '◎', label: 'Optimisation goal', does: 'Sets how much space, terrain and water each count. Re-aims every choice the engine makes; nothing on screen changes until you solve.' },
   { id: 'site', glyph: '◳', label: 'Site and terrain', does: 'Turns the terrain layers on and off underneath the plan: slope, plot fall, contours, surveyed ground.' },
   { id: 'zones', glyph: '✂', label: 'Edit the zoning', does: 'Split, merge, draw or delete zones by clicking on the plan. Changes the boundaries everything else is built inside.' },
@@ -255,6 +257,8 @@ export default function App(): React.ReactElement {
 
 function SectionBody({ section }: { section: string }): React.ReactElement {
   switch (section) {
+    case 'planning':
+      return <PlanningPanel />;
     case 'goal':
       return <GoalPanel />;
     case 'site':

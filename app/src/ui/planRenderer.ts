@@ -37,6 +37,11 @@ export interface PlanScene {
    * panels sit over the canvas. The sheet export leaves it at zero.
    */
   chromeInset?: { right: number; bottom: number };
+  /**
+   * Planning layers (steps 1-7), drawn over the zoning and under the
+   * layouts, earliest step first.
+   */
+  planning?: { geom: MultiPoly; fill?: string; stroke?: string; width: number; dashed?: boolean }[];
   selectedZoneId: string | null;
   background: string;
   /**
@@ -106,6 +111,12 @@ export function drawPlan(ctx: CanvasRenderingContext2D, view: View, scene: PlanS
         (selected ? 2 : 1) * pen,
       );
     }
+  }
+
+  for (const p of scene.planning ?? []) {
+    if (p.dashed) ctx.setLineDash([6 * pen, 4 * pen]);
+    fillMulti(ctx, view, p.geom, p.fill, p.stroke, p.width * pen);
+    ctx.setLineDash([]);
   }
 
   if (layers.layout) {

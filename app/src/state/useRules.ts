@@ -16,6 +16,8 @@ export function useRules(): ConfigBundle | null {
       programme: applyOverrides(config.programme, overrides.programme),
       assumptions: applyOverrides(config.assumptions, overrides.assumptions),
       siting: applyOverrides(config.siting, overrides.siting),
+      // Snapshots saved before the planning rules existed carry no overrides for them.
+      planning: applyOverrides(config.planning, overrides.planning ?? {}),
     };
   }, [config, overrides]);
 }

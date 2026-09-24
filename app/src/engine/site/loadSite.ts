@@ -35,6 +35,16 @@ export interface SiteModel {
   /** Present when the TIN has been loaded; the DEM alone is enough to plan. */
   tin: Tin | null;
   /**
+   * 1 per DEM cell where a survey point lies near it, 0 where the level is the
+   * terrain modeller's mesh. Null for a DEM that is survey-only.
+   */
+  measured: Uint8Array | null;
+  /**
+   * Slope in degrees of the raw survey TIN under each DEM cell, NaN where the
+   * survey did not reach. Null when the DEM ships without it.
+   */
+  surveySlopeDeg: Float32Array | null;
+  /**
    * The survey's holes closed, so the mesh is continuous. Present only when
    * asked for. The measured `dem` above is untouched: this carries, per cell,
    * whether the level was surveyed, harvested from a spot level or contour, or
@@ -95,6 +105,24 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
 
   const demBuffer = await src.binary('processed/dem_2m.f32');
   const dem = demFromBuffer(demMeta, demBuffer);
+
+  // The smoothed mesh flattens the steepest faces the survey measured; the
+  // survey's own slope travels with it for statutory checks.
+  let surveySlopeDeg: Float32Array | null = null;
+  if (demMeta.survey_slope) {
+    surveySlopeDeg = demFromBuffer(demMeta, await src.binary(`processed/${demMeta.survey_slope}`)).values;
+  }
+
+  // The mesh covers ground the survey never reached. The mask says which
+  // cells a survey point stands behind, so modelled ground is never passed
+  // off as measured.
+  let measured: Uint8Array | null = null;
+  if (demMeta.measured_mask) {
+    measured = new Uint8Array(await src.binary(`processed/${demMeta.measured_mask}`));
+    if (measured.length !== demMeta.nx * demMeta.ny) {
+      throw new Error(`measured mask: ${measured.length} cells for a ${demMeta.nx}x${demMeta.ny} DEM`);
+    }
+  }
 
   let tin: Tin | null = null;
   if (opts.withTin) tin = parseObj(await src.text('terrain/terrain_tin.obj'));
@@ -157,6 +185,7 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
           marginM: opts.fillMarginM ?? 20,
           contours,
           spotLevels,
+          measured: measured ?? undefined,
         })
       : null;
 
@@ -172,6 +201,8 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
     contours,
     dem,
     tin,
+    measured,
+    surveySlopeDeg,
     filled,
   };
 }

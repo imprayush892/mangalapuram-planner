@@ -16,6 +16,18 @@ export interface DemMeta {
   valid_cells: number;
   rl_min: number;
   rl_max: number;
+  /**
+   * uint8 grid beside the DEM: 1 where a survey point lies near the cell, 0
+   * where the level is the terrain modeller's mesh rather than a measurement.
+   */
+  measured_mask?: string;
+  measured_cells?: number;
+  /**
+   * float32 grid beside the DEM: slope in degrees of the raw survey TIN facet
+   * under each cell. The final mesh is smoothed; statutory slope limits are
+   * checked against the survey too.
+   */
+  survey_slope?: string;
 }
 
 export interface DemStats {

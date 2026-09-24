@@ -1,6 +1,6 @@
 {
   "format": "raw little-endian float32, row-major, row 0 = southernmost row (y0)",
-  "nodata": "NaN (unsurveyed)",
+  "nodata": "NaN (outside the mesh)",
   "cell_m": 2.0,
   "x0": 0.0,
   "y0": -10.0,
@@ -8,8 +8,13 @@
   "ny": 345,
   "cell_centre": "x = x0 + cell*(i+0.5), y = y0 + cell*(j+0.5)",
   "coords": "local metres (see site_origin.json)",
-  "source": "linear interpolation of mangalapuram_terrain_15_sept.obj (parcel-clipped TIN)",
-  "valid_cells": 61389,
-  "rl_min": 68.70343780517578,
-  "rl_max": 143.0540008544922
+  "source": "linear interpolation of terrain_mesh.obj (kerala_site final_mesh.obj, 2026-09-24)",
+  "valid_cells": 74861,
+  "rl_min": 68.89661407470703,
+  "rl_max": 142.3543243408203,
+  "measured_mask": "dem_2m_measured.u8",
+  "measured_note": "uint8 per cell, 1 where a survey point (spot_levels.csv) lies within 5.0 m of the cell centre. Elsewhere the level is the modeller's mesh, not a measurement.",
+  "measured_cells": 51913,
+  "survey_slope": "survey_slope_deg.f32",
+  "survey_slope_note": "float32 per cell, degrees: slope of the raw survey TIN facet under the cell centre (mangalapuram_terrain_15_sept.obj); NaN outside the survey TIN."
 }

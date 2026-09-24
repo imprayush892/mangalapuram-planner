@@ -13,6 +13,7 @@ export interface OverrideSet {
   programme: Overrides;
   assumptions: Overrides;
   siting: Overrides;
+  planning: Overrides;
 }
 
 export const EMPTY_OVERRIDES: OverrideSet = {
@@ -21,6 +22,7 @@ export const EMPTY_OVERRIDES: OverrideSet = {
   programme: {},
   assumptions: {},
   siting: {},
+  planning: {},
 };
 
 function setPath(target: Record<string, unknown>, path: string, value: unknown): void {

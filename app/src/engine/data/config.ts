@@ -14,15 +14,18 @@ export interface ConfigBundle {
   programme: YamlDoc;
   assumptions: YamlDoc;
   siting: YamlDoc;
+  /** Owner overrides (config/planning_rules.yaml): win where they overlap client rules. */
+  planning: YamlDoc;
 }
 
 export async function loadConfig(src: AssetSource): Promise<ConfigBundle> {
-  const [kmbr, client, programme, assumptions, siting] = await Promise.all([
+  const [kmbr, client, programme, assumptions, siting, planning] = await Promise.all([
     src.text('config/kmbr_rules.yaml'),
     src.text('config/client_rules.yaml'),
     src.text('config/programme.yaml'),
     src.text('config/assumptions.yaml'),
     src.text('config/siting_rules.yaml'),
+    src.text('config/planning_rules.yaml'),
   ]);
   return {
     kmbr: parseYaml(kmbr) as YamlDoc,
@@ -30,6 +33,7 @@ export async function loadConfig(src: AssetSource): Promise<ConfigBundle> {
     programme: parseYaml(programme) as YamlDoc,
     assumptions: parseYaml(assumptions) as YamlDoc,
     siting: parseYaml(siting) as YamlDoc,
+    planning: parseYaml(planning) as YamlDoc,
   };
 }
 

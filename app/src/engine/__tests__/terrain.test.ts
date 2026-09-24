@@ -13,6 +13,8 @@ interface TerrainGolden {
   summit_utm: [number, number];
   facet_slope_bands_ac: { tol_pct: number; values: Record<string, number> };
   plot_window_fall_ac: { note: string; values: Record<string, number> };
+  dem_valid_ac: Golden;
+  dem_measured_ac: Golden;
 }
 
 const SLOPE_EDGES = [0, 5, 10, 15, 20, 30, 45, 90];
@@ -26,9 +28,9 @@ const FALL_EDGES = [0, 0.5, 1, 2, 3, Infinity];
 const FALL_WINDOW = { x: 11.4, y: 14.2, minValidFraction: 0.75 };
 
 describe('M1 terrain — golden values', () => {
-  it('reads the parcel-clipped TIN as issued', async () => {
+  it('reads the terrain mesh as issued', async () => {
     const s = await site();
-    const g = (await expected()).terrain_parcel_clipped_tin as TerrainGolden;
+    const g = (await expected()).terrain_tin as TerrainGolden;
     expect(s.tin).not.toBeNull();
     expect(s.tin!.vertexCount).toBe(g.vertices);
     expect(s.tin!.faceCount).toBe(g.faces);
@@ -36,7 +38,7 @@ describe('M1 terrain — golden values', () => {
 
   it('reproduces the meshed plan area and relief', async () => {
     const s = await site();
-    const g = (await expected()).terrain_parcel_clipped_tin as TerrainGolden;
+    const g = (await expected()).terrain_tin as TerrainGolden;
     const stats = s.tin!.stats();
     const ac = m2ToAcres(stats.planAreaM2);
     expect(Math.abs(ac - g.meshed_plan_area_ac.value)).toBeLessThanOrEqual(tolerance(g.meshed_plan_area_ac));
@@ -52,7 +54,7 @@ describe('M1 terrain — golden values', () => {
 
   it('reproduces the facet slope bands', async () => {
     const s = await site();
-    const g = (await expected()).terrain_parcel_clipped_tin as TerrainGolden;
+    const g = (await expected()).terrain_tin as TerrainGolden;
     const bands = s.tin!.slopeBandsAc(SLOPE_EDGES);
     const keys = Object.keys(g.facet_slope_bands_ac.values);
     keys.forEach((key, i) => {
@@ -64,7 +66,7 @@ describe('M1 terrain — golden values', () => {
 
   it('reproduces the plot-window fall bands from the DEM (method-sensitive, 10%)', async () => {
     const s = await site();
-    const g = (await expected()).terrain_parcel_clipped_tin as TerrainGolden;
+    const g = (await expected()).terrain_tin as TerrainGolden;
     const { bands } = s.dem.fallBandsAc(
       FALL_EDGES,
       FALL_WINDOW.x,
@@ -87,7 +89,25 @@ describe('M1 terrain — golden values', () => {
     expect(stats.rlMin).toBeCloseTo(s.dem.meta.rl_min, 3);
     expect(stats.rlMax).toBeCloseTo(s.dem.meta.rl_max, 3);
     // The DEM resamples the TIN, so it covers the same ground to within a whisker.
-    expect(Math.abs(m2ToAcres(stats.areaM2) - 60.68)).toBeLessThan(0.5);
+    const g = (await expected()).terrain_tin as TerrainGolden;
+    expect(Math.abs(m2ToAcres(stats.areaM2) - g.dem_valid_ac.value)).toBeLessThanOrEqual(tolerance(g.dem_valid_ac));
+  });
+
+  it('says which levels a survey point stands behind', async () => {
+    const s = await site();
+    const g = (await expected()).terrain_tin as TerrainGolden;
+    expect(s.measured).not.toBeNull();
+    let measured = 0;
+    for (let k = 0; k < s.measured!.length; k += 1) {
+      if (s.measured![k] !== 1) continue;
+      // A measured cell is always a cell the DEM has a level for.
+      expect(Number.isFinite(s.dem.values[k]!)).toBe(true);
+      measured += 1;
+    }
+    const ac = m2ToAcres(measured * s.dem.cell * s.dem.cell);
+    expect(Math.abs(ac - g.dem_measured_ac.value)).toBeLessThanOrEqual(tolerance(g.dem_measured_ac));
+    // The mesh reaches further than the survey did: the gap is modelled ground.
+    expect(ac).toBeLessThan(g.dem_valid_ac.value - 5);
   });
 
   it('flags slopes over 45 degrees as unbuildable ground (Rule 22)', async () => {

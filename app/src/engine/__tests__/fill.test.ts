@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { nodeSource } from '../data/nodeSource';
 import { loadSite } from '../site/loadSite';
-import { LevelSource, confidenceAt } from '../terrain/fill';
+import { LevelSource, confidenceAt, unmeasuredAcIn } from '../terrain/fill';
 import { M2_PER_ACRE } from '../units';
 
 let cached: Awaited<ReturnType<typeof loadSite>> | null = null;
@@ -23,16 +23,20 @@ describe('closing the survey holes', () => {
       checked += 1;
       // Not "close to": identical. A fill that edits a measurement is a lie.
       expect(f.values[k]).toBe(raw);
-      expect(f.source[k]).toBe(LevelSource.Survey);
+      // The DEM is the terrain mesh: surveyed where a survey point stands
+      // behind the cell, the modeller's surface where none does.
+      expect(f.source[k]).toBe(s.measured![k] === 1 ? LevelSource.Survey : LevelSource.Mesh);
     }
     expect(checked).toBeGreaterThan(60_000);
+    expect(f.meshCells).toBeGreaterThan(10_000);
   });
 
   it('recovers real levels the DEM was throwing away', async () => {
     const s = await filledSite();
     const f = s.filled!;
-    // Spot levels and contour vertices on ground the TIN never carried.
-    expect(f.harvestedCells).toBeGreaterThan(300);
+    // Spot levels on ground the mesh never carried: the survey ran a little
+    // past the mesh edge in places.
+    expect(f.harvestedCells).toBeGreaterThan(0);
     for (let k = 0; k < f.source.length; k += 1) {
       if (f.source[k] !== LevelSource.Harvested) continue;
       expect(Number.isFinite(f.values[k]!)).toBe(true);
@@ -57,7 +61,8 @@ describe('closing the survey holes', () => {
       }
     }
     expect(holesInParcel, 'the parcel mesh must be continuous').toBe(0);
-    expect(f.interpolatedCells).toBeGreaterThan(10_000);
+    // The mesh covers the parcel, so what is left to interpolate is the margin.
+    expect(f.interpolatedCells).toBeGreaterThan(0);
   });
 
   it('stays inside the levels the survey actually found', async () => {
@@ -88,7 +93,7 @@ describe('closing the survey holes', () => {
         const k = j * nx + i;
         if (f.source[k] !== LevelSource.Interpolated) continue;
         for (const nk of [k - 1, k + 1, k - nx, k + nx]) {
-          if (f.source[nk] !== LevelSource.Survey) continue;
+          if (f.source[nk] !== LevelSource.Survey && f.source[nk] !== LevelSource.Mesh) continue;
           seams += 1;
           worst = Math.max(worst, Math.abs(f.values[k]! - f.values[nk]!));
         }
@@ -104,14 +109,14 @@ describe('closing the survey holes', () => {
     for (let j = 1; j < ny - 1; j += 1) {
       for (let i = 1; i < nx - 1; i += 1) {
         const k = j * nx + i;
-        if (f.source[k] !== LevelSource.Survey) continue;
+        if (f.source[k] !== LevelSource.Survey && f.source[k] !== LevelSource.Mesh) continue;
         for (const nk of [k + 1, k + nx]) {
-          if (f.source[nk] !== LevelSource.Survey) continue;
+          if (f.source[nk] !== LevelSource.Survey && f.source[nk] !== LevelSource.Mesh) continue;
           naturalWorst = Math.max(naturalWorst, Math.abs(f.values[k]! - f.values[nk]!));
         }
       }
     }
-    expect(seams).toBeGreaterThan(500);
+    expect(seams).toBeGreaterThan(50);
     expect(
       worst,
       `worst seam step ${worst.toFixed(2)} m against ${naturalWorst.toFixed(2)} m in measured ground`,
@@ -122,7 +127,7 @@ describe('closing the survey holes', () => {
     const s = await filledSite();
     const f = s.filled!;
     expect(f.maxFillDistanceM).toBeGreaterThan(10);
-    // The largest hole is about 4.6 ac, so its middle is tens of metres out.
+    // The widest stretch of mesh-only ground is tens of metres from a reading.
     expect(f.maxFillDistanceM).toBeLessThan(200);
     expect(confidenceAt(0)).toBe(1);
     expect(confidenceAt(25)).toBeCloseTo(0.5, 6);
@@ -149,18 +154,20 @@ describe('closing the survey holes', () => {
     for (let j = 0; j < ny; j += 1) {
       for (let i = 0; i < nx; i += 1) {
         const k = j * nx + i;
-        if (f.source[k] !== LevelSource.Interpolated) continue;
+        if (f.source[k] !== LevelSource.Interpolated && f.source[k] !== LevelSource.Mesh) continue;
         if (pointInParcel(s, s.dem.cellCentre(i, j))) inParcel += 1;
       }
     }
     const inParcelAc = (inParcel * cellArea) / M2_PER_ACRE;
-    const totalAc = (f.interpolatedCells * cellArea) / M2_PER_ACRE;
+    const totalAc = ((f.interpolatedCells + f.meshCells) * cellArea) / M2_PER_ACRE;
 
-    // The survey left 13.47 ac of the 73.54 ac parcel unmeasured.
-    expect(inParcelAc).toBeGreaterThan(12);
-    expect(inParcelAc).toBeLessThan(15);
+    // The acres the HUD warns about are the acres the fill marks as inferred.
+    const unmeasured = unmeasuredAcIn(s.dem, s.measured, s.parcel);
+    expect(Math.abs(inParcelAc - unmeasured)).toBeLessThan(0.5);
+    // No survey point within 5 m of about 22 ac of the 73.54 ac parcel.
+    expect(inParcelAc).toBeGreaterThan(15);
+    expect(inParcelAc).toBeLessThan(30);
     expect(totalAc).toBeGreaterThan(inParcelAc);
-    expect((f.harvestedCells * cellArea) / M2_PER_ACRE).toBeGreaterThan(0);
   });
 });
 
@@ -208,7 +215,9 @@ describe('the filled ground behaves like terrain', () => {
 
     const measured = band((k) => f.source[k] === LevelSource.Survey);
     const deepFill = band(
-      (k) => f.source[k] === LevelSource.Interpolated && f.distanceToMeasuredM[k]! >= 15,
+      (k) =>
+        (f.source[k] === LevelSource.Interpolated || f.source[k] === LevelSource.Mesh) &&
+        f.distanceToMeasuredM[k]! >= 15,
     );
 
     /*
@@ -239,7 +248,10 @@ describe('the filled ground behaves like terrain', () => {
         if (f.source[k] === LevelSource.Survey) {
           measuredTotal += v;
           measuredCount += 1;
-        } else if (f.source[k] === LevelSource.Interpolated && f.distanceToMeasuredM[k]! < 6) {
+        } else if (
+          (f.source[k] === LevelSource.Interpolated || f.source[k] === LevelSource.Mesh) &&
+          f.distanceToMeasuredM[k]! < 6
+        ) {
           seamTotal += v;
           seamCount += 1;
         }

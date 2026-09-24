@@ -4,17 +4,21 @@ site:
   parcel_P1_ac: {value: 47.37, tol_pct: 1.0}
   tbm_local_xy: {value: [231.787, 630.257], tol_m: 0.1}
   tbm_rl: 100.000
-terrain_parcel_clipped_tin:
-  vertices: 7488
-  faces: 13814
-  meshed_plan_area_ac: {value: 60.68, tol_pct: 0.5}
-  rl_min: 68.627
-  rl_max: 143.534
-  summit_utm: [706666.0, 953990.3]
-  facet_slope_bands_ac: {tol_pct: 2.0, values: {"0-5": 17.40, "5-10": 10.63, "10-15": 10.30, "15-20": 8.83, "20-30": 9.65, "30-45": 2.92, "45-90": 0.95}}
-  plot_window_fall_ac:   # 11.4 x 14.2 m window, fall = max-min
-    note: "from survey_update_1209_evaluation.txt; method-sensitive, tol 10%"
-    values: {"<0.5": 4.35, "0.5-1": 6.32, "1-2": 9.16, "2-3": 7.53, ">3": 28.65}
+terrain_tin:   # the final terrain mesh (kerala_site final_mesh.obj, 2026-09-24); was the 15-Sept survey TIN
+  source: "data/raw/survey/mangalapuram_terrain_final_mesh.obj, figures from tools/preprocess/build_terrain.py"
+  vertices: 5440
+  faces: 10370
+  meshed_plan_area_ac: {value: 73.98, tol_pct: 0.5}
+  rl_min: 68.891
+  rl_max: 142.426
+  summit_utm: [706679.7, 954007.2]
+  facet_slope_bands_ac: {tol_pct: 2.0, values: {"0-5": 18.81, "5-10": 13.65, "10-15": 14.66, "15-20": 14.54, "20-30": 11.04, "30-45": 1.24, "45-90": 0.04}}
+  plot_window_fall_ac:   # 11.4 x 14.2 m window, fall = max-min, on the 2 m DEM
+    note: "recomputed from the final-mesh DEM by build_terrain.py (independent numpy code); tol 10%"
+    values: {"<0.5": 6.03, "0.5-1": 7.36, "1-2": 10.41, "2-3": 9.98, ">3": 37.22}
+  dem_valid_ac: {value: 73.99, tol_pct: 0.5}
+  dem_measured_ac: {value: 51.31, tol_pct: 0.5}   # cells with a survey point within 5 m
+  survey_over_45_ac: {value: 0.96, tol_pct: 1.0}  # cells under a raw survey TIN facet over 45 deg (the 15-Sept TIN: 0.95 ac of facets)
 zoning_registration:
   median_fit_m: {value: 0.65, max: 1.0}
   scale: {value: 1.0336, tol: 0.003}

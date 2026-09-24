@@ -7,6 +7,8 @@ import { create } from 'zustand';
  * them collapses, so the model is never permanently crushed by a sidebar.
  */
 export type Section =
+  | 'planning'
+  | 'hydrology'
   | 'goal'
   | 'site'
   | 'zones'
@@ -19,6 +21,8 @@ export type Section =
   | 'exports';
 
 export const SECTIONS: readonly { id: Section; label: string; hint: string }[] = [
+  { id: 'planning', label: 'Planning layers', hint: 'water, slope and the land left to plot' },
+  { id: 'hydrology', label: 'Hydrology', hint: 'the storm, ponds, flows and catchments' },
   { id: 'goal', label: 'Optimisation goal', hint: 'space, terrain and water, weighted' },
   { id: 'site', label: 'Site context', hint: 'terrain, layers, what the survey holds' },
   { id: 'zones', label: 'Zoning', hint: 'split, merge and draw the zones' },
@@ -50,7 +54,8 @@ interface UiState {
 }
 
 export const useUi = create<UiState>((set) => ({
-  section: 'goal',
+  // The workflow starts from the analysis, so that is what opens first.
+  section: 'planning',
   leftOpen: true,
   rightOpen: true,
   dockOpen: true,

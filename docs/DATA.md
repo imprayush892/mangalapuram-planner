@@ -8,7 +8,10 @@
 | site_features.geojson | Existing road edges (RD), drain (DR), pond (POND), transformer (TF), well, TBM point | RD = edges of roads to retain & widen to 10 m |
 | zones_client_registered.geojson | Client Zoning Plan zones registered to survey | label_area_ac, drawn_area_ac, in_scope_ac, geometry_confidence. PHASE 5 geometry not recovered. Commercial / batching / Project 1 boundaries approximate |
 | zoning_registration.json | Transform Zoning CAD → UTM | Zoning plan is ~3.4% oversize, rotated ~1°; median fit 0.65 m |
-| dem_2m.f32 + dem_2m.json | 460 × 345 float32 grid, 2 m cells, NaN = unsurveyed | From the parcel-clipped TIN |
+| dem_2m.f32 + dem_2m.json | 460 × 345 float32 grid, 2 m cells, NaN = outside the mesh | From terrain_mesh.obj (tools/preprocess/build_terrain.py) |
+| dem_2m_measured.u8 | uint8 per DEM cell: 1 = a survey point within 5 m, 0 = the modeller's mesh only | Keeps modelled ground flagged low-confidence |
+| terrain_mesh.obj | Final terrain mesh (kerala_site final_mesh.obj, 2026-09-24) in local metres, Z up, triangulated | Original Rhino Y-up export kept as delivered in raw/survey/ |
+| hydrology_report.json/.xlsx | Hollows, catchments and the 100-yr design storm (fill-and-spill) | tools/preprocess/hydrology_analysis.py; inputs from config/assumptions.yaml hydrology |
 | spot_levels.csv | 7,488 unique survey points: local, UTM, lon/lat, RL | Same points as the OBJ |
 | contours_1m.geojson | 919 contour lines, RL 69–143, `major` every 5 m | |
 
@@ -27,6 +30,6 @@
 
 ## Known data issues
 - Level datum is assumed (TBM 100.000), not MSL.
-- ~12.9 ac of the parcel is unsurveyed (NaN in DEM); Google Earth levels may be added later, flag low-confidence.
+- The final mesh covers the whole parcel, but ~22.7 ac of it has no survey point within 5 m: those levels are the modeller's surface (dem_2m_measured.u8 = 0) and are flagged low-confidence. The mesh is smoother than the 15-Sept survey TIN (ground over 45°: 0.04 ac against 0.95 ac).
 - Survey QA: 4 rows rejected, duplicates collapsed; ids 4118/4119 disagree by 4.0 m (check).
 - No boundary or levels for the deferred 26.4 ac.

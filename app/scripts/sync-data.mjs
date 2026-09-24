@@ -15,11 +15,12 @@ const sources = [
   { from: path.join(repoDir, 'tests'), to: path.join(outDir, 'tests') },
 ];
 
-// The parcel-clipped TIN is the authoritative terrain surface for the golden
-// slope-band figures, so the app ships it alongside the 2 m DEM.
+// The terrain mesh is the authoritative surface for the golden slope-band
+// figures, so the app ships it alongside the 2 m DEM built from it
+// (tools/preprocess/build_terrain.py).
 const singleFiles = [
   {
-    from: path.join(repoDir, 'data', 'raw', 'survey', 'mangalapuram_terrain_15_sept.obj'),
+    from: path.join(repoDir, 'data', 'processed', 'terrain_mesh.obj'),
     to: path.join(outDir, 'terrain', 'terrain_tin.obj'),
   },
 ];
