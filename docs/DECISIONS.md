@@ -256,3 +256,13 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - Plots on both sides of every road; two villa plot types: 2,500-3,000 sq ft (main) and 2,000-2,500 sq ft (fill-in).
 - Place the commercial and convention zone and the batching plant.
 - Water: report pond areas and depths, channel widths and depths, and the volumes, so they can be checked against each other.
+- Apartments: 12 ac and 1,000 flats in three places: 3 towers in the client's apartment zone, 2 on 4.0 ac from Phase 2,
+  1 on 2.7 ac from Phase 3; each tower a 16,500 sq ft block of 20 floors, 10 flats a floor (airport line permitting).
+  FSI up to 4 is acceptable.
+- Villas: 700 on 35 ac including Phase 2 and 3; the 11.09 ac above the villa zones' 23.91 ac is split equally between
+  Phase 2 and 3, by an existing road with good views. The rest of each phase is to be decided with the client.
+- Hotel and business hub: expected on the land not yet acquired, not in Phase 2 or 3.
+- Villas sell on their views; towers must not block them. Owner's sketch: both Phase 2 towers at the west end of the
+  phase's apartment land, one above the other; the lower one crosses the zone's edge onto unzoned ground (0.32 ac
+  taken); the middle site, in front of the Phase 2 villas, is dropped. Elsewhere towers are scored on the share of the
+  villas' view they hide (`apartments.villa_views`).

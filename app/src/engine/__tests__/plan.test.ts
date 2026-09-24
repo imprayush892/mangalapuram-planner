@@ -237,6 +237,14 @@ describe('the client zoning plan leads (owner, 25 Sep)', () => {
     }
   });
 
+  it("puts the Phase 2 towers on the owner's sites and reports the villas' view each hides", async () => {
+    const { p } = await plan();
+    const ph2 = p.buildings.filter((b) => b.typology === 'apartments' && b.zone.startsWith('PHASE 2'));
+    expect(ph2.length).toBe(2);
+    for (const b of ph2) expect(b.notes.some((t) => /owner's site .* (\d|1\d) m from it/.test(t)), b.notes.join(' | ')).toBe(true);
+    for (const b of p.buildings.filter((q) => q.typology === 'apartments')) expect(b.notes.some((t) => /of the villas' view/.test(t))).toBe(true);
+  });
+
   it('lays golf only on gentle ground, as part of the clubhouse', async () => {
     const { a, p, s } = await plan();
     expect(p.golf.areaM2).toBeGreaterThan(0);

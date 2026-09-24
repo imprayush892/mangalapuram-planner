@@ -35,12 +35,15 @@ Two switches in `config/planning_rules.yaml` `options`, four plans:
 | | Roads to the ground (`road_orientation: terrain`) | North-south roads (`north_south`) |
 |---|---|---|
 | Plot rules (`villa_sizing: rules`) | A1: 2,500-3,000 + 2,000-2,500 sq ft plots, least cut and fill | A2: the same plots; primary and secondary within 10 deg of north-south, a cardinal grid |
-| Plots to the count (`count`) | B1: the villa zones carry the programme's 20 an acre (23.91 ac, 478 villas); the plot is the largest that fits (`runPlanToCount`) | B2: the same count on a north-south grid |
+| Plots to the count (`count`) | B1: the programme's 700 villas on the villa zones plus the Phase 2 and 3 villa land; the plot is the largest that fits (`runPlanToCount`) | B2: the same count on a north-south grid |
 
 Shared by all four (owner, 25 Sep, revised):
 - Apartments: six 16,500 sq ft towers, 1,000 flats shared equally (up to 20 floors, under the airport line):
   3 in the client's apartment zone (5.3 ac in the site), 2 on 4.0 ac and 1 on 2.7 ac carved from Phase 2
   and Phase 3 on their lower ground (programme 12 ac less 5.3). FSI up to 4 is acceptable.
+  Each tower 20 floors x 10 flats. Phase 2's two towers stand on the owner's sites at the phase's west end
+  (`apartments.tower_sites`), clear of the Phase 2 villas' outlook; the rest are scored on the share of the
+  villas' view they hide (`apartments.villa_views`: first-floor lookouts every 10 m, 300 m out).
 - Villas: the programme's 35 ac less the villa zones' 23.91 ac, split equally between Phase 2 and 3, by an
   existing road with the best outlook; option B sizes 700 villas to that land.
 - The clubhouse zone's dry side, across the existing road, is senior living; the client's senior zone,

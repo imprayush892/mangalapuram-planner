@@ -195,6 +195,18 @@ apartments:
   units_total: 1000
   # Owner 25 Sep: each tower is a 16,500 sq ft block of 20 floors with 10 flats a floor (owner's
   # calculation); the airport line can still hold a tower on high ground lower.
+  # Owner 25 Sep: villas sell on their views; where a zone leaves a choice, towers keep out of them.
+  # From first-floor lookouts every 10 m over the villa land, a direction has a view when ground at
+  # least drop_m below is seen over the terrain within reach_m. A tower's cost: metres of spread given
+  # up per 1% of all the villas' view it hides. ASSUMPTION (weight).
+  villa_views: {eye_m: 4.5, drop_m: 5, reach_m: 300, weight_m_per_pct: 60}
+  # Owner 25 Sep (sketch): tower sites, local metres; the zone's towers take them in order, each on
+  # the nearest ground that takes it. Both Phase 2 towers at the west end of the phase's apartment
+  # land, together, clear of the Phase 2 villas' outlook to the south.
+  tower_sites:
+    - {match: "PHASE 2", at: [434, 145]}
+    - {match: "PHASE 2", at: [403, 86], take_unzoned_m: 40}   # the other below it, across the zone's edge;
+      # the unzoned buildable ground within 40 m joins the apartment land (owner's sketch). The middle site is dropped.
   tower_floors: 20
   tower_flats_per_floor: 10
   tower_footprint_sft: 16500

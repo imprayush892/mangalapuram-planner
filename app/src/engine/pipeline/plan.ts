@@ -886,6 +886,28 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       notes.push(`${ph.name}: ${left.toFixed(2)} ac left, to be decided with the client`);
     }
   }
+  // Owner 25 Sep (sketch): a tower site may take the unzoned buildable ground
+  // around it into its apartment zone, where the owner drew the tower past the zone's edge.
+  for (const ts of pick<{ match: string; at: [number, number]; take_unzoned_m?: number }[]>(planning, 'apartments.tower_sites', [])) {
+    if (!ts.take_unzoned_m) continue;
+    const az = zones.find((z) => z.use === 'apartments' && z.name.toUpperCase().startsWith(ts.match.toUpperCase()));
+    if (!az) continue;
+    const zoned = emptyMask(dem);
+    for (const z of zones) for (const k of z.cells) zoned[k] = 1;
+    const r2 = ts.take_unzoned_m ** 2;
+    let took = 0;
+    for (let k = 0; k < n; k += 1) {
+      if (zoned[k] || !terrain[k] || L.waterlogging.mask[k] || L.nonBuildable.mask[k] || L.drains.mask[k] || L.existingRoads.mask[k]) continue;
+      const i = k % nx;
+      const p = dem.cellCentre(i, (k - i) / nx);
+      if ((p[0] - ts.at[0]) ** 2 + (p[1] - ts.at[1]) ** 2 > r2) continue;
+      az.mask[k] = 1;
+      az.cells.push(k);
+      took += 1;
+    }
+    az.areaM2 = az.cells.length * cellArea;
+    if (took > 0) notes.push(`${az.name}: takes ${((took * cellArea) / M2_PER_ACRE).toFixed(2)} ac of unzoned ground by the owner's tower site (${ts.at[0]}, ${ts.at[1]})`);
+  }
   // The ground each zone can build on: not waterlogged at the planning storm's
   // peak, not Rule 22 slope, clear of the natural drains and the built roads.
   const buildable = minus(terrain, L.waterlogging.mask, L.nonBuildable.mask, L.drains.mask, L.existingRoads.mask);
@@ -1580,6 +1602,85 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     podium?: { ring: Ring; topRl: number; bottomRl: number };
     flat: boolean;
   }
+  // ---- villa views (owner 25 Sep): villas sell on their outlook, so no tower
+  // stands in it where the zone leaves a choice. Lookouts every 10 m over the
+  // villa land, from the first floor; a direction has a view when ground well
+  // below is seen over the terrain within the reach.
+  const vv = pick<{ eye_m: number; drop_m: number; reach_m: number; weight_m_per_pct: number } | null>(planning, 'apartments.villa_views', null);
+  const VIEW_BINS = 72;
+  const lookouts: { x: number; y: number; bins: Uint8Array }[] = [];
+  let viewTotal = 0;
+  if (vv) {
+    const villaLand = emptyMask(dem);
+    for (const z of zones) if (z.use === 'villas') for (const k of z.cells) if (!L.waterlogging.mask[k] && !L.nonBuildable.mask[k]) villaLand[k] = 1;
+    const stepC = 2; // cells, 4 m
+    const reachC = vv.reach_m / dem.cell;
+    for (let j = 0; j < ny; j += 5) {
+      for (let i = 0; i < nx; i += 5) {
+        const k0 = j * nx + i;
+        if (!villaLand[k0]) continue;
+        const z0 = dem.values[k0]!;
+        const ze = z0 + vv.eye_m;
+        const bins = new Uint8Array(VIEW_BINS);
+        for (let b = 0; b < VIEW_BINS; b += 1) {
+          const a = (2 * Math.PI * b) / VIEW_BINS;
+          const di = Math.sin(a);
+          const dj = Math.cos(a);
+          let horizon = -Infinity;
+          for (let d = 10 / dem.cell; d <= reachC; d += stepC) {
+            const ii = Math.round(i + di * d);
+            const jj = Math.round(j + dj * d);
+            if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) break;
+            const k = jj * nx + ii;
+            if (!terrain[k]) continue;
+            const zz = dem.values[k]!;
+            if (!Number.isFinite(zz)) continue;
+            const ang = (zz - ze) / d;
+            if (ang >= horizon && zz <= z0 - vv.drop_m) bins[b] = 1;
+            horizon = Math.max(horizon, ang);
+          }
+          viewTotal += bins[b]!;
+        }
+        const p = dem.cellCentre(i, j);
+        lookouts.push({ x: p[0], y: p[1], bins });
+      }
+    }
+  }
+  /** Share (%) of all the villas' view that a building on this ring would hide. */
+  const villaViewHidden = (ring: Ring): number => {
+    if (!vv || viewTotal === 0) return 0;
+    let cx = 0;
+    let cy = 0;
+    for (const q of ring) {
+      cx += q[0];
+      cy += q[1];
+    }
+    cx /= ring.length;
+    cy /= ring.length;
+    let hidden = 0;
+    const binW = (2 * Math.PI) / VIEW_BINS;
+    for (const o of lookouts) {
+      const dc = Math.hypot(cx - o.x, cy - o.y);
+      if (dc < 15 || dc > vv.reach_m + 40) continue;
+      const mid = Math.atan2(cx - o.x, cy - o.y);
+      let lo = 0;
+      let hi = 0;
+      for (const q of ring) {
+        let da = Math.atan2(q[0] - o.x, q[1] - o.y) - mid;
+        while (da > Math.PI) da -= 2 * Math.PI;
+        while (da < -Math.PI) da += 2 * Math.PI;
+        lo = Math.min(lo, da);
+        hi = Math.max(hi, da);
+      }
+      for (let b = Math.floor((mid + lo) / binW); b <= Math.floor((mid + hi) / binW); b += 1) {
+        if (o.bins[((b % VIEW_BINS) + VIEW_BINS) % VIEW_BINS]) hidden += 1;
+      }
+    }
+    return (100 * hidden) / viewTotal;
+  };
+  // Owner 25 Sep: tower sites set on the owner's sketch; the tower goes on the nearest ground that takes it.
+  const towerSites = pick<{ match: string; at: [number, number] }[]>(planning, 'apartments.tower_sites', []);
+
   const draftsB: DraftBuilding[] = [];
   let seniorLeft = senNeeded;
   let aptUnitsLeft = aptUnits;
@@ -1758,7 +1859,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       // Towers on the lower ground, spread over the zone, none in another's
       // view, each under the airport height limit, within FSI on the zone.
       /** Towers of one plan shape: lower ground first, spread, staggered, under the airport limit. */
-      const planTowers = (dims: { L: number; D: number }): DraftBuilding[] => {
+      const planTowers = (dims: { L: number; D: number }, viewW: number): DraftBuilding[] => {
         const out: DraftBuilding[] = [];
         let unitsLeft = zoneTowers ? Number.POSITIVE_INFINITY : aptUnitsLeft;
         const want = zoneTowers ?? Number.POSITIVE_INFINITY;
@@ -1774,7 +1875,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             : Math.floor((apt.fsi * z.areaM2) / (zoneTowers * aptPlate));
         const P = apt.podium;
         const cands = candidatesIn(siteLand(z), dims, apt.setback + P);
-        type T = Cand & { ring: Ring; pod: Ring; pLo: number; pHi: number; floorsCap: number; bc: number };
+        type T = Cand & { ring: Ring; pod: Ring; pLo: number; pHi: number; floorsCap: number; bc: number; hid: number };
+        const pins = towerSites.filter((ts) => z.name.toUpperCase().startsWith(ts.match.toUpperCase())).map((ts) => ts.at);
         const towers: T[] = [];
         for (const cd of cands) {
           const pod = rectRing(cd.f, cd.a0 - P, cd.a1 + P, cd.b0 - P, cd.b1 + P);
@@ -1789,7 +1891,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           if (!Number.isFinite(pHi)) continue;
           const floorsCap = Math.min(apt.maxFloors, Math.floor((capRl - pHi - air.roof) / apt.fh));
           if (floorsCap < apt.minFloors) continue;
-          towers.push({ ...cd, ring: ringOf(cd), pod, pLo, pHi, floorsCap, bc: (cd.b0 + cd.b1) / 2 });
+          const ring = ringOf(cd);
+          towers.push({ ...cd, ring, pod, pLo, pHi, floorsCap, bc: (cd.b0 + cd.b1) / 2, hid: villaViewHidden(pod) });
         }
         const minHi = towers.reduce((m, t) => Math.min(m, t.pHi), Infinity);
         const spreadCap = 2 * (dims.L + 2 * P) + towerClear;
@@ -1822,8 +1925,13 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             if (bad) continue;
             // Spread counts up to the spacing that leaves room for another tower
             // between; beyond it the lower ground wins, so the zone still fills.
-            const s = chosen.length === 0 ? -t.pHi : Math.min(minD, spreadCap) - 2 * (t.pHi - minHi);
-            if (!blocksView && s > bestS) {
+            // An owner's site first: the nearest ground that takes the tower. Else
+            // the lower ground, spread, hiding as little of the villas' view as it can.
+            const pin = pins[chosen.length];
+            const s = pin
+              ? -Math.hypot(t.c[0] - pin[0], t.c[1] - pin[1])
+              : (chosen.length === 0 ? -t.pHi : Math.min(minD, spreadCap) - 2 * (t.pHi - minHi)) - viewW * t.hid;
+            if ((!blocksView || pin) && s > bestS) {
               bestS = s;
               best = t;
             }
@@ -1841,6 +1949,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           const floors = Math.min(best.floorsCap, Math.floor(budget / aptPlate), Math.ceil(unitsLeft / flatsPerFloor), floorsByFsi);
           if (floors < apt.minFloors) break;
           chosen.push(best);
+          const pinned = pins[chosen.length - 1];
           budget -= aptPlate * floors;
           const u = Math.min(unitsLeft, floors * flatsPerFloor);
           unitsLeft -= u;
@@ -1861,7 +1970,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
                 ? `held to ${floors} floors by the airport limit: top ${(best.pHi + floors * apt.fh + air.roof).toFixed(1)} RL against ${capRl.toFixed(1)} RL (${air.amsl} m AMSL)`
                 : `top ${(best.pHi + floors * apt.fh + air.roof).toFixed(1)} RL, under the airport limit of ${capRl.toFixed(1)} RL (${air.amsl} m AMSL)`,
               `podium follows the ground: ${podH.toFixed(1)} m from its low side to the tower floor; no flat platform cut`,
-              `on the lower ground of the zone; staggered: within ${apt.viewDepth} m up or down the slope no tower hides more than ${Math.round(apt.viewOverlap * 100)}% of its width; ${towerClear.toFixed(0)} m clear of the others`,
+              pinned
+                ? `on the owner's site (${pinned[0].toFixed(0)}, ${pinned[1].toFixed(0)}), ${Math.hypot(best.c[0] - pinned[0], best.c[1] - pinned[1]).toFixed(0)} m from it; ${towerClear.toFixed(0)} m clear of the others`
+                : `on the lower ground of the zone; staggered: within ${apt.viewDepth} m up or down the slope no tower hides more than ${Math.round(apt.viewOverlap * 100)}% of its width; ${towerClear.toFixed(0)} m clear of the others`,
+              ...(vv ? [`hides ${best.hid.toFixed(1)}% of the villas' view (first-floor lookouts every 10 m, ${vv.reach_m} m out)`] : []),
             ],
             podium: { ring: best.pod, topRl: best.pHi, bottomRl: best.pLo },
             flat: false,
@@ -1870,11 +1982,15 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         (out as DraftBuilding[] & { relaxed?: number }).relaxed = relaxed;
         return out;
       };
+      // The count and the flats come first; then the least of the villas' view hidden.
       let bestPlan: DraftBuilding[] = [];
-      for (const asp of [apt.aspect, ...aspects.filter((x) => x !== apt.aspect && x >= 1.5)]) {
-        const got = planTowers(plateDims(aptPlate, asp));
-        const score = (p: DraftBuilding[]): number => (zoneTowers ? p.length * 1e6 : 0) + p.reduce((s, b) => s + b.units, 0);
-        if (score(got) > score(bestPlan)) bestPlan = got;
+      const hidOf = (b: DraftBuilding): number => villaViewHidden(b.podium?.ring ?? b.placed.ring);
+      const score = (p: DraftBuilding[]): number => (zoneTowers ? p.length * 1e6 : 0) + p.reduce((s, b) => s + 100 * b.units - hidOf(b), 0);
+      for (const viewW of vv ? [vv.weight_m_per_pct, 0] : [0]) {
+        for (const asp of [apt.aspect, ...aspects.filter((x) => x !== apt.aspect && x >= 1.5)]) {
+          const got = planTowers(plateDims(aptPlate, asp), viewW);
+          if (score(got) > score(bestPlan)) bestPlan = got;
+        }
       }
       for (const b of bestPlan) {
         draftsB.push(b);
