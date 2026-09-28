@@ -1,16 +1,22 @@
-// Works out the four master plans the presentation forks into (A1, A2, B1, B2)
-// and writes them to dist/data/plans, each with a fingerprint of the rules and
-// the site. A hosted copy then loads them instead of planning in the viewer's
-// browser (the two sized to the count take a minute each). Run after
-// `npm run build`; part of `npm run build:deploy`.
-import { mkdir, writeFile } from 'node:fs/promises';
+// Works out the master plans the panel and the presentation offer (A1-C2) and
+// writes them, each with a fingerprint of the rules and the site, to
+// app/prebuilt/plans (the dev server serves them: sync-data copies them into
+// public/data/plans) and, after a build, to dist/data/plans. The app loads a
+// plan from there instead of planning it in the browser (the B3/B4 plans take
+// over a minute each), and only while its fingerprint matches the data.
+// `npm run plans`; part of `npm run build:deploy`.
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const distDir = process.argv[2] ?? path.join(appDir, 'dist');
-const dataDir = path.join(distDir, 'data');
+// The data the app serves; sync-data writes it from the repository's data and config.
+const dataDir = path.join(appDir, 'public', 'data');
+const outDirs = [path.join(appDir, 'prebuilt', 'plans')];
+if (existsSync(path.join(appDir, 'dist', 'data'))) outDirs.push(path.join(appDir, 'dist', 'data', 'plans'));
+if (existsSync(path.join(dataDir, 'plans'))) outDirs.push(path.join(dataDir, 'plans'));
 
 const vite = await createServer({ root: appDir, server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 try {
@@ -20,7 +26,7 @@ try {
   const { PRESENT_PLAN_OPTIONS, dataFingerprint, encodePlan } = await vite.ssrLoadModule('/src/engine/present/prebuilt.ts');
   const src = nodeSource(dataDir);
   const fingerprint = await dataFingerprint(src);
-  await mkdir(path.join(dataDir, 'plans'), { recursive: true });
+  for (const d of outDirs) await mkdir(d, { recursive: true });
   for (const o of PRESENT_PLAN_OPTIONS) {
     const t0 = Date.now();
     const overrides = {
@@ -28,9 +34,10 @@ try {
       planning: { 'options.villa_sizing': o.sizing, 'options.road_orientation': o.roads },
     };
     const { plan } = await runPipelineJob({ job: 'pipeline', id: 0, baseUrl: '', overrides }, () => {}, src);
-    const file = path.join(dataDir, 'plans', `${o.id}.json`);
+    const file = path.join(outDirs[0], `${o.id}.json`);
     await writeFile(file, JSON.stringify(encodePlan(plan, o.id, fingerprint)));
-    console.log(`present-plans: ${o.id} ${plan.plots.length} villas, ${Math.round((Date.now() - t0) / 1000)} s -> ${path.relative(appDir, file)}`);
+    for (const d of outDirs.slice(1)) await copyFile(file, path.join(d, `${o.id}.json`));
+    console.log(`present-plans: ${o.id} ${plan.plots.length} villas, ${Math.round((Date.now() - t0) / 1000)} s -> ${outDirs.map((d) => path.relative(appDir, d)).join(', ')}`);
   }
   console.log(`present-plans: fingerprint ${fingerprint}`);
 } finally {

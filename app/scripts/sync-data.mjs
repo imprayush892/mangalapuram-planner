@@ -45,6 +45,14 @@ for (const { from, to } of sources) {
   for (const rel of await listFiles(to)) bytes += (await stat(path.join(to, rel))).size;
 }
 
+// The ready-made master plans (scripts/present-plans.mjs), when they have been built:
+// the app uses them only while their fingerprint matches the data copied above.
+const prebuilt = path.join(appDir, 'prebuilt', 'plans');
+if (existsSync(prebuilt)) {
+  await cp(prebuilt, path.join(outDir, 'plans'), { recursive: true });
+  for (const rel of await listFiles(path.join(outDir, 'plans'))) bytes += (await stat(path.join(outDir, 'plans', rel))).size;
+}
+
 for (const { from, to } of singleFiles) {
   if (!existsSync(from)) throw new Error(`missing source file: ${from}`);
   await mkdir(path.dirname(to), { recursive: true });

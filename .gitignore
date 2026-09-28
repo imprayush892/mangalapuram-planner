@@ -8,3 +8,4 @@ coverage/
 app/dist/
 app/smoke*.png
 __pycache__/
+app/prebuilt/
