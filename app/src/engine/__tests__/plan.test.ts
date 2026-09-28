@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { config, site } from './fixtures';
 import { runAnalysis } from '../pipeline/analysis';
 import type { AnalysisResult } from '../pipeline/analysis';
-import { runPlan } from '../pipeline/plan';
+import { runPlan, withPath } from '../pipeline/plan';
+import { pick } from '../data/config';
 import type { PlanResult } from '../pipeline/plan';
 import { sftToM2 } from '../units';
 import { and, maskFrom, minus, patches, rasterise } from '../pipeline/mask';
@@ -97,6 +98,30 @@ describe('steps 9-11 villa plots', () => {
       expect(pl.builtUpM2).toBeLessThanOrEqual(pl.targetBuiltUpM2 + 1e-6);
       // the ground floor keeps 1.5 m to both sides of the plot
       expect(side(pl.groundFloor, 0)).toBeCloseTo(pl.widthM - 3, 6);
+    }
+  });
+
+  it('builds the B3/B4 small plots on KMBR Table 4 yards, reaching the client BUA with a second floor (owner 28 Sep)', async () => {
+    const [s, c] = await Promise.all([site(), config()]);
+    const { a } = await plan();
+    const planning = withPath(c.planning, 'options.villa_sizing', 'B_count');
+    const p = runPlan(
+      { dem: s.dem, features: s.features, zones: s.zones.map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc })), kmbr: c.kmbr, client: c.client, assumptions: c.assumptions, planning, programme: c.programme },
+      a,
+    );
+    expect(p.option.villaSizing).toBe('B_count');
+    expect(p.option.villaTarget).toBe(700);
+    const small = pick<number[]>(c.kmbr, 'table4_yards_up_to_10m.small_plot_A1_F_bua_le200_plot_le125', []);
+    for (const pl of p.plots) {
+      expect(pl.areaM2).toBeGreaterThanOrEqual(sftToM2(1030) - 0.5);
+      expect(pl.areaM2).toBeLessThanOrEqual(sftToM2(1750) + 0.5);
+      expect(pl.targetBuiltUpM2).toBeCloseTo(sftToM2(pl.package1 ? 1750 : 2000), 6);
+      if (pl.areaM2 <= 125 && pl.targetBuiltUpM2 <= 200) {
+        expect(side(pl.groundFloor, 0)).toBeCloseTo(pl.widthM - 2 * small[4]!, 6);
+        expect(pl.frontGardenM).toBeGreaterThanOrEqual(small[0]! - 1e-6);
+      }
+      expect(pl.upperFloorM2).toBeLessThanOrEqual(pl.groundFloorM2 + 1e-6);
+      expect(pl.roofRoomM2).toBeLessThanOrEqual(pl.groundFloorM2 + 1e-6);
     }
   });
 

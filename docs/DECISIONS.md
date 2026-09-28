@@ -283,3 +283,8 @@ Each of these is a switch or an editable assumption, not a silent decision.
   front; a bigger first floor grows toward the road. KMBR Table 4's front yard (3.0 m average) holds the garden's depth.
 - Where G+1 inside those yards cannot reach the BUA (true of every B plot), a partial second floor, a room on the roof,
   takes the rest (option a); the first floor may be as big as the ground floor.
+- Two more options, B3 and B4: B1/B2 hold the client's plot size, B3/B4 hold the client's 700 units. B3/B4 are the
+  earlier count layouts (the largest plot that fits 700, narrow and deep) on the new house rules: the same BUA, reached
+  with a second floor (G+2), a front garden, a first-floor balcony that the first floor can grow into; the owner's 1.5 m
+  setbacks are set aside for these small plots and KMBR Table 4's yards govern (the small-plot row up to 125 m² of plot
+  and 200 m² of BUA). Gross FSI stays at the client's (about 0.91 on 35 ac).

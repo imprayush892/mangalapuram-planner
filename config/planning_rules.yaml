@@ -19,7 +19,7 @@ version: 2026-09-25
 
 # The six master-plan options (owner 25 and 28 Sep): villa category x road orientation.
 options:
-  villa_sizing: A                # A, B or C: villas.categories
+  villa_sizing: A                # A, B, B_count or C: villas.categories
   road_orientation: terrain      # terrain = least cut and fill; north_south = Vastu, primary and secondary N-S
 
 zoning:
@@ -156,6 +156,17 @@ villas:
       types: [{name: standard, plot_sft: [1500, 1750], bua_sft: 2000}]
       # Package 1's 60 villas at 1,750 sq ft (Outflow B9, E9), read as the zoning plan's Project 1.
       package_1: {zone: "PROJECT - 1", units: 60, bua_sft: 1750}
+    B_count:   # options B3/B4 (owner 28 Sep): the earlier 700-plot layouts, on the new house rules
+      count: true
+      # The plot is the largest that still fits the client's 700: searched over this range. Its floor
+      # is the smallest plot a full G+2 at 65% ground coverage can hold 2,000 sq ft on: 2,000 / 1.95.
+      types: [{name: standard, plot_sft: [1030, 1750], bua_sft: 2000}]
+      package_1: {zone: "PROJECT - 1", units: 60, bua_sft: 1750}
+      # The earlier count plots' shape: up to 18 m deep, at most 1:2.5, at least 6 m wide.
+      shape: {max_depth_m: 18, depth_per_width: 2.5, min_width_m: 6}
+      # The owner's 1.5 m setbacks are set aside for these small plots: KMBR Table 4's yards govern
+      # (the small-plot row up to 125 m2 of plot and 200 m2 of BUA; the ordinary row above).
+      house: {yards: kmbr, small_plot_row: small_plot_A1_F_bua_le200_plot_le125, small_plot_max_m2: 125, small_bua_max_m2: 200}
     C:   # two types, placed plot by plot on terrain and sales, no fixed share (owner 28 Sep)
       types:
         - {name: standard, plot_sft: [1750, 2000], bua_sft: 2300}
@@ -182,7 +193,8 @@ villas:
     # than this many times its width (client_rules villa_plots.aspect_ratio.max).
     min_house_side_m: 4.5
     max_plot_aspect: 2.5
-    # Owner 28 Sep (option a): what G+1 cannot hold goes into a room on the roof, set to the back.
+    # Owner 28 Sep (option a): what G+1 cannot hold goes into a room on the roof, set to the back; it
+    # may grow to a full second floor (G+2), as on the B3/B4 plots.
     roof_room: true
   floor_height_m: 3.0                      # ASSUMPTION, as assumptions.yaml floor_to_floor_m.apartments
 

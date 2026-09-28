@@ -2,25 +2,27 @@ import type { AssetSource } from '../data/source';
 import type { PlanResult } from '../pipeline/plan';
 
 /**
- * The six master plans worked out ahead of time, for a hosted copy of the app:
+ * The eight master plans worked out ahead of time, for a hosted copy of the app:
  * sizing a plan's villas can take a minute, longer on a tablet, and
  * a host may not start workers at all. Each file carries a fingerprint of the
  * rules and the site it was planned on; the app uses a file only when the
  * fingerprint matches what it has loaded, so a prebuilt plan is never stale.
  */
 
-export type PresentOptionId = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+export type PresentOptionId = 'A1' | 'A2' | 'B1' | 'B2' | 'B3' | 'B4' | 'C1' | 'C2';
 
 /**
- * The six master plans (owner 25 and 28 Sep): villa category (planning_rules.yaml
+ * The eight master plans (owner 25 and 28 Sep): villa category (planning_rules.yaml
  * villas.categories) by road layout. The one list the panel, the presentation
  * and the prebuild all read.
  */
-export const PRESENT_PLAN_OPTIONS: { id: PresentOptionId; sizing: 'A' | 'B' | 'C'; roads: 'terrain' | 'north_south'; label: string }[] = [
+export const PRESENT_PLAN_OPTIONS: { id: PresentOptionId; sizing: 'A' | 'B' | 'B_count' | 'C'; roads: 'terrain' | 'north_south'; label: string }[] = [
   { id: 'A1', sizing: 'A', roads: 'terrain', label: 'Large villas · roads to the ground' },
   { id: 'A2', sizing: 'A', roads: 'north_south', label: 'Large villas · north–south roads' },
-  { id: 'B1', sizing: 'B', roads: 'terrain', label: "Client's 700 · roads to the ground" },
-  { id: 'B2', sizing: 'B', roads: 'north_south', label: "Client's 700 · north–south roads" },
+  { id: 'B1', sizing: 'B', roads: 'terrain', label: 'Client plot size held · roads to the ground' },
+  { id: 'B2', sizing: 'B', roads: 'north_south', label: 'Client plot size held · north–south roads' },
+  { id: 'B3', sizing: 'B_count', roads: 'terrain', label: 'Client 700 units held (G+2) · roads to the ground' },
+  { id: 'B4', sizing: 'B_count', roads: 'north_south', label: 'Client 700 units held (G+2) · north–south roads' },
   { id: 'C1', sizing: 'C', roads: 'terrain', label: 'Standard and premium · roads to the ground' },
   { id: 'C2', sizing: 'C', roads: 'north_south', label: 'Standard and premium · north–south roads' },
 ];

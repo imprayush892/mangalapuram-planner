@@ -138,7 +138,7 @@ export interface PlanPlot {
   floorHeightM: number;
 }
 
-export type VillaCategory = 'A' | 'B' | 'C';
+export type VillaCategory = 'A' | 'B' | 'B_count' | 'C';
 export type VillaKind = 'standard' | 'premium';
 
 export interface PlanBuilding {
@@ -1233,12 +1233,15 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     bua_sft: number;
   }
   const catName = pick<string>(planning, 'options.villa_sizing', 'A');
-  const villaSizing: VillaCategory = catName === 'B' || catName === 'C' ? catName : 'A';
-  const cat = pick<{ count?: boolean; types: VillaTypeRule[]; package_1?: { zone: string; units: number; bua_sft: number }; premium_when?: { zones: string[]; outlook_min: number } }>(
-    planning,
-    `villas.categories.${villaSizing}`,
-    { types: [] },
-  );
+  const villaSizing: VillaCategory = (['B', 'B_count', 'C'] as const).find((c) => c === catName) ?? 'A';
+  const cat = pick<{
+    count?: boolean;
+    types: VillaTypeRule[];
+    package_1?: { zone: string; units: number; bua_sft: number };
+    premium_when?: { zones: string[]; outlook_min: number };
+    shape?: { max_depth_m: number; depth_per_width: number; min_width_m: number };
+    house?: { yards: 'kmbr'; small_plot_row: string; small_plot_max_m2: number; small_bua_max_m2: number };
+  }>(planning, `villas.categories.${villaSizing}`, { types: [] });
   if (cat.types.length === 0) throw new Error(`planning_rules.yaml villas.categories.${villaSizing}: no villa types`);
   // Where in each type's range the plots are cut (runPlanSized searches it): 1 = the largest.
   const plotScale = Math.min(1, Math.max(0, pick<number>(planning, 'villas.plot_scale', 1)));
@@ -1247,7 +1250,18 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const stdRule = cat.types.find((t) => t.name === 'standard') ?? cat.types[0]!;
   const premRule = cat.types.find((t) => t.name === 'premium') ?? null;
   // Every type shares the standard plot's depth, so a street serves them alike; a premium plot is wider.
-  const plotD = Math.sqrt(depthPerWidth * areaOf(stdRule, plotScale));
+  // The plot shape: the category's own (B3/B4: the earlier narrow, deep count plots), else the
+  // shape with the most ground floor inside the owner's yards.
+  const shapeOf = (a: number): { w: number; d: number } => {
+    if (cat.shape) {
+      const d0 = Math.min(cat.shape.max_depth_m, Math.sqrt(cat.shape.depth_per_width * a));
+      const w = Math.max(cat.shape.min_width_m, a / d0);
+      return { w, d: a / w };
+    }
+    const d = Math.sqrt(depthPerWidth * a);
+    return { w: a / d, d };
+  };
+  const plotD = shapeOf(areaOf(stdRule, plotScale)).d;
   const plotW = areaOf(stdRule, plotScale) / plotD;
   const premW = premRule ? areaOf(premRule, plotScale) / plotD : plotW;
   const widthOf = (k: VillaKind): number => (k === 'premium' ? premW : plotW);
@@ -1256,19 +1270,50 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const depthsFor = (k: VillaKind): number[] => {
     const t = k === 'premium' && premRule ? premRule : stdRule;
     const dShort = sftToM2(t.plot_sft[0]) / widthOf(k);
-    return dShort < plotD - 0.5 ? [plotD, dShort] : [plotD];
+    return dShort < plotD - 0.5 && holdsBua(widthOf(k), dShort, k) ? [plotD, dShort] : [plotD];
   };
   const buaOf = (k: VillaKind): number => sftToM2((k === 'premium' && premRule ? premRule : stdRule).bua_sft);
+  // A plot cut to fit a pocket, or deepened into the strip behind it, stays in its range and within
+  // a quarter of the size its row is cut at, so it keeps to its neighbours' scale.
+  const maxFlexArea = (t: VillaTypeRule): number => Math.min(sftToM2(t.plot_sft[1]), 1.25 * areaOf(t, plotScale));
   // The gross villa land: the villa zones' labels and the phase villa land (the client's allocation).
   const villaLandAc = zones.filter((z) => z.use === 'villas').reduce((sum, z) => sum + (z.labelAc ?? z.areaM2 / M2_PER_ACRE), 0);
   const grossLandM2 = villaLandAc * M2_PER_ACRE;
   const grossFsi = num(planning, 'villas.gross_fsi');
   const targetBuaM2 = grossFsi * grossLandM2;
-  // B: the client's 700 villas at 20 an acre. A: as many as the gross FSI allows at its BUA.
-  // C: no count; plots are laid until the BUA reaches the gross FSI.
+  // B, B3/B4 (count): the client's 700 villas at 20 an acre. A (one type): as many as the gross
+  // FSI allows at its BUA. C (two types): no count; plots are laid until the BUA reaches the gross FSI.
   const perAcre = pick<number>(planning, 'villas.count_basis.programme_units', 700) / pick<number>(planning, 'villas.count_basis.programme_land_ac', 35);
-  const villaTarget =
-    villaSizing === 'B' ? Math.round(villaLandAc * perAcre) : villaSizing === 'A' ? Math.floor(targetBuaM2 / buaOf('standard')) : 0;
+  const villaTarget = cat.count ? Math.round(villaLandAc * perAcre) : premRule ? 0 : Math.floor(targetBuaM2 / buaOf('standard'));
+  // The house's yards: the owner's (rear fixed, sides at least, KMBR Table 4's front yard in front)
+  // or, for the B3/B4 small plots, KMBR Table 4's own yards, by the row the plot and its BUA fall in.
+  const kmbrRow = (row: string): number[] => {
+    const v = pick<number[]>(input.kmbr, `table4_yards_up_to_10m.${row}`, []);
+    if (v.length < 6) throw new Error(`kmbr_rules.yaml table4_yards_up_to_10m.${row}: expected 6 yard values`);
+    return v;
+  };
+  const ownerRow = pick<string>(planning, 'villas.house.front_yard_row', 'A1_A2_any__F_upto200');
+  const yardsFor = (plotM2: number, buaM2: number): { front: number; rear: number; side: number; row: string } => {
+    if (cat.house?.yards === 'kmbr') {
+      const small = plotM2 <= cat.house.small_plot_max_m2 + 1e-9 && buaM2 <= cat.house.small_bua_max_m2 + 1e-9;
+      const row = small ? cat.house.small_plot_row : ownerRow;
+      const r = kmbrRow(row);
+      return { front: r[0]!, rear: r[2]!, side: r[4]!, row };
+    }
+    return { front: kmbrRow(ownerRow)[0]!, rear: num(planning, 'villas.house.rear_m'), side: num(planning, 'villas.house.side_min_m'), row: ownerRow };
+  };
+  // The most a house can hold on a w x d plot inside its yards: the ground floor
+  // at most its coverage, the first floor and (with the roof room) a second at most as big.
+  const coverMax = num(planning, 'villas.house.ground_coverage_max');
+  const levelsMax = pick<boolean>(planning, 'villas.house.roof_room', true) ? 3 : 2;
+  const houseCap = (w: number, d: number, buaM2: number): number => {
+    const y = yardsFor(w * d, buaM2);
+    const gw = w - 2 * y.side;
+    if (gw <= 0) return 0;
+    return gw * Math.max(0, Math.min((coverMax * w * d) / gw, d - y.rear - y.front)) * levelsMax;
+  };
+  /** A plot on which the house can reach its category's BUA. */
+  const holdsBua = (w: number, d: number, k: VillaKind): boolean => houseCap(w, d, buaOf(k)) >= buaOf(k) - 0.5;
   // C: premium where the client zoned it, or with an open outlook (owner 28 Sep: terrain and sales).
   const premiumAt = (() => {
     if (!premRule || !cat.premium_when) return (_p: Pt, _zone: string): boolean => false;
@@ -1589,9 +1634,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   // within their type's range, square to the road they front, and free to run
   // past the end of a stretch of road.
   {
-    const hRear = num(planning, 'villas.house.rear_m');
-    const hSide = num(planning, 'villas.house.side_min_m');
-    const frontMinM = pick<number[]>(input.kmbr, `table4_yards_up_to_10m.${pick<string>(planning, 'villas.house.front_yard_row', 'A1_A2_any__F_upto200')}`, [3])[0] ?? 3;
+    const yMin = yardsFor(sftToM2(stdRule.plot_sft[0]), buaOf('standard'));
+    const hRear = yMin.rear;
+    const hSide = yMin.side;
+    const frontMinM = yMin.front;
     const minHouse = num(planning, 'villas.house.min_house_side_m');
     const maxAspect = num(planning, 'villas.house.max_plot_aspect');
     const sizes = new Map<VillaKind, { w: number; d: number }[]>();
@@ -1600,7 +1646,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       if (hit) return hit;
       const t = k === 'premium' && premRule ? premRule : stdRule;
       const aMin = sftToM2(t.plot_sft[0]);
-      const aMax = sftToM2(t.plot_sft[1]);
+      const aMax = maxFlexArea(t);
       const out: { w: number; d: number }[] = [];
       // Largest first, so a pocket is used up; every size stays in the type's range.
       for (const a of [aMax, (aMin + aMax) / 2, aMin]) {
@@ -1608,6 +1654,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           const d = a / w;
           if (d / w > maxAspect || w / d > maxAspect) continue;
           if (d < hRear + frontMinM + minHouse) continue;
+          // Only a plot the house can reach its BUA on (a wide, shallow one loses its depth to the yards).
+          if (!holdsBua(w, d, k)) continue;
           out.push({ w, d });
         }
       }
@@ -1659,9 +1707,11 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     let deepened = 0;
     for (const p of drafts) {
       const t = p.kind === 'premium' && premRule ? premRule : stdRule;
-      const dMax = sftToM2(t.plot_sft[1]) / p.w;
+      const dMax = maxFlexArea(t) / p.w;
       if (dMax < p.d + 0.5) continue;
       for (let dNew = dMax; dNew >= p.d + 0.5; dNew -= 0.5) {
+        // Not into a size whose yards leave the house short of its BUA (above KMBR's small-plot limit).
+        if (holdsBua(p.w, p.d, p.kind) && !holdsBua(p.w, dNew, p.kind)) continue;
         const strip = rectRing(p.f, p.a0, p.a0 + p.w, p.b0 + p.d, p.b0 + dNew);
         if (plotIndex.overlaps(strip) || !clearOfRoads(strip)) continue;
         if (!landOk(rectSamples(p.f, p.a0, p.a0 + p.w, p.b0 + p.d, p.b0 + dNew, 1.5))) continue;
@@ -2455,15 +2505,11 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   // a room on the roof, at the back (option a).
   const hs = {
     cover: num(planning, 'villas.house.ground_coverage_max'),
-    rear: num(planning, 'villas.house.rear_m'),
-    side: num(planning, 'villas.house.side_min_m'),
     roof: pick<boolean>(planning, 'villas.house.roof_room', true),
   };
-  const frontRow = pick<string>(planning, 'villas.house.front_yard_row', 'A1_A2_any__F_upto200');
-  const frontYard = pick<number[]>(input.kmbr, `table4_yards_up_to_10m.${frontRow}`, [])[0];
-  if (frontYard === undefined) throw new Error(`kmbr_rules.yaml table4_yards_up_to_10m.${frontRow}: no front yard`);
-  const pkg = villaSizing === 'B' ? cat.package_1 ?? null : null;
+  const pkg = cat.package_1 ?? null;
   let pkgLeft = pkg?.units ?? 0;
+  const yardRows = new Set<string>();
   const plots: PlanPlot[] = keptDrafts.map((d, i) => {
     const smp = rectSamples(d.f, d.a0, d.a0 + d.w, d.b0, d.b0 + d.d, 1);
     const pf = platformFor(dem, smp, plotLimit, delta);
@@ -2475,14 +2521,16 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     if (inPkg) pkgLeft -= 1;
     const target = inPkg ? sftToM2(pkg!.bua_sft) : buaOf(d.kind);
     // The house in the plot's frame: a along the road, b from the road (front) to the back.
-    const gw = Math.max(0, d.w - 2 * hs.side);
-    const gd = gw > 0 ? Math.max(0, Math.min((hs.cover * area) / gw, d.d - hs.rear - frontYard)) : 0;
+    const y = yardsFor(area, target);
+    yardRows.add(`${y.row} (front ${y.front} m, rear ${y.rear} m, sides ${y.side} m)`);
+    const gw = Math.max(0, d.w - 2 * y.side);
+    const gd = gw > 0 ? Math.max(0, Math.min((hs.cover * area) / gw, d.d - y.rear - y.front)) : 0;
     const ground = gw * gd;
-    const bBack = d.b0 + d.d - hs.rear;
+    const bBack = d.b0 + d.d - y.rear;
     const first = Math.min(ground, Math.max(0, target - ground));
     const roofM2 = hs.roof ? Math.min(ground, Math.max(0, target - ground - first)) : 0;
-    const a0 = d.a0 + hs.side;
-    const a1 = d.a0 + d.w - hs.side;
+    const a0 = d.a0 + y.side;
+    const a1 = d.a0 + d.w - y.side;
     const fd = gw > 0 ? first / gw : 0;
     const rd = gw > 0 ? roofM2 / gw : 0;
     const bua = ground + first + roofM2;
@@ -2507,7 +2555,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       upperFloorM2: first,
       roofRoomM2: roofM2,
       balconyM2: ground - first,
-      frontGardenM: d.d - hs.rear - gd,
+      frontGardenM: d.d - y.rear - gd,
       targetBuiltUpM2: target,
       builtUpM2: bua,
       fsi: bua / area,
@@ -2517,7 +2565,12 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const shortOfBua = plots.filter((p) => p.builtUpM2 < p.targetBuiltUpM2 - 0.5).length;
   if (shortOfBua > 0) notes.push(`${shortOfBua} villas cannot reach their BUA even with a roof room: their plots are too small for the yards`);
   const withRoof = plots.filter((p) => p.roofRoomM2 > 0.5).length;
-  if (withRoof > 0) notes.push(`${withRoof} of ${plots.length} villas need a roof room to reach their BUA: G+1 inside the yards (rear ${hs.rear} m, sides ${hs.side} m, front ${frontYard} m, KMBR Table 4) cannot hold it`);
+  if (withRoof > 0) {
+    const full = plots.filter((p) => p.roofRoomM2 >= p.groundFloorM2 - 0.5 && p.roofRoomM2 > 0.5).length;
+    notes.push(
+      `${withRoof} of ${plots.length} villas need a second floor or roof room to reach their BUA (${full} a full second floor, G+2): G+1 inside the yards cannot hold it; yards: ${[...yardRows].join('; ')}`,
+    );
+  }
 
   const counters: Record<BuildingUse, number> = { school: 0, clubhouse: 0, senior: 0, apartments: 0, commercial: 0, batching: 0 };
   const prefix: Record<BuildingUse, string> = { school: 'SCH', clubhouse: 'CLUB', senior: 'S', apartments: 'T', commercial: 'COM', batching: 'BP' };

@@ -44,12 +44,13 @@ the app uses one only when the fingerprint matches and no rule has been overridd
 live (in a worker, or on the page where the host blocks workers).
 
 ## Master-plan options (owner, 25 and 28 Sep)
-Two switches in `config/planning_rules.yaml` `options`, six plans (`villas.categories`):
+Two switches in `config/planning_rules.yaml` `options`, eight plans (`villas.categories`):
 
 | Villa category (`villa_sizing`) | Plot, sq ft | BUA, sq ft (fixed) | Target | 1: roads to the ground | 2: north-south roads |
 |---|---|---|---|---|---|
 | A | 2,250-2,600 | 3,000 | the count the gross FSI allows | A1 | A2 |
-| B (the client's) | 1,500-1,750 | 2,000; Package 1's 60 in Project 1 at 1,750 | 700 villas, 20 an acre | B1 | B2 |
+| B (the client's plot size held) | 1,500-1,750 | 2,000; Package 1's 60 in Project 1 at 1,750 | 700 villas, 20 an acre | B1 | B2 |
+| B_count (the client's 700 units held) | the largest that fits 700, in 860-1,750 (narrow, deep) | as B, G+2 where G+1 cannot hold it | 700 villas | B3 | B4 |
 | C | standard 1,750-2,000 / premium 2,000-2,250 | 2,300 / 2,600 | the gross FSI's BUA | C1 | C2 |
 
 Owner, 28 Sep: gross FSI 0.918 on the villa land (the client's E17/D17); plots 80% of the villa land and

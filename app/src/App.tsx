@@ -179,7 +179,7 @@ export default function App(): React.ReactElement {
             type="button"
             onClick={startPresenting}
             disabled={status !== 'ready' || presenting}
-            title="Present the plan step by step: terrain, water, the land that can be built on, roads, the six master plans, the massing. Next / Back, arrow keys or a clicker; Esc ends."
+            title="Present the plan step by step: terrain, water, the land that can be built on, roads, the eight master plans, the massing. Next / Back, arrow keys or a clicker; Esc ends."
             className="rounded border border-accent/70 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent hover:bg-accent/20 disabled:opacity-40"
           >
             ▶ Present

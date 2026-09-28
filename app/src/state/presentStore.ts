@@ -16,7 +16,7 @@ import type { PresentOptionId } from '../engine/present/prebuilt';
 /**
  * Presentation mode: the planning pipeline revealed one step at a time on the
  * 2D plan and the 3D terrain, each step adding to the last. At the plots the
- * plan forks into the six master plans; from there on any of them can be
+ * plan forks into the eight master plans; from there on any of them can be
  * shown. Every step only switches what the views already draw.
  */
 
@@ -40,7 +40,7 @@ export interface PresentStep {
   uses: BuildingUse[] | 'all' | 'none';
   /** Villa masses on their plots. */
   villas: boolean;
-  /** The six master plans part here. */
+  /** The eight master plans part here. */
   fork?: boolean;
 }
 
@@ -147,7 +147,7 @@ export const PRESENT_STEPS: PresentStep[] = [
   {
     key: 'plots',
     num: '9',
-    title: 'Villa plots: six master plans',
+    title: 'Villa plots: eight master plans',
     layers: ['waterlogging'],
     raster: 'none',
     zones: 'off',
@@ -256,7 +256,7 @@ interface PresentState {
 }
 
 function optionOf(plan: PlanResult): OptionId {
-  return `${plan.option.villaSizing}${plan.option.roads === 'north_south' ? 2 : 1}` as OptionId;
+  return PRESENT_OPTIONS.find((o) => o.sizing === plan.option.villaSizing && o.roads === plan.option.roads)?.id ?? 'A1';
 }
 
 /** The plan as a step shows it: only the building uses it has reached. */

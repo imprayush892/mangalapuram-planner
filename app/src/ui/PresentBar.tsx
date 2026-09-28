@@ -82,8 +82,8 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
 
 /**
  * The presenter's bar: where the reveal has got to, what the step shows, the
- * six master plans once the plots are laid, and Back / Next. Arrow keys,
- * Page Up / Down (a clicker) and the space bar step; 1-6 pick a plan; Esc ends.
+ * eight master plans once the plots are laid, and Back / Next. Arrow keys,
+ * Page Up / Down (a clicker) and the space bar step; 1-8 pick a plan; Esc ends.
  */
 export default function PresentBar(): React.ReactElement {
   const { step, option, plans, prep, errors, next, back, go, choose, stop } = usePresent();
@@ -141,7 +141,7 @@ export default function PresentBar(): React.ReactElement {
       </p>
 
       {forked && (
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="mt-3 grid grid-cols-4 gap-2">
           {PRESENT_OPTIONS.map((o, i) => {
             const ready = Boolean(plans[o.id]);
             const on = o.id === option;
