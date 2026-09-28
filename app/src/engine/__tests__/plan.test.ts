@@ -74,7 +74,7 @@ describe('steps 9-11 villa plots', () => {
       expect(pl.areaM2).toBeLessThanOrEqual(sftToM2(2600) + 0.5);
       const a = side(pl.ring, 0);
       const b = side(pl.ring, 1);
-      expect(Math.max(a, b) / Math.min(a, b)).toBeLessThanOrEqual(2.5);
+      expect(Math.max(a, b) / Math.min(a, b)).toBeLessThanOrEqual(2.5 + 1e-9);
     }
   });
 

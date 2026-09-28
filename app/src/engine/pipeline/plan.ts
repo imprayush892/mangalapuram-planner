@@ -11,7 +11,7 @@ import type { AnalysisResult } from './analysis';
 import { parseRatio } from './analysis';
 import type { Mask } from './mask';
 import { and, areaM2, count, dilate, distanceTo, emptyMask, erode, maskFrom, minus, or, patches, rasterise, toMulti } from './mask';
-import { corridor, gradeLimitedProfile, lineLength, pathToLine, route } from './route';
+import { corridor, gradeLimitedProfile, lineLength, pathToLine, route, simplify } from './route';
 
 /**
  * Planning steps 8-16, led by the client's zoning plan (owner, 25 Sep 2026).
@@ -1528,8 +1528,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     const centre = toWorld(f, a0 + w / 2, b0 + d / 2);
     const cc = dem.cellAt(centre);
     if (!cc || !villaLand[cc.j * nx + cc.i]) return false;
-    if (!landOk(rectSamples(f, a0, a0 + w, b0, b0 + d, 1.5))) return false;
-    if (plotIndex.overlaps(ring) || !clearOfRoads(ring)) return false;
+    if (plotIndex.overlaps(ring)) return false;
+    if (!landOk(rectSamples(f, a0, a0 + w, b0, b0 + d, 1.5)) || !clearOfRoads(ring)) return false;
     plotIndex.add(ring);
     const zi = zoneOf[cc.j * nx + cc.i]!;
     const facingDeg = (((Math.atan2(-f.v[0], -f.v[1]) * 180) / Math.PI) + 360) % 360;
@@ -1576,10 +1576,104 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       }
     }
   };
+  // A road routed cell by cell is a staircase of short steps no plot can front:
+  // plots are laid along its straightened line instead (within 1.5 m of it).
+  const plotLine = (line: readonly Pt[]): Pt[] => simplify(line, 1.5);
   // The villa streets first (they were laid for plots), then every other road.
-  for (const r of roads) if (r.kept && r.row) fillAlong(r.centreline, r.widthM / 2, r);
-  for (const r of roads) if (r.kept && !r.row) fillAlong(r.centreline, r.widthM / 2, r);
-  for (const line of existingLines) fillAlong(line, exWidth / 2, null);
+  for (const r of roads) if (r.kept && r.row) fillAlong(plotLine(r.centreline), r.widthM / 2, r);
+  for (const r of roads) if (r.kept && !r.row) fillAlong(plotLine(r.centreline), r.widthM / 2, r);
+  for (const line of existingLines) fillAlong(plotLine(line), exWidth / 2, null);
+
+  // Second pass (owner 28 Sep): the pockets the first pass left, at row ends,
+  // corners and zone edges, filled with plots that flex in width and depth
+  // within their type's range, square to the road they front, and free to run
+  // past the end of a stretch of road.
+  {
+    const hRear = num(planning, 'villas.house.rear_m');
+    const hSide = num(planning, 'villas.house.side_min_m');
+    const frontMinM = pick<number[]>(input.kmbr, `table4_yards_up_to_10m.${pick<string>(planning, 'villas.house.front_yard_row', 'A1_A2_any__F_upto200')}`, [3])[0] ?? 3;
+    const minHouse = num(planning, 'villas.house.min_house_side_m');
+    const maxAspect = num(planning, 'villas.house.max_plot_aspect');
+    const sizes = new Map<VillaKind, { w: number; d: number }[]>();
+    const flexSizes = (k: VillaKind): { w: number; d: number }[] => {
+      const hit = sizes.get(k);
+      if (hit) return hit;
+      const t = k === 'premium' && premRule ? premRule : stdRule;
+      const aMin = sftToM2(t.plot_sft[0]);
+      const aMax = sftToM2(t.plot_sft[1]);
+      const out: { w: number; d: number }[] = [];
+      // Largest first, so a pocket is used up; every size stays in the type's range.
+      for (const a of [aMax, (aMin + aMax) / 2, aMin]) {
+        for (let w = Math.sqrt(a * maxAspect); w >= 2 * hSide + minHouse - 1e-9; w -= 0.5) {
+          const d = a / w;
+          if (d / w > maxAspect || w / d > maxAspect) continue;
+          if (d < hRear + frontMinM + minHouse) continue;
+          out.push({ w, d });
+        }
+      }
+      sizes.set(k, out);
+      return out;
+    };
+    const before = drafts.length;
+    const fillFlex = (line: readonly Pt[], half: number, road: RoadRec | null): void => {
+      const off = half + 0.25;
+      for (let q = 1; q < line.length; q += 1) {
+        const A = line[q - 1]!;
+        const B = line[q]!;
+        const len = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (len < 3) continue;
+        const t: Pt = [(B[0] - A[0]) / len, (B[1] - A[1]) / len];
+        for (const side of [1, -1]) {
+          const v: Pt = [-t[1] * side, t[0] * side];
+          const f: Frame = side > 0 ? { c: A, u: t, v } : { c: A, u: [-t[0], -t[1]], v };
+          // A plot may overhang either end of the stretch by up to 40% of its width.
+          for (let x = -0.4 * plotW; x <= len - 0.6 * minHouse; x += 1) {
+            const at = toWorld(f, side > 0 ? x + plotW / 2 : -(x + plotW / 2), off + plotD / 2);
+            const kinds: VillaKind[] = kindAt(at) === 'premium' ? ['premium', 'standard'] : ['standard'];
+            let placedW = 0;
+            for (const kind of kinds) {
+              for (const s of flexSizes(kind)) {
+                if (x + s.w < 0.6 * s.w || x > len - 0.6 * s.w) continue;
+                const a0 = side > 0 ? x : -(x + s.w);
+                if (tryPlot(f, a0, off, s.w, s.d, road, kind)) {
+                  placedW = s.w;
+                  break;
+                }
+              }
+              if (placedW > 0) break;
+            }
+            if (placedW > 0) x += placedW - 1;
+          }
+        }
+      }
+    };
+    for (const r of roads) if (r.kept) fillFlex(plotLine(r.centreline), r.widthM / 2, r);
+    for (const line of existingLines) fillFlex(plotLine(line), exWidth / 2, null);
+    if (drafts.length > before) notes.push(`${drafts.length - before} more plots in the pockets at row ends, corners and zone edges, sized within their range to fit`);
+  }
+
+  // Third pass (owner 28 Sep: the plot flexes with the terrain, the BUA stays):
+  // each plot deepens into the strip of land behind it, up to its type's largest
+  // area, so the slivers too narrow for a plot of their own are not left over.
+  {
+    let deepened = 0;
+    for (const p of drafts) {
+      const t = p.kind === 'premium' && premRule ? premRule : stdRule;
+      const dMax = sftToM2(t.plot_sft[1]) / p.w;
+      if (dMax < p.d + 0.5) continue;
+      for (let dNew = dMax; dNew >= p.d + 0.5; dNew -= 0.5) {
+        const strip = rectRing(p.f, p.a0, p.a0 + p.w, p.b0 + p.d, p.b0 + dNew);
+        if (plotIndex.overlaps(strip) || !clearOfRoads(strip)) continue;
+        if (!landOk(rectSamples(p.f, p.a0, p.a0 + p.w, p.b0 + p.d, p.b0 + dNew, 1.5))) continue;
+        plotIndex.add(strip);
+        p.d = dNew;
+        p.ring = rectRing(p.f, p.a0, p.a0 + p.w, p.b0, p.b0 + dNew);
+        deepened += 1;
+        break;
+      }
+    }
+    if (deepened > 0) notes.push(`${deepened} plots deepened into the strip behind them, within their range, so it is not left over`);
+  }
 
   // Later roads must go round the plots.
   const plotCells = rasterise(

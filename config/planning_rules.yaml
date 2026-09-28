@@ -177,6 +177,11 @@ villas:
     # ASSUMPTION: the plot shape with the most ground floor inside those yards:
     # depth / width = (front 3.0 + rear 1.5) / (2 x side 1.5).
     shape_depth_per_width: 1.5
+    # Plots cut to fit a pocket (row ends, corners, zone edges) flex in width and depth within their
+    # type's range. ASSUMPTION: the house stays at least this wide and deep, and the plot no longer
+    # than this many times its width (client_rules villa_plots.aspect_ratio.max).
+    min_house_side_m: 4.5
+    max_plot_aspect: 2.5
     # Owner 28 Sep (option a): what G+1 cannot hold goes into a room on the roof, set to the back.
     roof_room: true
   floor_height_m: 3.0                      # ASSUMPTION, as assumptions.yaml floor_to_floor_m.apartments
