@@ -21,11 +21,11 @@ checked on top. Values marked DEFAULT / ASSUMPTION / ESTIMATE there await the ow
 | 7 | Plotable zones | safe, not Rule 22 ground, clear of drains, off the existing roads, reachable by a 15 m plot | built |
 | 0 | Zones | the client's zoning plan (`zones_client_registered.geojson`) gives each zone its use (`zoning.uses`); PHASE 2 and 3 give land to apartments and villas, the rest to be decided (owner 25 Sep); the hospital zone is reserved; waterlogged, Rule 22 and drain ground in a zone goes to open space | built |
 | 8 | Roads | existing roads fixed and checked against 1:8; primary roads (1:8) join every zone's buildable land to the network, preferring the gaps and edges between zones and kept out of the school, clubhouse and senior campuses; in the villa zones, streets along the contours at the spacing that fits the most plots (tertiary, 1:6) and cross streets every 8 plots (secondary, 1:7, left out over 30 m³/m of grading); drives to every building; roads that serve nothing are taken out and their land is green | built |
-| 9 | Plot subdivision | villa plots on both sides of every road through villa land: standard 2,500-3,000 sq ft first (15 m wide), compact 2,000-2,500 where a standard one will not fit (15 x 15 m = 2,422 sq ft with the 15 m minimum side) | built |
+| 9 | Plot subdivision | villa plots on both sides of every road through villa land, sized by the option's villa category (below): about 1.5 deep per 1 wide, the shape with the most ground floor inside the yards; a shallower plot where the land runs out, down to the range's smallest | built |
 | 10 | Plot slope | every plot's ground fitted with a plane; checked against 1:5 | built |
 | 11 | Cut and fill | each plot's platform held to 1:5, balanced; level pads for senior, school, clubhouse, commercial and the batching plant; road profiles | built |
 | 12 | Typologies | from the client zoning; golf (part of the clubhouse) on open ground no steeper than 1:8 in and within 50 m of the clubhouse zone, waterlogged land included | built |
-| 13 | FSI + footprints | villas G 60% + F 40% of the plot; senior G+3, 6 units a floor; apartments ≤ FSI 3.0 on their zone, 4 flats a floor, ≤ 20 floors; school, clubhouse and commercial as wings at KMBR Table 6 coverage; the convention hall on its own or on a commercial block's ground floor | built |
+| 13 | FSI + footprints | villas to the owner's sketch (28 Sep): a fixed BUA per category, ground floor up to 65%, first floor on its back and sides, a roof room for the rest; senior G+3, 6 units a floor; apartments ≤ FSI 3.0 on their zone, 4 flats a floor, ≤ 20 floors; school, clubhouse and commercial as wings at KMBR Table 6 coverage; the convention hall on its own or on a commercial block's ground floor | built |
 | 14 | Placement | school, clubhouse, senior, commercial as one compact group each in their zone; towers on the lower ground, spread, staggered for views (within 100 m up or down the slope no tower hides over a third of another), 12 m apart, podiums following the ground, every top under the airport limit (140 m AMSL, AAI CCZM grid C9) | built |
 | 15-16 | 3D and masterplan | terrain, hydrology, zones, blocks by use, roads by tier, plot outlines and cut/fill draped on the ground; villas, senior, towers on podiums, school, clubhouse, commercial and the batching plant as masses; the GLB export carries the same | built |
 
@@ -43,15 +43,25 @@ A hosted copy (`npm run build:deploy`) ships the four plans ready-made in `dist/
 the app uses one only when the fingerprint matches and no rule has been overridden, otherwise it plans
 live (in a worker, or on the page where the host blocks workers).
 
-## Master-plan options (owner, 25 Sep)
-Two switches in `config/planning_rules.yaml` `options`, four plans:
+## Master-plan options (owner, 25 and 28 Sep)
+Two switches in `config/planning_rules.yaml` `options`, six plans (`villas.categories`):
 
-| | Roads to the ground (`road_orientation: terrain`) | North-south roads (`north_south`) |
-|---|---|---|
-| Plot rules (`villa_sizing: rules`) | A1: 2,500-3,000 + 2,000-2,500 sq ft plots, least cut and fill | A2: the same plots; primary and secondary within 10 deg of north-south, a cardinal grid |
-| Plots to the count (`count`) | B1: the programme's 700 villas on the villa zones plus the Phase 2 and 3 villa land; the plot is the largest that fits (`runPlanToCount`) | B2: the same count on a north-south grid |
+| Villa category (`villa_sizing`) | Plot, sq ft | BUA, sq ft (fixed) | Target | 1: roads to the ground | 2: north-south roads |
+|---|---|---|---|---|---|
+| A | 2,250-2,600 | 3,000 | the count the gross FSI allows | A1 | A2 |
+| B (the client's) | 1,500-1,750 | 2,000; Package 1's 60 in Project 1 at 1,750 | 700 villas, 20 an acre | B1 | B2 |
+| C | standard 1,750-2,000 / premium 2,000-2,250 | 2,300 / 2,600 | the gross FSI's BUA | C1 | C2 |
 
-Shared by all four (owner, 25 Sep, revised):
+Owner, 28 Sep: gross FSI 0.918 on the villa land (the client's E17/D17); plots 80% of the villa land and
+roads 20%, 5% either way (reported, replacing the client's 50/30/20); the BUA stays fixed while the plot
+flexes in its range with the terrain, so the net FSI rises on a smaller plot and the gross holds. The
+plots are cut as large as the range allows while the target is still met (`runPlanSized`); C's premium
+plots go in the premium zone or where the outlook is open, plot by plot. The house (owner's sketch): rear
+1.5 m, sides at least 1.5 m, a front garden of at least KMBR Table 4's front yard (3.0 m), the ground
+floor up to 65% of the plot, the first floor on its back and both sides with a balcony in front, and
+what G+1 cannot hold in a room on the roof at the back (option a).
+
+Shared by all six (owner, 25 Sep, revised):
 - Apartments: six 16,500 sq ft towers, 1,000 flats shared equally (up to 20 floors, under the airport line):
   3 in the client's apartment zone (5.3 ac in the site), 2 on 4.0 ac and 1 on 2.7 ac carved from Phase 2
   and Phase 3 on their lower ground (programme 12 ac less 5.3). FSI up to 4 is acceptable.

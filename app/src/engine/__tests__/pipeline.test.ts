@@ -180,14 +180,16 @@ describe('planning steps 1-7 on the site', () => {
     expect(sum).toBeCloseTo(r.parcelAreaM2, 0);
   });
 
-  it('leaves only land a 15 m plot can sit on', async () => {
+  it('leaves only land the smallest plot can sit on (planning_rules.yaml plotable.min_width_m)', async () => {
     const { r, s } = await analysis();
+    const w = pick<number>((await config()).planning, 'plotable.min_width_m', 0);
+    expect(w).toBeGreaterThan(0);
     const plot = r.layers.plotable.mask;
-    // Every plotable cell is within 7.5 m of a point a 15 m disc can be centred on.
-    const core = erode(s.dem, plot, 7.5);
+    // Every plotable cell is within half the width of a point a disc that wide can be centred on.
+    const core = erode(s.dem, plot, w / 2);
     expect(count(core)).toBeGreaterThan(0);
     // Opening again changes nothing: what is left is already wide enough.
-    expect(count(openToWidth(s.dem, plot, 15))).toBe(count(plot));
+    expect(count(openToWidth(s.dem, plot, w))).toBe(count(plot));
   });
 
   it('traces outlines whose area matches the cells', async () => {

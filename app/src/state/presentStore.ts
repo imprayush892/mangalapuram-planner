@@ -10,48 +10,19 @@ import type { BuildingUse, PlanResult } from '../engine/pipeline/plan';
 import type { GenerateResponse, PipelineRequest } from '../engine/runGeneration';
 import type { OverrideSet } from '../engine/data/overrides';
 import { fetchSource } from '../engine/data/source';
-import { loadPrebuiltPlans } from '../engine/present/prebuilt';
+import { PRESENT_PLAN_OPTIONS, loadPrebuiltPlans } from '../engine/present/prebuilt';
+import type { PresentOptionId } from '../engine/present/prebuilt';
 
 /**
  * Presentation mode: the planning pipeline revealed one step at a time on the
  * 2D plan and the 3D terrain, each step adding to the last. At the plots the
- * plan forks into the four master plans; from there on any of the four can be
+ * plan forks into the six master plans; from there on any of them can be
  * shown. Every step only switches what the views already draw.
  */
 
-export type OptionId = 'A1' | 'A2' | 'B1' | 'B2';
+export type OptionId = PresentOptionId;
 
-export const PRESENT_OPTIONS: {
-  id: OptionId;
-  sizing: 'rules' | 'count';
-  roads: 'terrain' | 'north_south';
-  label: string;
-}[] = [
-  {
-    id: 'A1',
-    sizing: 'rules',
-    roads: 'terrain',
-    label: 'Plot rules · roads to the ground',
-  },
-  {
-    id: 'A2',
-    sizing: 'rules',
-    roads: 'north_south',
-    label: 'Plot rules · north–south roads',
-  },
-  {
-    id: 'B1',
-    sizing: 'count',
-    roads: 'terrain',
-    label: 'To the count · roads to the ground',
-  },
-  {
-    id: 'B2',
-    sizing: 'count',
-    roads: 'north_south',
-    label: 'To the count · north–south roads',
-  },
-];
+export const PRESENT_OPTIONS = PRESENT_PLAN_OPTIONS;
 
 export interface PresentStep {
   key: string;
@@ -69,7 +40,7 @@ export interface PresentStep {
   uses: BuildingUse[] | 'all' | 'none';
   /** Villa masses on their plots. */
   villas: boolean;
-  /** The four master plans part here. */
+  /** The six master plans part here. */
   fork?: boolean;
 }
 
@@ -176,7 +147,7 @@ export const PRESENT_STEPS: PresentStep[] = [
   {
     key: 'plots',
     num: '9',
-    title: 'Villa plots: four master plans',
+    title: 'Villa plots: six master plans',
     layers: ['waterlogging'],
     raster: 'none',
     zones: 'off',
@@ -285,9 +256,7 @@ interface PresentState {
 }
 
 function optionOf(plan: PlanResult): OptionId {
-  const count = plan.option.villaSizing === 'count';
-  const ns = plan.option.roads === 'north_south';
-  return count ? (ns ? 'B2' : 'B1') : ns ? 'A2' : 'A1';
+  return `${plan.option.villaSizing}${plan.option.roads === 'north_south' ? 2 : 1}` as OptionId;
 }
 
 /** The plan as a step shows it: only the building uses it has reached. */

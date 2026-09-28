@@ -266,3 +266,20 @@ Each of these is a switch or an editable assumption, not a silent decision.
   phase's apartment land, one above the other; the lower one crosses the zone's edge onto unzoned ground (0.32 ac
   taken); the middle site, in front of the Phase 2 villas, is dropped. Elsewhere towers are scored on the share of the
   villas' view they hide (`apartments.villa_views`).
+
+## 28 Sep 2026 — owner, on the villas
+- The earlier count options (about 1,000-1,200 sq ft plots at FSI 1) were wrong: B follows the client's cashflow exactly
+  (Outflow B9/B17, C9/C17, E9/E17): 700 villas on 35 ac, 2,000 sq ft BUA (Package 1's 60 at 1,750). Only the road
+  layout changes between B1 and B2.
+- The client's 50/30/20 villa land split is dropped: villa land is 80% plots and 20% roads, 5% either way.
+- Gross FSI on the villa land stays at the client's 0.918 (E17/D17). Each type's BUA is fixed; its plot flexes within a
+  range with the terrain, so the net FSI rises on a smaller plot and the gross holds.
+- Plot ranges: B 1,500-1,750; A 2,250-2,600 (BUA 3,000, the cap); new category C with two types, 1,750-2,000
+  (BUA 2,300) and 2,000-2,250 (BUA 2,600), placed by terrain and sales, no fixed share. C carries the client's premium
+  segment, which the earlier options did not.
+- Package 1 sits in the zoning plan's Project 1 (the zoning plan names no packages).
+- The house (owner's sketch): rear setback 1.5 m fixed; sides at least 1.5 m; the rest in front is garden; ground
+  floor 0.65 of the plot, first floor 0.5, set on the back and both sides of the ground floor so it has a balcony in
+  front; a bigger first floor grows toward the road. KMBR Table 4's front yard (3.0 m average) holds the garden's depth.
+- Where G+1 inside those yards cannot reach the BUA (true of every B plot), a partial second floor, a room on the roof,
+  takes the rest (option a); the first floor may be as big as the ground floor.

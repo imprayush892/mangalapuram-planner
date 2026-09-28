@@ -17,9 +17,9 @@
 # natural drains), and then only to hand that ground to open space.
 version: 2026-09-25
 
-# The four master-plan options (owner 25 Sep): villa sizing x road orientation.
+# The six master-plan options (owner 25 and 28 Sep): villa category x road orientation.
 options:
-  villa_sizing: rules            # rules = 2,500-3,000 + 2,000-2,500 sq ft plots; count = sized to the villa count
+  villa_sizing: A                # A, B or C: villas.categories
   road_orientation: terrain      # terrain = least cut and fill; north_south = Vastu, primary and secondary N-S
 
 zoning:
@@ -132,26 +132,54 @@ roads:
 
 plotable:
   # A plotable zone must fit the smallest plot: nothing narrower than this survives.
-  min_width_m: 15                          # = villas.min_plot_side_m
-  min_area_m2: 251                         # = the smallest villa plot (2,700 sq ft)
+  min_width_m: 9.6                         # the smallest plot's short side: 1,500 sq ft (category B) at villas.house.shape_depth_per_width
+  min_area_m2: 139                         # = the smallest villa plot (1,500 sq ft, category B)
 
-villas:                                    # replaces client_rules villa_plots sizing (18 m side, 45% footprint, 20/30/50 plot sizing)
-  built_area_sft: {min: 2500, max: 3000}   # main type (owner 25 Sep: 2,500-3,000); never over 3,000 sq ft
-  # Owner 25 Sep: where the main type will not fit, a smaller plot rather than wasted land.
-  # With the 15 m minimum side the smallest plot is 15 x 15 m = 2,422 sq ft.
-  compact_built_area_sft: {min: 2000, max: 2500}
-  # Sizing by count (owner 25 Sep): 700 villas on 35 ac in the programme = 20 an acre of villa
-  # zone, taken on the zones' own area (labels, 23.91 ac); the plot is whatever fits that many.
+# Owner 28 Sep: the villas, re-based on the client's cashflow (Outflow C9/C17, E9/E17). Replaces the
+# client's 50/30/20 land split and the 25 Sep plot rules (2,500-3,000 + 2,000-2,500 sq ft, FSI 1.0).
+villas:
+  # Villa land is 80% plots and 20% roads, with 5% leeway either way; the open space comes from the
+  # water and the slope, not from the villa land. Reported against each plan, not forced.
+  land_split: {plots: 0.80, roads: 0.20, tolerance: 0.05}
+  # Gross FSI on the villa land held at the client's: E17 / D17 = 1,280,000 / 1,393,981 sq ft.
+  gross_fsi: 0.918
+  # 700 villas on 35 ac in the cashflow (Outflow B9 + B17, C9 + C17) = 20 an acre of villa land.
   count_basis: {programme_units: 700, programme_land_ac: 35}
-  count_sizing: {max_aspect: 2.5, max_depth_m: 18, min_width_m: 6, min_area_m2: 80, max_area_m2: 280, steps: 7}
-  design_built_area_sft: 2850              # ASSUMPTION: the plots are cut at the middle of the range
+  # Three ways to size the villas, each with two road layouts (options A1-C2). A type has a plot
+  # range the terrain may use and a BUA that stays fixed whatever the plot within the range, so a
+  # smaller plot has a higher net FSI and the gross stays the same. BUA = 1.15 x the range's top.
+  categories:
+    A:   # as many villas as the gross FSI allows at the BUA cap (owner: never over 3,000 sq ft)
+      types: [{name: standard, plot_sft: [2250, 2600], bua_sft: 3000}]
+    B:   # exactly the client's: 700 villas at 20 an acre; only the road layout changes
+      count: true
+      types: [{name: standard, plot_sft: [1500, 1750], bua_sft: 2000}]
+      # Package 1's 60 villas at 1,750 sq ft (Outflow B9, E9), read as the zoning plan's Project 1.
+      package_1: {zone: "PROJECT - 1", units: 60, bua_sft: 1750}
+    C:   # two types, placed plot by plot on terrain and sales, no fixed share (owner 28 Sep)
+      types:
+        - {name: standard, plot_sft: [1750, 2000], bua_sft: 2300}
+        - {name: premium, plot_sft: [2000, 2250], bua_sft: 2600}
+      # ASSUMPTION: premium in the client's premium zone, or where at least half the ground within
+      # 250 m lies 5 m or more below the plot (an open outlook).
+      premium_when: {zones: ["PREMIUM"], outlook_min: 0.5}
+  # Plots are cut at one point in their type's range, searched from the largest down until the
+  # category's target (count or gross FSI) is met.
+  sizing_steps: 6
+  # Owner 28 Sep sketch: the house on its plot.
+  house:
+    ground_coverage_max: 0.65              # owner: ground floor 0.65 of the plot (= KMBR Table 6 A1 coverage)
+    first_floor_share: 0.50                # owner's target; a bigger first floor grows toward the road
+    rear_m: 1.5                            # owner: fixed
+    side_min_m: 1.5                        # owner: at least; wider is fine
+    # The rest of the plot, in front, is garden: at least KMBR Table 4's front yard for the row below.
+    front_yard_row: A1_A2_any__F_upto200
+    # ASSUMPTION: the plot shape with the most ground floor inside those yards:
+    # depth / width = (front 3.0 + rear 1.5) / (2 x side 1.5).
+    shape_depth_per_width: 1.5
+    # Owner 28 Sep (option a): what G+1 cannot hold goes into a room on the roof, set to the back.
+    roof_room: true
   floor_height_m: 3.0                      # ASSUMPTION, as assumptions.yaml floor_to_floor_m.apartments
-  fsi: 1.0                                 # built area = plot area
-  floors: 2                                # G+1
-  ground_floor_share_of_plot: 0.60         # footprint = the plot's own shape scaled to 60% of its area
-  first_floor_share_of_plot: 0.40          # 0.60 + 0.40 = FSI 1.0
-  plot_aspect_ratio: {min: 1.0, max: 2.5}
-  min_plot_side_m: 15                      # applies to the plot, not the villa
 
 senior_living:                             # replaces client "senior = villa-style plots"
   min_floors: 4                            # G+3 minimum

@@ -231,7 +231,8 @@ function buildPlanMasses(plan: PlanResult, withVillas = true): THREE.Group {
   for (const p of withVillas ? plan.plots : []) {
     if (!Number.isFinite(p.baseRl)) continue;
     villas.add(extrude(p.groundFloor, p.baseRl, p.floorHeightM, PLAN_COLOURS.villas, `${p.id} ground floor`));
-    villas.add(extrude(p.upperFloor, p.baseRl + p.floorHeightM, p.floorHeightM, PLAN_COLOURS.villas, `${p.id} first floor`));
+    if (p.upperFloorM2 > 0.5) villas.add(extrude(p.upperFloor, p.baseRl + p.floorHeightM, p.floorHeightM, PLAN_COLOURS.villas, `${p.id} first floor`));
+    if (p.roofRoom) villas.add(extrude(p.roofRoom, p.baseRl + 2 * p.floorHeightM, p.floorHeightM, PLAN_COLOURS.villas, `${p.id} roof room`));
   }
   group.add(villas);
   const others = new THREE.Group();

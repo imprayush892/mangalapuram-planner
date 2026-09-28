@@ -64,22 +64,21 @@ describe('step 8 roads', () => {
 });
 
 describe('steps 9-11 villa plots', () => {
-  it('cuts plots of 2,500-3,000 sq ft, compact ones of 2,000-2,500 where those will not fit; no side under 15 m, aspect 1:1 to 1:2.5', async () => {
+  it("cuts category A plots of 2,250-2,600 sq ft (owner 28 Sep), no more than the gross FSI's count, aspect 1:1 to 1:2.5", async () => {
     const { p } = await plan();
+    expect(p.option.villaSizing).toBe('A');
     expect(p.plots.length).toBeGreaterThan(150);
+    expect(p.plots.length).toBeLessThanOrEqual(p.option.villaTarget);
     for (const pl of p.plots) {
-      expect(pl.areaM2).toBeGreaterThanOrEqual(sftToM2(2000) - 0.5);
-      expect(pl.areaM2).toBeLessThanOrEqual(sftToM2(3000) + 0.5);
-      if (pl.kind === 'standard') expect(pl.areaM2).toBeGreaterThanOrEqual(sftToM2(2500) - 0.5);
-      else expect(pl.areaM2).toBeLessThanOrEqual(sftToM2(2500) + 0.5);
+      expect(pl.areaM2).toBeGreaterThanOrEqual(sftToM2(2250) - 0.5);
+      expect(pl.areaM2).toBeLessThanOrEqual(sftToM2(2600) + 0.5);
       const a = side(pl.ring, 0);
       const b = side(pl.ring, 1);
-      expect(Math.min(a, b)).toBeGreaterThanOrEqual(15 - 1e-6);
       expect(Math.max(a, b) / Math.min(a, b)).toBeLessThanOrEqual(2.5);
     }
   });
 
-  it('builds G+1 on 60% of the plot and 40% above it: FSI 1.0', async () => {
+  it('builds each villa to the owner sketch: rear 1.5 m, sides 1.5 m, the KMBR front yard, ground floor at most 65%, first floor no bigger, the rest on the roof', async () => {
     const { p } = await plan();
     const area = (r: readonly (readonly [number, number])[]): number => {
       let s2 = 0;
@@ -87,10 +86,17 @@ describe('steps 9-11 villa plots', () => {
       return Math.abs(s2) / 2;
     };
     for (const pl of p.plots) {
-      expect(area(pl.groundFloor) / pl.areaM2).toBeCloseTo(0.6, 3);
-      expect(area(pl.upperFloor) / pl.areaM2).toBeCloseTo(0.4, 3);
-      expect(pl.fsi).toBeCloseTo(1, 9);
-      expect(pl.builtUpM2).toBeCloseTo(pl.areaM2, 6);
+      expect(area(pl.groundFloor)).toBeCloseTo(pl.groundFloorM2, 3);
+      expect(pl.groundFloorM2 / pl.areaM2).toBeLessThanOrEqual(0.65 + 1e-9);
+      expect(pl.upperFloorM2).toBeLessThanOrEqual(pl.groundFloorM2 + 1e-6);
+      expect(pl.roofRoomM2).toBeLessThanOrEqual(pl.groundFloorM2 + 1e-6);
+      expect(pl.frontGardenM).toBeGreaterThanOrEqual(3.0 - 1e-6);
+      expect(pl.builtUpM2).toBeCloseTo(pl.groundFloorM2 + pl.upperFloorM2 + pl.roofRoomM2, 6);
+      // A: 3,000 sq ft, reached on every plot the yards allow
+      expect(pl.targetBuiltUpM2).toBeCloseTo(sftToM2(3000), 6);
+      expect(pl.builtUpM2).toBeLessThanOrEqual(pl.targetBuiltUpM2 + 1e-6);
+      // the ground floor keeps 1.5 m to both sides of the plot
+      expect(side(pl.groundFloor, 0)).toBeCloseTo(pl.widthM - 3, 6);
     }
   });
 
@@ -285,7 +291,7 @@ describe('the plan crosses to the page from the worker', () => {
 });
 
 describe('step 15-16 massing', () => {
-  it('puts every villa (two storeys), building and podium into the 3D scene the GLB exports', async () => {
+  it('puts every villa (ground, first floor, roof room where it has one), building and podium into the 3D scene the GLB exports', async () => {
     const { p, s } = await plan();
     const { buildMassingScene } = await import('../export/glb');
     const scene = buildMassingScene({ dem: s.dem, layouts: [], parcel: s.parcel, terrainStep: 8, plan: p });
@@ -293,8 +299,10 @@ describe('step 15-16 massing', () => {
     expect(group).toBeDefined();
     const villas = group!.getObjectByName('Villas')!;
     const others = group!.getObjectByName('Buildings')!;
-    const finite = p.plots.filter((x) => Number.isFinite(x.baseRl)).length;
-    expect(villas.children.length).toBe(finite * 2);
+    const levels = p.plots
+      .filter((x) => Number.isFinite(x.baseRl))
+      .reduce((t, x) => t + 1 + (x.upperFloorM2 > 0.5 ? 1 : 0) + (x.roofRoom ? 1 : 0), 0);
+    expect(villas.children.length).toBe(levels);
     const podiums = p.buildings.filter((b) => b.podium).length;
     expect(others.children.length).toBe(p.buildings.length + podiums);
   });

@@ -192,12 +192,12 @@ export function runPipeline(overrides: PipelineRequest['overrides']): void {
   const full: PipelineRequest = { job: 'pipeline', id, baseUrl: dataBaseUrl(), overrides };
   setPlanStatus({ running: true, message: 'starting…', error: null });
 
-  // The rules as written, one of the four master plans: a hosted copy ships it ready-made.
+  // The rules as written, one of the six master plans: a hosted copy ships it ready-made.
   const onlyOptions = Object.entries(overrides).every(([doc, o]) =>
     Object.keys(o ?? {}).every((k) => doc === 'planning' && k.startsWith('options.')),
   );
   if (onlyOptions) {
-    const sizing = (overrides.planning?.['options.villa_sizing'] as string | undefined) ?? 'rules';
+    const sizing = (overrides.planning?.['options.villa_sizing'] as string | undefined) ?? 'A';
     const roads = (overrides.planning?.['options.road_orientation'] as string | undefined) ?? 'terrain';
     const opt = PRESENT_PLAN_OPTIONS.find((o) => o.sizing === sizing && o.roads === roads)?.id;
     prebuilt ??= loadPrebuiltPlans(fetchSource(dataBaseUrl()));
