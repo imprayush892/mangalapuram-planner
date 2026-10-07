@@ -387,3 +387,21 @@ Each of these is a switch or an editable assumption, not a silent decision.
   line) off the villa plots. One drive serves a campus (school, hospital, clubhouse, senior enclave), to its nearest
   wing; each apartment tower keeps its own. A building's wings stand on one piece of land, no road between them.
 - D1 and D2: no two buildings or plots overlap and no road crosses a plot or a building (tested).
+
+## 7 Oct 2026 · the model's 8.3 ac of open space placed: kept parks and a green chain in the villas
+
+- The model gives open space as an area only (Inputs C38: 10% of the gross, the UDCPR minimum, + 1 ac = 8.3 ac).
+  It is now designated in the zoning as `park` zones (tools/zoning/draft_model.py), counted on dry land; ponds and
+  the ground the 300 mm storm floods stay open too but are not counted. KMBR Rule 31(v)-(vi): 10% of the layout,
+  reached like a plot, no piece under 200 m2 or 6 m wide (the kept parks front the site's roads; the streets run
+  through the pockets). The Rule asks for one piece "as far as possible"; here it is eight, by the owner's design.
+- Owner: the open space south of Phase 4 becomes villa land (with the strip south of Phase 2), and the same area
+  comes out of the villa land as green pockets, a chain from the west lake through the villas to the south pond.
+  Kept: north pond 2.21 ac, gate west wing 0.79, north-west corner 0.77, south-east corner 0.60. Pockets (drawn
+  14% larger for the villa streets through them): by the west lake 0.55, Phase 3's Rule 22 slope 0.30, Phase 4
+  1.86, to the south pond 1.86. Open space net of roads: 8.27 ac (D1), 8.28 ac (D2). Villa land stays 19.94 ac
+  (Phase 3 gives its 0.30 ac slope; Phase 4 takes it).
+- Pockets are squared to north (both options' streets run N-S or E-W); plots the 2 m grid lets reach into a pocket
+  are trimmed off its exact edge (or taken out where they cannot be).
+- Cost: the pockets take flat villa land, the land gained is the south hillside: D1 284 villas (was 290), D2 279
+  (was 289); plots 79.3% / 78.6% of the villa land.

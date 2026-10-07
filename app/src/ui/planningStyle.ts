@@ -50,6 +50,7 @@ export const TYPOLOGY_RGB: Record<import('../engine/pipeline/plan').Typology, [n
   reserved: [200, 200, 200],
   future: [226, 221, 208],
   open: [150, 160, 165],
+  park: [60, 160, 75],
 };
 
 export const TYPOLOGY_LABEL: Record<import('../engine/pipeline/plan').Typology, string> = {
@@ -67,6 +68,7 @@ export const TYPOLOGY_LABEL: Record<import('../engine/pipeline/plan').Typology, 
   reserved: 'Reserved (hospital)',
   future: 'To be decided with client',
   open: 'Open space',
+  park: 'Park (designated open space)',
 };
 
 export const TIER_RGB: Record<import('../engine/pipeline/plan').RoadTier, [number, number, number]> = {

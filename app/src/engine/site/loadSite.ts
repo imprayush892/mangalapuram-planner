@@ -71,6 +71,7 @@ interface ZoneProps {
   use?: string;
   phase?: number;
   component?: string;
+  within?: string;
   label_area_ac: number;
   drawn_area_ac: number;
   in_scope_ac: number;
@@ -171,6 +172,7 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
       computedInScopeAc: m2ToAcres(multiPolyArea(geom)),
       confidence: f.properties.geometry_confidence,
       ...(f.properties.use ? { use: f.properties.use, phase: f.properties.phase, component: f.properties.component } : {}),
+      ...(f.properties.within ? { within: f.properties.within } : {}),
     };
   };
   const zones: Zone[] = zonesFc.features.map(toZone);

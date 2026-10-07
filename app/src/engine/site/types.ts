@@ -36,6 +36,8 @@ export interface Zone {
   use?: string;
   phase?: number;
   component?: string;
+  /** An open-space zone that sits inside another use's land (a green pocket in the villas): its streets run on through it. */
+  within?: string;
 }
 
 export interface SiteFeature {

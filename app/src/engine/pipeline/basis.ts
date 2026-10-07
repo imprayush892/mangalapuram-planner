@@ -32,6 +32,6 @@ export function planBasis(site: SiteModel, config: ConfigBundle): Pick<PlanInput
   return {
     planning,
     programme: config.programmeDraft,
-    zones: site.draftZones.map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc, use: z.use, phase: z.phase, component: z.component })),
+    zones: site.draftZones.map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc, use: z.use, phase: z.phase, component: z.component, within: z.within })),
   };
 }

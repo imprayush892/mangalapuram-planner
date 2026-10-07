@@ -38,13 +38,39 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     const [s, c] = await Promise.all([site(), config()]);
     const lines = pick<Line[]>(c.programmeDraft, 'lines', []);
     const zoned = lines.filter((l) => (l.land_ac ?? 0) > 0);
-    expect(s.draftZones.length).toBe(zoned.length);
+    expect(s.draftZones.filter((z) => z.use !== 'park').length).toBe(zoned.length);
     for (const l of zoned) {
       const z = s.draftZones.find((q) => q.component === l.id);
       expect(z, l.id).toBeDefined();
       expect(z!.use === l.use || (z!.use === 'clubhouse' && l.use === 'club'), `${l.id} use`).toBe(true);
-      expect(Math.abs(z!.computedInScopeAc - l.land_ac!), `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeLessThan(0.06);
+      // Owner 7 Oct: the villa phases trade land with the green pockets (Phase 3's Rule 22 slope to Phase 4).
+      const tol = l.use === 'villas' ? 0.35 : 0.06;
+      expect(Math.abs(z!.computedInScopeAc - l.land_ac!), `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeLessThan(tol);
     }
+    const villaModel = zoned.filter((l) => l.use === 'villas').reduce((a, l) => a + l.land_ac!, 0);
+    const villaDrawn = s.draftZones.filter((z) => z.use === 'villas').reduce((a, z) => a + z.computedInScopeAc, 0);
+    expect(Math.abs(villaDrawn - villaModel), `villa land ${villaDrawn.toFixed(2)} ac`).toBeLessThan(0.06);
+  });
+
+  it('designates the model open space, each piece usable and reached (KMBR Rule 31(v)-(vi))', async () => {
+    const [s, c, p] = await Promise.all([site(), config(), plan()]);
+    const model = pick<number>(c.programmeDraft, 'scope.open_space_ac', 8.3);
+    const rule = pick<{ min_area_m2: number; min_width_m: number }>(c.kmbr, 'rule31_subdivision.recreation', { min_area_m2: 200, min_width_m: 6 });
+    const open = s.draftZones.filter((z) => z.use === 'park');
+    const roads = p.roads.flatMap((r) => r.geom);
+    let net = 0;
+    for (const z of open) {
+      const a = multiPolyArea(z.geom);
+      expect(a, z.name).toBeGreaterThanOrEqual(rule.min_area_m2);
+      // The villa streets run on through a green pocket (a fifth of it at most); other open space keeps its land.
+      const under = multiPolyArea(intersect(z.geom, roads));
+      expect(under / a, `${z.name} under roads`).toBeLessThan(z.within ? 0.25 : 0.1);
+      net += (a - under) / 4046.8564224;
+    }
+    // The model's open space, net of the roads that cross it (within a fifth of an acre).
+    expect(Math.abs(net - model), `open space net of roads ${net.toFixed(2)} ac`).toBeLessThan(0.2);
+    // No plot in the open space (a few square metres at an edge: the zones are read on the 2 m grid).
+    for (const q of p.plots) for (const z of open) expect(multiPolyArea(intersect([[q.ring as [number, number][]]], z.geom)), `${q.id} in ${z.name}`).toBeLessThan(5);
   });
 
   it('places the hospital, the school stages, the clubhouses, retail, office, senior living and apartments in full', async () => {
@@ -98,8 +124,9 @@ describe('the draft model basis (owner, 7 Oct)', () => {
         });
       const sftArea = q.areaM2 * 10.7639;
       if (square) {
+        // A rectangle at its type's size, widened or deepened; or a row-end plot that came out square (0.84 up).
         rects += 1;
-        expect(sftArea / t.plot_sft, `${q.id} ${q.kind}`).toBeGreaterThan(0.98);
+        expect(sftArea / t.plot_sft, `${q.id} ${q.kind}`).toBeGreaterThan(0.84);
         expect(sftArea / t.plot_sft, `${q.id} ${q.kind}`).toBeLessThan(grow + 0.01);
       } else {
         expect(sftArea, `${q.id} ${q.kind}`).toBeGreaterThan(0.84 * sftMin);

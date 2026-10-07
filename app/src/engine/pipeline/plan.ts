@@ -5,7 +5,7 @@ import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
 import { bufferPolyline, roadFromEdge, roadStrip } from '../geom/offset';
 import { difference, intersect as intersectPolys, union } from '../geom/boolean';
-import { pointInMulti } from '../geom/planar';
+import { multiPolyArea, pointInMulti } from '../geom/planar';
 import { coverageFsi, highRise, gapBetweenBuildingsM } from '../rules/kmbr';
 import type { Occupancy } from '../rules/kmbr';
 import { sftToM2, M2_PER_ACRE } from '../units';
@@ -56,7 +56,9 @@ export type Typology =
   | 'batching'
   | 'reserved'
   | 'future'
-  | 'open';
+  | 'open'
+  /** Designated recreational open space (draft model: the model's 8.3 ac, KMBR Rule 31(v)): parks and green pockets. */
+  | 'park';
 export type BuildingUse = 'school' | 'clubhouse' | 'senior' | 'apartments' | 'commercial' | 'retail' | 'office' | 'hospital' | 'batching';
 
 export interface PlanRoad {
@@ -255,7 +257,7 @@ export interface PlanInput {
    * The zoning, clipped to the parcel: the client's plan, or the draft model's zones, which carry
    * their use, phase and programme component (programme line id).
    */
-  zones: { name: string; geom: MultiPoly; labelAc?: number; use?: string; phase?: number; component?: string }[];
+  zones: { name: string; geom: MultiPoly; labelAc?: number; use?: string; phase?: number; component?: string; within?: string }[];
   kmbr: YamlDoc;
   client: YamlDoc;
   assumptions: YamlDoc;
@@ -1168,7 +1170,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const minPiece = num(planning, 'roads.primary_serves_pieces_over_m2');
   let unreached = 0;
   const zoneOrder = zones
-    .filter((z) => z.use !== 'reserved' && z.use !== 'future' && z.use !== 'open' && z.cells.length > 0)
+    .filter((z) => z.use !== 'reserved' && z.use !== 'future' && z.use !== 'open' && z.use !== 'park' && z.cells.length > 0)
     .sort((a, b) => b.areaM2 - a.areaM2);
   for (const z of zoneOrder) {
     const pieces = patches(dem, zoneLand(z))
@@ -1458,11 +1460,16 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   }
   // MIX (owner 7 Oct: 85% of the villa land in plots): one street grid runs across villa zones that touch, so
   // no strip is lost where one phase meets the next; each plot still belongs to the zone it stands in.
-  const gridAreas: { z: ZoneInfo; land: Mask }[] = isMix ? [{ z: villaZones[0]!, land: villaLand }] : villaZones.map((z) => ({ z, land: zoneLand(z) }));
+  // Green pockets in the villa land (owner 7 Oct, open space): the street grid runs on through them, so the
+  // streets stay continuous and each pocket fronts a street (KMBR Rule 31(vi): access as if it were a plot); no plot
+  // is laid there. (The zoning sizes the pockets for the streets that cross them.)
+  let gridLand = villaLand;
+  for (const [zi, z] of zones.entries()) if (input.zones[zi]?.within === 'villas') gridLand = or(gridLand, zoneLand(z));
+  const gridAreas: { z: ZoneInfo; land: Mask }[] = isMix ? [{ z: villaZones[0]!, land: gridLand }] : villaZones.map((z) => ({ z, land: zoneLand(z) }));
   for (const { z: z0, land } of villaZones.length > 0 ? gridAreas : []) {
     for (const piece of patches(dem, land)) {
       if (piece.length * cellArea < minBlock) continue;
-      const z = isMix ? (villaZones.find((q) => q.mask[piece[Math.floor(piece.length / 2)]!]) ?? z0) : z0;
+      const z = isMix ? (villaZones.find((q) => piece.some((k) => q.mask[k])) ?? z0) : z0;
       const pm = emptyMask(dem);
       for (const k of piece) pm[k] = 1;
       let f = frameFor(dem, piece);
@@ -1769,6 +1776,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     return true;
   };
   const plotLand = isMix ? or(villaLand, and(minus(network, L.existingRoads.mask), villaZoneMask)) : or(villaLand, and(network, villaZoneMask));
+  // (Open space is read on the 2 m grid here; the plots are trimmed off its exact outline once laid.)
   const landOk = (smp: readonly { p: Pt }[]): boolean => {
     for (const q of smp) {
       const cc = dem.cellAt(q.p);
@@ -2921,6 +2929,11 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     }
     // The drive stops short of the wall: its centreline half its width and a metre off.
     const line = lineOf(r.path);
+    if (line.length < 2) {
+      // The network already touches the building's edge: no drive to lay.
+      if (grp) reachedGroup.add(grp);
+      continue;
+    }
     const distToWings = (q: Pt): number => Math.min(...wings.map((w) => distToRing(q, w)));
     while (line.length > 2 && distToWings(line[line.length - 1]!) < driveOff) line.pop();
     const last = line[line.length - 1]!;
@@ -3089,43 +3102,43 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   // land): each pocket of villa land no plot or road took joins the plot beside it that shares the longest edge
   // with it, where the two make one convex plot of at most five sides within the growth limit. Pockets on
   // waterlogged ground or a natural drain stay open.
+  // A closed ring without its repeated end, and without the points that sit on a straight run (within tol).
+  const closedSimplify = (r: Ring, tol: number): Ring => {
+    let pts: Pt[] = [...r];
+    if (pts.length > 1 && Math.hypot(pts[0]![0] - pts[pts.length - 1]![0], pts[0]![1] - pts[pts.length - 1]![1]) < 1e-9) pts.pop();
+    for (let changed = true; changed && pts.length > 3; ) {
+      changed = false;
+      for (let q = 0; q < pts.length && pts.length > 3; q += 1) {
+        const A = pts[(q + pts.length - 1) % pts.length]!;
+        const B = pts[q]!;
+        const C = pts[(q + 1) % pts.length]!;
+        const len = Math.hypot(C[0] - A[0], C[1] - A[1]);
+        const off = len < 1e-9 ? 0 : Math.abs((B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0])) / len;
+        if (off < tol || Math.hypot(B[0] - A[0], B[1] - A[1]) < 0.05) {
+          pts = pts.filter((_, k) => k !== q);
+          changed = true;
+        }
+      }
+    }
+    return pts as Ring;
+  };
+  const convexRing = (r: readonly Pt[]): boolean => {
+    let sgn = 0;
+    for (let q = 0; q < r.length; q += 1) {
+      const A = r[q]!;
+      const B = r[(q + 1) % r.length]!;
+      const C = r[(q + 2) % r.length]!;
+      if (Math.hypot(B[0] - A[0], B[1] - A[1]) < 1) return false;
+      const z = (B[0] - A[0]) * (C[1] - B[1]) - (B[1] - A[1]) * (C[0] - B[0]);
+      if (Math.abs(z) < 1e-6) continue;
+      if (sgn === 0) sgn = Math.sign(z);
+      else if (Math.sign(z) !== sgn) return false;
+    }
+    return true;
+  };
   if (isMix && keptDrafts.length > 0) {
     let joined = 0;
     const capOf = (q: DraftPlot): number => mixGrow * sftToM2(ruleOf(q.kind).plot_sft[0]);
-    // A closed ring without its repeated end, and without the points that sit on a straight run (within tol).
-    const closedSimplify = (r: Ring, tol: number): Ring => {
-      let pts: Pt[] = [...r];
-      if (pts.length > 1 && Math.hypot(pts[0]![0] - pts[pts.length - 1]![0], pts[0]![1] - pts[pts.length - 1]![1]) < 1e-9) pts.pop();
-      for (let changed = true; changed && pts.length > 3; ) {
-        changed = false;
-        for (let q = 0; q < pts.length && pts.length > 3; q += 1) {
-          const A = pts[(q + pts.length - 1) % pts.length]!;
-          const B = pts[q]!;
-          const C = pts[(q + 1) % pts.length]!;
-          const len = Math.hypot(C[0] - A[0], C[1] - A[1]);
-          const off = len < 1e-9 ? 0 : Math.abs((B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0])) / len;
-          if (off < tol || Math.hypot(B[0] - A[0], B[1] - A[1]) < 0.05) {
-            pts = pts.filter((_, k) => k !== q);
-            changed = true;
-          }
-        }
-      }
-      return pts as Ring;
-    };
-    const convexRing = (r: readonly Pt[]): boolean => {
-      let sgn = 0;
-      for (let q = 0; q < r.length; q += 1) {
-        const A = r[q]!;
-        const B = r[(q + 1) % r.length]!;
-        const C = r[(q + 2) % r.length]!;
-        if (Math.hypot(B[0] - A[0], B[1] - A[1]) < 1) return false;
-        const z = (B[0] - A[0]) * (C[1] - B[1]) - (B[1] - A[1]) * (C[0] - B[0]);
-        if (Math.abs(z) < 1e-6) continue;
-        if (sgn === 0) sgn = Math.sign(z);
-        else if (Math.sign(z) !== sgn) return false;
-      }
-      return true;
-    };
     const keepOut = or(L.waterlogging.mask, L.drains.mask);
     const roadPolys: MultiPoly = [];
     for (const r of roads) if (r.kept) roadPolys.push(...r.geom);
@@ -3193,6 +3206,56 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       }
     }
     if (joined > 0) notes.push(`${joined} pockets of villa land join the plot beside them (each still one plot of four or five sides, owner 7 Oct)`);
+  }
+
+  // Open space (owner 7 Oct) on its exact outline: a plot the 2 m grid let reach into a green pocket is trimmed
+  // off it: a rectangle loses depth from the back or width from a side, any other plot is cut along the pocket's
+  // edge if it stays one convex plot of four or five sides; a plot that cannot be trimmed goes.
+  if (isMix) {
+    const opens = zones.map((z, i) => (z.use === 'park' ? input.zones[i]!.geom : null)).filter((g): g is MultiPoly => g !== null);
+    const into = (r: Ring): number => opens.reduce((t, g) => t + multiPolyArea(intersectPolys([[r]], g)), 0);
+    let trimmed = 0;
+    const gone = new Set<DraftPlot>();
+    for (const q of keptDrafts) {
+      if (into(q.ring) < 0.05) continue;
+      let ok = false;
+      const minA = 0.84 * sftToM2(ruleOf(q.kind).plot_sft[0]);
+      if (q.area === undefined) {
+        for (let cut = 0.25; cut <= 4 && !ok; cut += 0.25) {
+          for (const [a0, w, d] of [
+            [q.a0, q.w, q.d - cut],
+            [q.a0 + cut, q.w - cut, q.d],
+            [q.a0, q.w - cut, q.d],
+          ] as [number, number, number][]) {
+            if (w * d < minA || w < 6) continue;
+            const r = rectRing(q.f, a0, a0 + w, q.b0, q.b0 + d);
+            if (into(r) < 0.05) {
+              Object.assign(q, { a0, w, d, ring: r });
+              ok = true;
+              break;
+            }
+          }
+        }
+      } else {
+        const cutR = difference([[q.ring]], ...opens);
+        if (cutR.length === 1 && cutR[0]!.length === 1) {
+          const r = closedSimplify(cutR[0]![0]!, 0.15);
+          if (r.length >= 4 && r.length <= 5 && convexRing(r) && ringArea(r) >= minA) {
+            q.ring = r;
+            q.area = ringArea(r);
+            ok = true;
+          }
+        }
+      }
+      if (ok) trimmed += 1;
+      else gone.add(q);
+    }
+    if (gone.size > 0) {
+      const keep = keptDrafts.filter((q) => !gone.has(q));
+      keptDrafts.length = 0;
+      keptDrafts.push(...keep);
+    }
+    if (trimmed + gone.size > 0) notes.push(`${trimmed} plots trimmed off the green pockets' edges${gone.size > 0 ? `, ${gone.size} taken out` : ''} (open space, owner 7 Oct)`);
   }
 
   /* ------------------------------------------------------------ golf */
@@ -3523,7 +3586,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   /* --------------------------------------------- FSI per zone parcel */
   const parcels: PlanParcel[] = [];
   for (const z of zones) {
-    if (z.cells.length === 0 || z.use === 'open' || z.use === 'reserved' || z.use === 'future') continue;
+    if (z.cells.length === 0 || z.use === 'open' || z.use === 'park' || z.use === 'reserved' || z.use === 'future') continue;
     const ids = new Set(blocks.filter((b) => b.zone === z.name).map((b) => b.id));
     if (z.use === 'villas') {
       const ps = plots.filter((p) => p.zone === z.name);
@@ -3561,7 +3624,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     } else if (z.use === 'villas') {
       const std = ps.filter((p) => p.kind === 'standard').length;
       holds = `${ps.length} villa plots (${std} standard, ${ps.length - std} compact)`;
-    } else if (z.use === 'reserved') holds = 'reserved (hospital, deferred)';
+    } else if (z.use === 'park' || z.use === 'open') holds = 'open space: recreational, nothing built (KMBR Rule 31(v))';
+    else if (z.use === 'reserved') holds = 'reserved (hospital, deferred)';
     else if (z.use === 'future') holds = 'future phase, not planned now';
     else if (z.use === 'clubhouse') holds = `${bs.length} clubhouse wings; golf ${ac(inZ(golf))} in the zone`;
     else if (bs.length === 0) holds = z.cells.length === 0 ? 'outside the parcel' : 'nothing placed';
