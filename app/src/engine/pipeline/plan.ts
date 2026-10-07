@@ -200,6 +200,8 @@ export interface ZoneReport {
   steepM2: number;
   drainM2: number;
   roadsM2: number;
+  /** A park (designated open space): its land net of the roads drawn across it, on the exact outlines. */
+  openNetM2?: number;
   /** What was built there, in words. */
   holds: string;
 }
@@ -3609,6 +3611,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
 
   /* ------------------------------------------------- zone reports */
   const newRoadMask = minus(network, L.existingRoads.mask);
+  const roadPolysAll: MultiPoly = roads.filter((r) => r.kept).flatMap((r) => r.geom);
   const zoneReports: ZoneReport[] = zones.filter((z) => z.cells.length > 0).map((z) => {
     const inZ = (m: Mask): number => {
       let s = 0;
@@ -3644,6 +3647,12 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       steepM2: inZ(minus(L.nonBuildable.mask, L.waterlogging.mask)),
       drainM2: inZ(minus(L.drains.mask, L.waterlogging.mask, L.nonBuildable.mask)),
       roadsM2: inZ(newRoadMask),
+      ...(z.use === 'park'
+        ? (() => {
+            const g = input.zones[zones.indexOf(z)]!.geom;
+            return { openNetM2: multiPolyArea(g) - multiPolyArea(intersectPolys(g, roadPolysAll)) };
+          })()
+        : {}),
       holds,
     };
   });

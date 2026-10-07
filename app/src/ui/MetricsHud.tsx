@@ -112,7 +112,8 @@ export default function MetricsHud(): React.ReactElement {
     : 0;
   const otherUnits = pipeline ? pipeline.buildings.filter((b) => b.typology !== 'apartments').reduce((s, b) => s + b.units, 0) : 0;
   const landByUse = pipeline
-    ? [...pipeline.zones.reduce((m, z) => m.set(z.use, (m.get(z.use) ?? 0) + z.areaM2), new Map<string, number>())]
+    ? // Parks net of the streets that run through the green pockets: the model's open space is net land.
+      [...pipeline.zones.reduce((m, z) => m.set(z.use, (m.get(z.use) ?? 0) + (z.use === 'park' ? (z.openNetM2 ?? z.areaM2) : z.areaM2)), new Map<string, number>())]
         .map(([use, m2]) => ({ use, ac: m2 / 4046.8564224 }))
         .sort((a, b) => b.ac - a.ac)
     : [];
