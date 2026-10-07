@@ -74,6 +74,14 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     for (const q of p.plots) {
       const t = types.find((x) => x.name === q.kind)!;
       expect(q.ring.length, q.id).toBe(4);
+      // A true four-sided plot: every side at least 1 m, every corner turning the same way.
+      const turns = q.ring.map((v, i) => {
+        const b = q.ring[(i + 1) % 4]!;
+        const cc = q.ring[(i + 2) % 4]!;
+        expect(Math.hypot(b[0] - v[0], b[1] - v[1]), q.id).toBeGreaterThan(0.99);
+        return Math.sign((b[0] - v[0]) * (cc[1] - b[1]) - (b[1] - v[1]) * (cc[0] - b[0]));
+      });
+      expect(new Set(turns.filter((s) => s !== 0)).size, q.id).toBe(1);
       const square = q.ring.every((v, i) => {
         const a = q.ring[(i + 3) % 4]!;
         const b = q.ring[(i + 1) % 4]!;

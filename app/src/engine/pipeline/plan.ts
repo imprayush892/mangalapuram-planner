@@ -1506,7 +1506,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             v: [-Math.sin(t) * fr.u[0] + Math.cos(t) * fr.v[0], -Math.sin(t) * fr.u[1] + Math.cos(t) * fr.v[1]],
           };
         };
-        const turns = roadMode === 'north_south' ? [] : [-30, -20, -10, 10, 20, 30];
+        // Every degree, so a grid can square up to a straight zone edge (owner 7 Oct: 85% plots).
+        const turns = roadMode === 'north_south' ? [] : Array.from({ length: 61 }, (_, i) => i - 30).filter((d) => d !== 0);
         const base = f;
         let bestN = countFor(base);
         for (const d of turns) {
@@ -1519,7 +1520,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         }
         if (roadMode === 'north_south') {
           // Vastu: north-south (or east-west) within the tolerance; among those, the most plots.
-          for (let t = -nsTol; t <= nsTol + 1e-9; t += nsTol / 2) {
+          for (let t = -nsTol; t <= nsTol + 1e-9; t += 1) {
             const th = (t * Math.PI) / 180;
             for (const fr of [
               { c: f.c, u: [Math.cos(th), -Math.sin(th)] as Pt, v: [Math.sin(th), Math.cos(th)] as Pt },
@@ -1865,7 +1866,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           tries += 1;
         }
         area = (p.d * (lf + lb)) / 2;
-        if (tries >= 20 || area < aMin || lf < minFront || lb < 0 || (lf + lb) / 2 < minAvgW) continue;
+        if (tries >= 20 || area < aMin || lf < minFront || lb < 1 || (lf + lb) / 2 < minAvgW) continue;
         // Its type: the one nearest its area, the one furthest behind its share where two are near.
         const zc = kindCount.get(p.zone) ?? new Map<VillaKind, number>();
         const placed = [...zc.values()].reduce((a, b) => a + b, 0);
@@ -2065,6 +2066,106 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       }
     }
     if (deepened > 0) notes.push(`${deepened} plots deepened into the strip behind them, within their range, so it is not left over`);
+    // MIX (owner 7 Oct: the model's 85% is plots): where the edge of the land runs at a slant behind a
+    // plot, its back follows the edge, so the wedge is the plot's garden, not left over. Still four-sided:
+    // the front and both sides as they were, the back along the edge.
+    if (isMix) {
+      let slanted = 0;
+      const freeAt = (fr: Frame, u: number, b: number): boolean => {
+        const cc = dem.cellAt(toWorld(fr, u, b));
+        return cc !== null && plotLand[cc.j * nx + cc.i] === 1;
+      };
+      const shoelace = (r: readonly Pt[]): number => {
+        let a = 0;
+        for (let q = 0; q < r.length; q += 1) {
+          const A = r[q]!;
+          const B = r[(q + 1) % r.length]!;
+          a += A[0] * B[1] - B[0] * A[1];
+        }
+        return Math.abs(a) / 2;
+      };
+      // Four corners turning the same way, each side at least 1 m: a true four-sided plot.
+      const convex = (r: readonly Pt[]): boolean => {
+        let sgn = 0;
+        for (let q = 0; q < r.length; q += 1) {
+          const A = r[q]!;
+          const B = r[(q + 1) % r.length]!;
+          const C = r[(q + 2) % r.length]!;
+          if (Math.hypot(B[0] - A[0], B[1] - A[1]) < 1) return false;
+          const z = (B[0] - A[0]) * (C[1] - B[1]) - (B[1] - A[1]) * (C[0] - B[0]);
+          if (Math.abs(z) < 1e-6) continue;
+          if (sgn === 0) sgn = Math.sign(z);
+          else if (Math.sign(z) !== sgn) return false;
+        }
+        return true;
+      };
+      for (const p of drafts) {
+        if (p.ring.length !== 4 || !convex(p.ring)) continue;
+        const now = p.area ?? p.w * p.d;
+        const cap = mixGrow * sftToM2(ruleOf(p.kind).plot_sft[0]) - now;
+        if (cap < 4) continue;
+        // In the plot's own frame: the front on the street, each side a straight line run on past the back.
+        const [F0, F1, B1, B0] = p.ring.map((q) => toFrame(p.f, q)) as [[number, number], [number, number], [number, number], [number, number]];
+        const sideAt = (F: [number, number], B: [number, number], b: number): number =>
+          Math.abs(B[1] - F[1]) < 1e-6 ? B[0] : F[0] + ((B[0] - F[0]) * (b - F[1])) / (B[1] - F[1]);
+        const inward0 = Math.sign(F1[0] - F0[0]) * 0.4;
+        const reach = (F: [number, number], B: [number, number], inward: number): number => {
+          let L = 0;
+          while (L < 30 && freeAt(p.f, sideAt(F, B, B[1] + L + 0.5) + inward, B[1] + L + 0.5)) L += 0.5;
+          return L;
+        };
+        let e0 = reach(F0, B0, inward0);
+        let e1 = reach(F1, B1, -inward0);
+        if (Math.max(e0, e1) < 1) continue;
+        // The back is straight: no deeper at its middle than the land allows there.
+        const mid: [number, number] = [(B0[0] + B1[0]) / 2, (B0[1] + B1[1]) / 2];
+        let em = 0;
+        while (em < 30 && freeAt(p.f, mid[0], mid[1] + em + 0.5)) em += 0.5;
+        if (em < (e0 + e1) / 2) {
+          const k = em / Math.max(1e-6, (e0 + e1) / 2);
+          e0 *= k;
+          e1 *= k;
+        }
+        const corners = (a: number, b: number): [Pt, Pt] => [
+          toWorld(p.f, sideAt(F1, B1, B1[1] + b), B1[1] + b),
+          toWorld(p.f, sideAt(F0, B0, B0[1] + a), B0[1] + a),
+        ];
+        const wedge = (a: number, b: number): Ring => [p.ring[3]!, p.ring[2]!, ...corners(a, b)] as Ring;
+        // Every point of the wedge (bilinear over its four corners) on land the plots may take.
+        const inLand = (w: Ring): boolean => {
+          for (let su = 0.05; su < 1; su += 0.1) {
+            for (let sv = 0.05; sv < 1; sv += 0.1) {
+              const x = (1 - sv) * ((1 - su) * w[0]![0] + su * w[1]![0]) + sv * ((1 - su) * w[3]![0] + su * w[2]![0]);
+              const y = (1 - sv) * ((1 - su) * w[0]![1] + su * w[1]![1]) + sv * ((1 - su) * w[3]![1] + su * w[2]![1]);
+              const cc = dem.cellAt([x, y]);
+              if (!cc || !plotLand[cc.j * nx + cc.i]) return false;
+            }
+          }
+          return true;
+        };
+        let tries = 0;
+        let w = wedge(e0, e1);
+        while (
+          tries < 60 &&
+          Math.max(e0, e1) >= 1 &&
+          (shoelace(w) > cap || !convex([p.ring[0]!, p.ring[1]!, w[2]!, w[3]!]) || plotIndex.overlaps(w) || !clearOfRoads(w) || !inLand(w))
+        ) {
+          e0 = Math.max(0, e0 - 0.5);
+          e1 = Math.max(0, e1 - 0.5);
+          w = wedge(e0, e1);
+          tries += 1;
+        }
+        if (tries >= 60 || Math.max(e0, e1) < 1) continue;
+        // Not into a size whose yards leave the house short of its BUA.
+        if (holdsBua(p.w, p.d, p.kind) && !holdsBua(p.w, p.d + Math.min(e0, e1), p.kind)) continue;
+        plotIndex.add(w);
+        const [c1, c0] = corners(e0, e1);
+        p.ring = [p.ring[0]!, p.ring[1]!, c1, c0] as Ring;
+        p.area = shoelace(p.ring);
+        slanted += 1;
+      }
+      if (slanted > 0) notes.push(`${slanted} plots take the wedge behind them, their back along the slanting edge of the land (four-sided, owner 7 Oct)`);
+    }
   }
 
   // Later roads must go round the plots.

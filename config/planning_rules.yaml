@@ -229,7 +229,7 @@ villas:
       # 1:2.5), so the street pattern is 6 m of street to 40 m of plots: 87% of a block sold.
       plot_depth_m: 20
       # ASSUMPTION (owner 7 Oct: 85% of the villa land in plots): after every plot of the model's sizes is
-      # laid, an end or edge plot takes in the land left beside or behind it, up to 1.5 x its type's area.
+      # laid, an end or edge plot takes in the land left beside or behind it, up to 2 x its type's area.
       max_plot_growth: 2.0
   # Plots are cut at one point in their type's range, searched from the largest down until the
   # category's target (count or gross FSI) is met.
