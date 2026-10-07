@@ -42,6 +42,8 @@ export interface PresentStep {
   villas: boolean;
   /** The eight master plans part here. */
   fork?: boolean;
+  /** The draft model's One-Page Summary figures shown over the plan (ui/PresentFigures.tsx). */
+  card?: 'land' | 'tickets' | 'funding';
 }
 
 export const PRESENT_STEPS: PresentStep[] = [
@@ -221,6 +223,43 @@ export const PRESENT_STEPS: PresentStep[] = [
     plan: ['roads', 'blocks', 'plots', 'buildings'],
     uses: 'all',
     villas: true,
+  },
+  // The draft model's figures over the finished plan (owner 7 Oct): One-Page Summary A, E and B.
+  {
+    key: 'figures-land',
+    num: 'A',
+    title: 'Land by product type',
+    layers: ['waterlogging'],
+    raster: 'none',
+    zones: 'off',
+    plan: ['roads', 'blocks', 'plots', 'buildings'],
+    uses: 'all',
+    villas: true,
+    card: 'land',
+  },
+  {
+    key: 'figures-tickets',
+    num: 'E',
+    title: 'Homes, sizes and ticket prices',
+    layers: ['waterlogging'],
+    raster: 'none',
+    zones: 'off',
+    plan: ['roads', 'blocks', 'plots', 'buildings'],
+    uses: 'all',
+    villas: true,
+    card: 'tickets',
+  },
+  {
+    key: 'figures-funding',
+    num: 'B',
+    title: 'Funding and key assumptions',
+    layers: ['waterlogging'],
+    raster: 'none',
+    zones: 'off',
+    plan: ['roads', 'blocks', 'plots', 'buildings'],
+    uses: 'all',
+    villas: true,
+    card: 'funding',
   },
 ];
 

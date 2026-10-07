@@ -75,6 +75,12 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
       return plan
         ? `${plan.plots.length} villas, ${plan.buildings.filter((b) => b.typology === 'apartments').length} towers, ${(plan.roads.reduce((s, r) => s + r.lengthM, 0) / 1000).toFixed(1)} km of new roads.`
         : '';
+    case 'figures-land':
+      return "The 73 acres as the draft model allocates them: what each product type takes, and in which phases.";
+    case 'figures-tickets':
+      return 'Every home in the model, by typology: its size, its rate and what it sells for.';
+    case 'figures-funding':
+      return 'What the promoter puts in, what is borrowed, and the assumptions the cashflow rests on.';
     default:
       return '';
   }
@@ -123,7 +129,7 @@ export default function PresentBar(): React.ReactElement {
     <GlassPanel className="pointer-events-auto w-full max-w-[860px] px-5 py-3">
       <div className="flex items-baseline justify-between gap-4">
         <p className="text-[11px] uppercase tracking-[0.18em] text-accent">
-          {s.num === '0' ? 'The zoning' : `Step ${s.num}`}
+          {s.num === '0' ? 'The zoning' : s.card ? `The draft model · ${s.num}` : `Step ${s.num}`}
           {forked && (
             <span className="text-muted">
               {' '}

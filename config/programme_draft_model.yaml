@@ -43,3 +43,44 @@ apartment_types:
   - {name: 2BHK, share: 0.3, saleable_sft: 1200}
   - {name: 3BHK, share: 0.5, saleable_sft: 1600}
   - {name: 4BHK, share: 0.2, saleable_sft: 2200}
+
+# One-Page Summary of the draft model (Draft model.xlsx, sheet 'One-Page Summary'), for the presentation's
+# closing figures (owner 7 Oct). Generated from the workbook's cells; each value carries its cell.
+summary:
+  source: "Draft model.xlsx · One-Page Summary"
+  land:            # A. Land allocation by product type (C8:F20)
+    - {use: "Apartments", acres: 12, share: 0.1644, phases: [1, 2, 3, 4], cell: D9}
+    - {use: "Villas", acres: 19.94, share: 0.2732, phases: [1, 2, 3, 4], cell: D10}
+    - {use: "Senior living", acres: 6, share: 0.0822, phases: [1, 2], cell: D11}
+    - {use: "Retail & F&B high street (leased)", acres: 1.5, share: 0.0205, phases: [3], cell: D12}
+    - {use: "Commercial office", acres: 2.5, share: 0.0342, phases: [4], cell: D13}
+    - {use: "School (sale to operator)", acres: 4, share: 0.0548, phases: [2, 3], cell: D14}
+    - {use: "Hospital (sale to operator)", acres: 5, share: 0.0685, phases: [2], cell: D15}
+    - {use: "Clubhouses (amenity — cost only)", acres: 3, share: 0.0411, phases: [1, 2, 3, 4], cell: D16}
+    - {use: "Sales office & entry (cost only)", acres: 0, share: 0, phases: [1], cell: D17}
+    - {use: "Internal roads & trunk infrastructure", acres: 10.76, share: 0.1474, phases: [], cell: D18}
+    - {use: "Recreational open space", acres: 8.3, share: 0.1137, phases: [], cell: D19}
+  land_total_ac: 73   # D20
+  funding:         # B. Funding & key assumptions (H8:K17)
+    - {label: "Promoter equity committed", value: 200, unit: "₹ Cr", cell: K8}
+    - {label: "Additional promoter top-up", value: 157.27, unit: "₹ Cr", cell: K9}
+    - {label: "Peak construction loan", value: 142.79, unit: "₹ Cr", cell: K10}
+    - {label: "Loan limit / rate", text: "300 Cr @ 15.0%", cell: K11}
+    - {label: "Interest & fees", value: 40.23, unit: "₹ Cr", cell: K12}
+    - {label: "Cumulative cash turns positive", text: "FY32 Q2", cell: K13}
+    - {label: "Land rate", text: "5.0 Cr/acre + 7% stamp/reg", cell: K14}
+    - {label: "Price / cost escalation p.a.", text: "5% / 6%", cell: K15}
+    - {label: "RERA escrow share", value: 70.0, unit: "%", cell: K16}
+    - {label: "Payment plan (apartments)", text: "10 / 20 / 65 / 5% (book/agree/build/possess)", cell: K17}
+  tickets:         # E. Unit sizes & average ticket size by typology, all phases combined (₹ lakh) (B57:M67)
+    - {comp: "V", typology: "Villas — 1,800 sft plot", units: 64, size_sft: 2000, plot_or_carpet_sft: 1800, base_rate: 7753, base_ticket_lakh: 155.1, realised_rate: 8949, ticket_lakh: 179.0, revenue_cr: 114.5, phases: "P1–P4", share_of_res_revenue: 0.0575, row: 58}
+    - {comp: "V", typology: "Villas — 2,250 sft plot", units: 127, size_sft: 2400, plot_or_carpet_sft: 2250, base_rate: 7988, base_ticket_lakh: 191.7, realised_rate: 9225, ticket_lakh: 221.4, revenue_cr: 281.2, phases: "P1–P4", share_of_res_revenue: 0.1411, row: 59}
+    - {comp: "V", typology: "Villas — 2,500 sft plot", units: 96, size_sft: 2550, plot_or_carpet_sft: 2500, base_rate: 8144, base_ticket_lakh: 207.7, realised_rate: 9410, ticket_lakh: 240.0, revenue_cr: 230.4, phases: "P1–P4", share_of_res_revenue: 0.1156, row: 60}
+    - {comp: "V", typology: "Villas — 2,800 sft plot", units: 33, size_sft: 2700, plot_or_carpet_sft: 2800, base_rate: 8375, base_ticket_lakh: 226.1, realised_rate: 9677, ticket_lakh: 261.3, revenue_cr: 86.2, phases: "P1–P4", share_of_res_revenue: 0.0433, row: 61}
+    - {comp: "A", typology: "Apartments — 2BHK apartment", units: 280, size_sft: 1200, plot_or_carpet_sft: 840, base_rate: 5920, base_ticket_lakh: 71.0, realised_rate: 7029, ticket_lakh: 84.4, revenue_cr: 236.2, phases: "P1–P4", share_of_res_revenue: 0.1185, row: 62}
+    - {comp: "A", typology: "Apartments — 3BHK apartment", units: 467, size_sft: 1600, plot_or_carpet_sft: 1120, base_rate: 6099, base_ticket_lakh: 97.6, realised_rate: 7243, ticket_lakh: 115.9, revenue_cr: 541.2, phases: "P1–P4", share_of_res_revenue: 0.2716, row: 63}
+    - {comp: "A", typology: "Apartments — 4BHK apartment", units: 188, size_sft: 2200, plot_or_carpet_sft: 1540, base_rate: 6274, base_ticket_lakh: 138.0, realised_rate: 7449, ticket_lakh: 163.9, revenue_cr: 308.1, phases: "P1–P4", share_of_res_revenue: 0.1546, row: 64}
+    - {comp: "C04", typology: "Phase 1 — 32-unit senior living", units: 32, size_sft: 1000, plot_or_carpet_sft: null, base_rate: 9000, base_ticket_lakh: 90, realised_rate: 9749, ticket_lakh: 97.5, revenue_cr: 31.2, phases: "1", share_of_res_revenue: 0.0157, row: 65}
+    - {comp: "C07", typology: "Senior citizens enclave — 160 units", units: 160, size_sft: 1000, plot_or_carpet_sft: null, base_rate: 9000, base_ticket_lakh: 90, realised_rate: 10239, ticket_lakh: 102.4, revenue_cr: 163.8, phases: "2", share_of_res_revenue: 0.0822, row: 66}
+  tickets_average: {units: 1447, size_sft: 1697, ticket_lakh: 137.7, revenue_cr: 1992.8, row: 67}
+  tickets_note: "Villas: 320 units, avg 2,396 sft on 2,292 sft plots, avg ticket ₹223 L. Apartments: 935 units, avg 1,601 sft, avg ticket ₹116 L. Detail on 'Ticket Size Analysis'."   # C68
