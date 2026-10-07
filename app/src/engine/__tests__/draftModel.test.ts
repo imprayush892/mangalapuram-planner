@@ -89,13 +89,13 @@ describe('the draft model basis (owner, 7 Oct)', () => {
         return Math.abs(d) / (Math.hypot(a[0] - v[0], a[1] - v[1]) * Math.hypot(b[0] - v[0], b[1] - v[1])) < 0.01;
       });
       const ratio = (q.areaM2 * 10.7639) / t.plot_sft;
-      if (square && Math.abs(ratio - 1) < 0.02) rects += 1;
-      else {
-        expect(ratio, `${q.id} ${q.kind}`).toBeGreaterThan(0.84);
-        expect(ratio, `${q.id} ${q.kind}`).toBeLessThan(grow + 0.01);
-      }
+      if (square) {
+        rects += 1;
+        expect(ratio, `${q.id} ${q.kind}`).toBeGreaterThan(0.98);
+      } else expect(ratio, `${q.id} ${q.kind}`).toBeGreaterThan(0.84);
+      expect(ratio, `${q.id} ${q.kind}`).toBeLessThan(grow + 0.01);
     }
-    expect(rects / p.plots.length).toBeGreaterThan(0.6);
+    expect(rects / p.plots.length).toBeGreaterThan(0.75);
   });
 
   it('holds most of the apartments in towers under the airport limit', async () => {

@@ -56,7 +56,7 @@ bases:
     # through the retail street; and the south road along the parcel edge (owner 28 Sep).
     roads.owner_routes:
       - {tier: primary, why: "the main entry road from the gate on the Mangalapuram-Pothencode road (client zoning plan, 18 m N-S road)",
-         points: [[340, 662], [334, 630], [331, 600], [329, 575], [326, 540], [325, 440], [330, 360], [345, 300]]}   # along the gate arm's west edge
+         points: [[340, 662], [334, 630], [331, 600], [329, 575], [326, 540], [325, 440], [329, 370], [332, 348]]}   # along the gate arm's west edge, ending on the existing road (not into the Phase 2 villas, owner 7 Oct)
       - {tier: primary, why: "the owner's south road, along the parcel edge",
          points: [[471, 11], [527, 28], [585, 30], [632, 37], [646, 57], [649, 72], [675, 87]]}
 

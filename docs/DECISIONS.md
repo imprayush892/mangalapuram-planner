@@ -317,3 +317,20 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - Hospital, retail and office are blocks to their construction area, coverage from KMBR Table 6 (C, F, E). Floors
   are assumptions (hospital up to 8, retail up to G+4 on its narrow strip, office up to 12). A senior zone that holds
   too few G+3 blocks lets them rise to G+5 (ASSUMPTION).
+
+## 7 Oct 2026 · villas toward the model's 85% (owner: "if the model assumes 85% then it has to be 85%")
+
+- Plots stay rectangles; at the ends and edges of rows a plot may be four-sided (owner 7 Oct). Every plot is checked
+  to be a true quadrilateral (convex, each side at least 1 m) and within 0.84-2.0 x its type's area.
+- One street grid runs across villa zones that touch (each plot belongs to the zone it stands in), turned every
+  degree within 30 degrees of the contours (D1) or within the Vastu tolerance (D2, and only among the directions
+  whose streets climb no more than a quarter over the gentlest: an east-west street up the hill cut 20,000 m3).
+- Plot fronts sit on the road edge; back-to-back rows meet; plots may front the site's existing roads at their
+  edge (these come as road edges, not centrelines); a plot whose back meets a slanting edge takes the wedge.
+- Zoning (owner chose "square up the villa zones"): Phase 1 villas are one block, the north corner of Project 2 with
+  the top-west of Project 3, instead of a ragged strip north of the existing road (now open space by the pond);
+  the line between Phases 1 and 2 is set so Phase 3 keeps its 5.982 ac. The entry road ends on the existing road
+  instead of running into the Phase 2 villas.
+- Result: plots on 78% (D1, 285 villas) and 79% (D2, 286 villas) of the villa land; streets 12-13%, trunk roads 1-2%.
+  The remaining 7-8% is fixed geometry: the existing road and the out-of-scope strip run diagonally along Phases
+  1, 3 and 4, a Rule 22 slope sits in Phase 3, and trunk roads to the school and the east apartments cross Phase 4.

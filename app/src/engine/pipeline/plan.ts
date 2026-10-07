@@ -1412,7 +1412,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   /* ------------------------------------- 8c streets in the villa zones */
   const minBlock = num(planning, 'plotable.min_area_m2');
   const crossEvery = num(planning, 'roads.cross_street_every_plots');
-  const pitch = 2 * plotD + tw + 0.5;
+  // Back-to-back rows meet (MIX: plots on the street edge, 0.15 m between the backs); 0.5 m otherwise.
+  const pitch = 2 * plotD + tw + (isMix ? 0.15 : 0.5);
   const crossPitch = Math.max(crossEvery * plotW, pick<number>(planning, 'roads.cross_street_min_spacing_m', 60)) + width.secondary + 1;
   // A north-south grid keeps its cross streets whatever they cost: that is the option.
   const maxCrossEarth = roadMode === 'north_south' ? Number.POSITIVE_INFINITY : num(planning, 'roads.cross_street_max_earthwork_m3_per_m');
@@ -1425,9 +1426,13 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     villaLand = or(villaLand, zoneLand(z));
     villaZoneMask = or(villaZoneMask, z.mask);
   }
-  for (const z of villaZones) {
-    for (const piece of patches(dem, zoneLand(z))) {
+  // MIX (owner 7 Oct: 85% of the villa land in plots): one street grid runs across villa zones that touch, so
+  // no strip is lost where one phase meets the next; each plot still belongs to the zone it stands in.
+  const gridAreas: { z: ZoneInfo; land: Mask }[] = isMix ? [{ z: villaZones[0]!, land: villaLand }] : villaZones.map((z) => ({ z, land: zoneLand(z) }));
+  for (const { z: z0, land } of villaZones.length > 0 ? gridAreas : []) {
+    for (const piece of patches(dem, land)) {
       if (piece.length * cellArea < minBlock) continue;
+      const z = isMix ? (villaZones.find((q) => q.mask[piece[Math.floor(piece.length / 2)]!]) ?? z0) : z0;
       const pm = emptyMask(dem);
       for (const k of piece) pm[k] = 1;
       let f = frameFor(dem, piece);
@@ -1519,18 +1524,40 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           }
         }
         if (roadMode === 'north_south') {
-          // Vastu: north-south (or east-west) within the tolerance; among those, the most plots.
+          // Vastu: north-south (or east-west) within the tolerance; among those whose streets climb no
+          // more than a quarter over the gentlest, the most plots (a street straight up the hill is not
+          // worth a few plots: it is cut to 1:6 the whole way).
+          const climb = (fr: Frame): number => {
+            let gsum = 0;
+            for (let q = 0; q < piece.length; q += 7) {
+              const k = piece[q]!;
+              const i = k % nx;
+              const j = (k - i) / nx;
+              const zl = dem.at(i - 1, j);
+              const zr = dem.at(i + 1, j);
+              const zd = dem.at(i, j - 1);
+              const zu = dem.at(i, j + 1);
+              if (![zl, zr, zd, zu].every(Number.isFinite)) continue;
+              gsum += Math.abs(((zr - zl) / (2 * dem.cell)) * fr.u[0] + ((zu - zd) / (2 * dem.cell)) * fr.u[1]);
+            }
+            return gsum;
+          };
+          const cands: { fr: Frame; n: number; g: number }[] = [];
           for (let t = -nsTol; t <= nsTol + 1e-9; t += 1) {
             const th = (t * Math.PI) / 180;
             for (const fr of [
               { c: f.c, u: [Math.cos(th), -Math.sin(th)] as Pt, v: [Math.sin(th), Math.cos(th)] as Pt },
               { c: f.c, u: [Math.sin(th), Math.cos(th)] as Pt, v: [-Math.cos(th), Math.sin(th)] as Pt },
             ]) {
-              const n = countFor(fr);
-              if (n > bestN) {
-                bestN = n;
-                f = fr;
-              }
+              cands.push({ fr, n: countFor(fr), g: climb(fr) });
+            }
+          }
+          const gMin = Math.min(...cands.map((c) => c.g));
+          bestN = -1;
+          for (const c of cands) {
+            if (c.g <= 1.25 * gMin + 1e-9 && c.n > bestN) {
+              bestN = c.n;
+              f = c.fr;
             }
           }
         }
@@ -1693,13 +1720,16 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
 
   /* ---------------------------------- 9 villa plots along every road */
   const segIndex = new SegIndex(25);
-  for (const line of existingLines) segIndex.addLine(line, exWidth / 2);
+  // The site's roads come as their edges (existing_road_edge), not centrelines. MIX (owner 7 Oct: 85% in
+  // plots): a plot may front the edge itself; the client basis keeps its half-width clear of each edge.
+  const exHalf = isMix ? 0.3 : exWidth / 2;
+  for (const line of existingLines) segIndex.addLine(line, exHalf);
   for (const r of roads) if (r.kept) segIndex.addLine(r.centreline, r.widthM / 2);
   const clearOfRoads = (ring: Ring): boolean => {
     for (const sg of segIndex.near(ring)) if (ringSegmentGap(ring, sg.a, sg.b) < sg.half - 0.05) return false;
     return true;
   };
-  const plotLand = or(villaLand, and(network, villaZoneMask));
+  const plotLand = isMix ? or(villaLand, and(minus(network, L.existingRoads.mask), villaZoneMask)) : or(villaLand, and(network, villaZoneMask));
   const landOk = (smp: readonly { p: Pt }[]): boolean => {
     for (const q of smp) {
       const cc = dem.cellAt(q.p);
@@ -1709,6 +1739,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   };
   const drafts: DraftPlot[] = [];
   const plotIndex = new RingIndex(25);
+  // The plot's front line off the road's edge. MIX (owner 7 Oct: 85% in plots): on the edge, so no strip of
+  // land runs between every road and the plots along it.
+  const frontGap = isMix ? 0.02 : 0.25;
   /** Plots laid so far, by zone and type (MIX keeps each zone on the model's mix). */
   const kindCount = new Map<string, Map<VillaKind, number>>();
   const tryPlot = (f: Frame, a0: number, b0: number, w: number, d: number, road: RoadRec | null, kind: VillaKind): boolean => {
@@ -1747,7 +1780,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     return premiumAt(p, zi >= 0 ? zones[zi]!.name : '') ? ['premium', 'standard'] : ['standard'];
   };
   const fillAlong = (line: readonly Pt[], half: number, road: RoadRec | null): void => {
-    const off = half + 0.25;
+    const off = half + frontGap;
     for (let q = 1; q < line.length; q += 1) {
       const A = line[q - 1]!;
       const B = line[q]!;
@@ -1784,7 +1817,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   // The villa streets first (they were laid for plots), then every other road.
   for (const r of roads) if (r.kept && r.row) fillAlong(plotLine(r.centreline), r.widthM / 2, r);
   for (const r of roads) if (r.kept && !r.row) fillAlong(plotLine(r.centreline), r.widthM / 2, r);
-  for (const line of existingLines) fillAlong(plotLine(line), exWidth / 2, null);
+  for (const line of existingLines) fillAlong(plotLine(line), exHalf, null);
 
   // Row ends (owner 7 Oct): plots stay rectangles, but at the end of a row, where the land runs out at a
   // slant, the last plot may be four-sided: its front on the street, its back parallel to it, one side
@@ -1857,11 +1890,13 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             toWorld(p.f, u0, p.b0 + p.d),
           ] as Ring;
         let ring = quad(lf, lb);
-        // Shrink the far side until the plot is clear of the others and of every road.
+        // Shrink the far side until the plot is clear of the others and of every road; where the land
+        // runs out at the back first, the plot keeps 1 m of back and its far side turns on that corner.
+        const lbFloor = Math.min(1, lb);
         let tries = 0;
         while ((plotIndex.overlaps(ring) || !clearOfRoads(ring)) && tries < 20) {
           lf -= 0.5;
-          lb -= 0.5;
+          lb = Math.max(lbFloor, lb - 0.5);
           ring = quad(lf, lb);
           tries += 1;
         }
@@ -1909,7 +1944,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         const len = Math.hypot(B[0] - A[0], B[1] - A[1]);
         if (len < 6) continue;
         const t: Pt = [(B[0] - A[0]) / len, (B[1] - A[1]) / len];
-        const off = r.widthM / 2 + 0.25;
+        const off = r.widthM / 2 + frontGap;
         for (const side of [1, -1] as const) {
           const v: Pt = [-t[1] * side, t[0] * side];
           const f: Frame = side > 0 ? { c: A, u: t, v } : { c: A, u: [-t[0], -t[1]], v };
@@ -2006,7 +2041,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     };
     const before = drafts.length;
     const fillFlex = (line: readonly Pt[], half: number, road: RoadRec | null): void => {
-      const off = half + 0.25;
+      const off = half + frontGap;
       for (let q = 1; q < line.length; q += 1) {
         const A = line[q - 1]!;
         const B = line[q]!;
@@ -2038,7 +2073,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       }
     };
     for (const r of roads) if (r.kept) fillFlex(plotLine(r.centreline), r.widthM / 2, r);
-    for (const line of existingLines) fillFlex(plotLine(line), exWidth / 2, null);
+    for (const line of existingLines) fillFlex(plotLine(line), exHalf, null);
     if (drafts.length > before) notes.push(`${drafts.length - before} more plots in the pockets at row ends, corners and zone edges, sized within their range to fit`);
   }
 

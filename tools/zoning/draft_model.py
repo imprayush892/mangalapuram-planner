@@ -139,7 +139,7 @@ def add(comp, name, use, phase, acres, g):
 # the road is left as the gate's open space.
 from shapely.geometry import LineString
 # The entry road as planning_rules.yaml bases.draft_model roads.owner_routes draws it (primary, 10 m).
-ENTRY = LineString([(340, 662), (334, 630), (331, 600), (329, 575), (326, 540), (325, 440), (330, 360), (345, 300)])
+ENTRY = LineString([(340, 662), (334, 630), (331, 600), (329, 575), (326, 540), (325, 440), (329, 370), (332, 348)])
 ENTRY_ROAD = ENTRY.buffer(5, cap_style=2)
 EAST_OF_ENTRY = ENTRY.buffer(400, single_sided=True, cap_style=2)   # the line runs south: its left is east
 RETAIL_DEPTH = 45                                              # one row of high-street blocks with its yards
@@ -158,10 +158,29 @@ add("C16", "COMMERCIAL OFFICE", "office", 4, 2.5, office)
 # --- Phase 1, next to the gate ---
 P1V = P1V.intersection(EAST_OF_ENTRY).difference(ENTRY_ROAD)   # villas east of the entry road only, right up to it
 ch1, p1_rest = take(P1V, 0.5, "S")
-# The Phase 1 villas' balance from the north edge of Project 2, next to them (not across the entry road,
-# so the villa land stays one piece with the trunk roads on its edges).
-top_up, P2V = take(P2V, 2.991 - p1_rest.area / AC, "N")
-add("C03", "VILLAS · PHASE 1", "villas", 1, 2.991, unary_union([p1_rest, top_up]))
+# Phase 1 villas (owner 7 Oct: 85% of the villa land in plots, so the villa zones are compact blocks): the
+# north corner of Project 2, between the existing road and the entry road, with the top-west of Project 3
+# beside it, one block. The scrap of Project 1 by the pond north of the existing road stays open space
+# (a strip that ragged would lose a fifth of itself to the street pattern).
+def _phase1(y):
+    top = P2V.intersection(above(y))
+    east, _ = take(P3V.intersection(above(y)), 2.991 - top.area / AC, "W")
+    return top, east
+
+
+# The line between Phase 1 and Phase 2: as far south as leaves Project 3 its Phase 3 villas (5.982 ac).
+lo, hi = 250.0, 330.0
+for _ in range(40):
+    P1_TOP = (lo + hi) / 2
+    if (P3V.area - _phase1(P1_TOP)[1].area) / AC < 5.982:
+        hi = P1_TOP
+    else:
+        lo = P1_TOP
+P1_TOP = lo
+top_up, p1_east = _phase1(P1_TOP)
+P2V = P2V.difference(top_up)
+P3V = P3V.difference(p1_east).buffer(0)
+add("C03", "VILLAS · PHASE 1", "villas", 1, 2.991, unary_union([top_up, p1_east]))
 add("C08", "VILLA CLUBHOUSE 1", "clubhouse", 1, 0.5, ch1)
 a1, apt_ne = take(apt_ne, 1.2, "E")                                          # few villa sight-lines cross the NE corner
 add("C02", "APARTMENTS · PHASE 1", "apartments", 1, 1.2, a1)
