@@ -109,6 +109,20 @@ export function bufferPolyline(line: readonly Pt[], width: number, square = true
   return fromPaths(out);
 }
 
+/**
+ * A strip of the given total width along an open polyline. (bufferPolyline above returns a strip half
+ * the width it is given: Clipper's open-path inflate takes the delta as the whole width. Its callers
+ * are left as they are; new code uses this.)
+ */
+export function stripAlong(line: readonly Pt[], width: number): MultiPoly {
+  if (line.length < 2 || width <= 0) return [];
+  const paths = new Paths64();
+  const path = new Path64();
+  for (const [x, y] of line) path.push(new Point64(Math.round(x * SCALE), Math.round(y * SCALE)));
+  paths.push(path);
+  return fromPaths(Clipper.InflatePaths(paths, width * SCALE, JoinType.Miter, EndType.Butt, 2));
+}
+
 /** Union via Clipper (used where polygon-clipping's robustness is not enough). */
 /**
  * Outward offset of an irregular boundary, such as the parcel.

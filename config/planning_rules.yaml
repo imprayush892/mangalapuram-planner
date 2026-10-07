@@ -47,6 +47,10 @@ bases:
     apartments.plan_efficiency: 0.87
     # The model sells 85% of the villa land as plots (Inputs C41); the plan reports against it.
     villas.land_split: {plots: 0.85, roads: 0.15, tolerance: 0.05}
+    # The model's villa land is net of the trunk roads (Inputs C36): trunk roads keep out of the villa
+    # zones' interiors, and the villa streets take the cross streets' place less often.
+    roads.zone_interior_cost: {villas: 25, apartments: 2.5, commercial: 2.5, retail: 25, office: 25, hospital: 25, batching: 2.5, senior: 25, school: 25, clubhouse: 25, reserved: 25}
+    roads.cross_street_every_plots: 1000      # no cross streets through the rows: the streets link to the network at their ends
     # Owner's roads: the client's 18 m entry road from the main gate on the Mangalapuram-Pothencode
     # road south to the existing road (zoning plan: "Main gate / commercial strip, 18 m N-S road"),
     # through the retail street; and the south road along the parcel edge (owner 28 Sep).
@@ -221,6 +225,12 @@ villas:
       types_from_programme: true
       count: true
       types: []
+      # ASSUMPTION: every plot 20 m deep (widths 7.8-12.1 m for the 1,800-2,800 sq ft types, all within
+      # 1:2.5), so the street pattern is 6 m of street to 40 m of plots: 87% of a block sold.
+      plot_depth_m: 20
+      # ASSUMPTION (owner 7 Oct: 85% of the villa land in plots): after every plot of the model's sizes is
+      # laid, an end or edge plot takes in the land left beside or behind it, up to 1.5 x its type's area.
+      max_plot_growth: 2.0
   # Plots are cut at one point in their type's range, searched from the largest down until the
   # category's target (count or gross FSI) is met.
   sizing_steps: 6
@@ -348,7 +358,7 @@ commercial:                                # the client's COMMERCIAL & CONVENTIO
 blocks:
   hospital: {occupancy: C_hospital, max_floors: 8, floor_height_m: 4.0}
   # A high street: long blocks along the entry road in the gate arm, up to G+4 (ASSUMPTION: wing size, shapes, floors).
-  retail: {occupancy: F_commercial, max_floors: 5, floor_height_m: 4.5, wing_max_m2: 1800, aspects: [4, 3, 2], wing_gap_m: 6}
+  retail: {occupancy: F_commercial, max_floors: 5, floor_height_m: 4.5, wing_max_m2: 900, aspects: [4, 3, 2], wing_gap_m: 6}
   office: {occupancy: E_office, max_floors: 12, floor_height_m: 3.6}
 
 batching_plant:                            # the client's BATCHING PLANT zone: a temporary works yard

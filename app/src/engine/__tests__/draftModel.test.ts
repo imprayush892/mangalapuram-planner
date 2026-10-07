@@ -67,10 +67,27 @@ describe('the draft model basis (owner, 7 Oct)', () => {
         expect(Math.abs(share - t.share), `${z.name} ${t.name}`).toBeLessThan(0.1);
       }
     }
+    // Owner 7 Oct: every plot four-sided; rectangles at their type's size; at the ends and edges of rows a plot
+    // may be a trapezoid, or take in the land beside it, within the growth limit.
+    const grow = pick<number>(c.planning, 'villas.categories.MIX.max_plot_growth', 1);
+    let rects = 0;
     for (const q of p.plots) {
       const t = types.find((x) => x.name === q.kind)!;
-      expect(Math.abs(q.areaM2 * 10.7639 - t.plot_sft) / t.plot_sft, `${q.id} ${q.kind}`).toBeLessThan(0.02);
+      expect(q.ring.length, q.id).toBe(4);
+      const square = q.ring.every((v, i) => {
+        const a = q.ring[(i + 3) % 4]!;
+        const b = q.ring[(i + 1) % 4]!;
+        const d = (a[0] - v[0]) * (b[0] - v[0]) + (a[1] - v[1]) * (b[1] - v[1]);
+        return Math.abs(d) / (Math.hypot(a[0] - v[0], a[1] - v[1]) * Math.hypot(b[0] - v[0], b[1] - v[1])) < 0.01;
+      });
+      const ratio = (q.areaM2 * 10.7639) / t.plot_sft;
+      if (square && Math.abs(ratio - 1) < 0.02) rects += 1;
+      else {
+        expect(ratio, `${q.id} ${q.kind}`).toBeGreaterThan(0.84);
+        expect(ratio, `${q.id} ${q.kind}`).toBeLessThan(grow + 0.01);
+      }
     }
+    expect(rects / p.plots.length).toBeGreaterThan(0.6);
   });
 
   it('holds most of the apartments in towers under the airport limit', async () => {

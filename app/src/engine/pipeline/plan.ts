@@ -3,7 +3,7 @@ import type { MultiPoly, Pt, Ring } from '../geom/types';
 import type { SiteFeature } from '../site/types';
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
-import { bufferPolyline } from '../geom/offset';
+import { bufferPolyline, stripAlong } from '../geom/offset';
 import { coverageFsi, highRise, gapBetweenBuildingsM } from '../rules/kmbr';
 import type { Occupancy } from '../rules/kmbr';
 import { sftToM2, M2_PER_ACRE } from '../units';
@@ -575,7 +575,10 @@ interface Placed {
 
 interface DraftPlot {
   facingDeg: number;
+  /** The plot's outline: the rectangle, or (row ends, owner 7 Oct) a four-sided plot on the rectangle's core. */
   ring: Ring;
+  /** A four-sided end plot's own area (its ring); a rectangle's is w x d. */
+  area?: number;
   f: Frame;
   a0: number;
   b0: number;
@@ -1082,7 +1085,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       tier,
       centreline: line,
       widthM: width[tier],
-      geom: bufferPolyline(line, width[tier]),
+      geom: stripAlong(line, width[tier]),
       lengthM: lineLength(line),
       limit: lim[tier],
       terrainMaxGrade: prof.terrainMaxGrade,
@@ -1298,7 +1301,13 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   // Every type shares the standard plot's depth, so a street serves them alike; a premium plot is wider.
   // The plot shape: the category's own (B3/B4: the earlier narrow, deep count plots), else the
   // shape with the most ground floor inside the owner's yards.
+  const fixedDepth = pick<number | null>(planning, `villas.categories.${villaSizing}.plot_depth_m`, null);
+  // MIX: once every plot of the model's sizes is laid, an end or edge plot may take in the land left
+  // beside or behind it, up to this many times its type's area (owner 7 Oct: 85% of the villa land in plots).
+  const mixGrow = pick<number>(planning, `villas.categories.${villaSizing}.max_plot_growth`, 1);
   const shapeOf = (a: number): { w: number; d: number } => {
+    // MIX: one plot depth for every type, so a street serves them alike; the width makes the area.
+    if (fixedDepth) return { w: a / fixedDepth, d: fixedDepth };
     if (cat.shape) {
       const d0 = Math.min(cat.shape.max_depth_m, Math.sqrt(cat.shape.depth_per_width * a));
       const w = Math.max(cat.shape.min_width_m, a / d0);
@@ -1446,6 +1455,82 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           if (gsum < best) {
             best = gsum;
             f = fr;
+          }
+        }
+      }
+      // MIX (draft model): the grid that fits the most plots, turned within 30 degrees of the contours
+      // (north-south: within the Vastu tolerance), by the same count of plot runs either side of each street.
+      if (isMix) {
+        const countFor = (fr: Frame): number => {
+          let u0 = Infinity;
+          let u1 = -Infinity;
+          let v0 = Infinity;
+          let v1 = -Infinity;
+          for (const k of piece) {
+            const [a, b] = toFrame(fr, dem.cellCentre(k % nx, Math.floor(k / nx)));
+            u0 = Math.min(u0, a);
+            u1 = Math.max(u1, a);
+            v0 = Math.min(v0, b);
+            v1 = Math.max(v1, b);
+          }
+          const inQ = (a: number, b: number): boolean => {
+            const cc = dem.cellAt(toWorld(fr, a, b));
+            return cc !== null && pm[cc.j * nx + cc.i] === 1;
+          };
+          const sideQ = (u: number, vs: number, sd: 1 | -1): boolean =>
+            inQ(u, vs + sd * (tw / 2 + 0.6)) && inQ(u, vs + sd * (tw / 2 + minD / 2)) && inQ(u, vs + sd * (tw / 2 + minD - 0.6));
+          let best = 0;
+          for (let phi = 0; phi < pitch; phi += 3) {
+            let tot = 0;
+            for (let vs = v0 + phi; vs <= v1; vs += pitch) {
+              for (const sd of [1, -1] as const) {
+                let run = 0;
+                for (let u = u0; u <= u1 + 1; u += 1) {
+                  if (u <= u1 && inQ(u, vs) && sideQ(u, vs, sd)) run += 1;
+                  else {
+                    tot += Math.floor(run / plotW);
+                    run = 0;
+                  }
+                }
+              }
+            }
+            best = Math.max(best, tot);
+          }
+          return best;
+        };
+        const turnFr = (fr: Frame, deg: number): Frame => {
+          const t = (deg * Math.PI) / 180;
+          return {
+            c: fr.c,
+            u: [Math.cos(t) * fr.u[0] + Math.sin(t) * fr.v[0], Math.cos(t) * fr.u[1] + Math.sin(t) * fr.v[1]],
+            v: [-Math.sin(t) * fr.u[0] + Math.cos(t) * fr.v[0], -Math.sin(t) * fr.u[1] + Math.cos(t) * fr.v[1]],
+          };
+        };
+        const turns = roadMode === 'north_south' ? [] : [-30, -20, -10, 10, 20, 30];
+        const base = f;
+        let bestN = countFor(base);
+        for (const d of turns) {
+          const fr = turnFr(base, d);
+          const n = countFor(fr);
+          if (n > bestN) {
+            bestN = n;
+            f = fr;
+          }
+        }
+        if (roadMode === 'north_south') {
+          // Vastu: north-south (or east-west) within the tolerance; among those, the most plots.
+          for (let t = -nsTol; t <= nsTol + 1e-9; t += nsTol / 2) {
+            const th = (t * Math.PI) / 180;
+            for (const fr of [
+              { c: f.c, u: [Math.cos(th), -Math.sin(th)] as Pt, v: [Math.sin(th), Math.cos(th)] as Pt },
+              { c: f.c, u: [Math.sin(th), Math.cos(th)] as Pt, v: [-Math.cos(th), Math.sin(th)] as Pt },
+            ]) {
+              const n = countFor(fr);
+              if (n > bestN) {
+                bestN = n;
+                f = fr;
+              }
+            }
           }
         }
       }
@@ -1700,6 +1785,191 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   for (const r of roads) if (r.kept && !r.row) fillAlong(plotLine(r.centreline), r.widthM / 2, r);
   for (const line of existingLines) fillAlong(plotLine(line), exWidth / 2, null);
 
+  // Row ends (owner 7 Oct): plots stay rectangles, but at the end of a row, where the land runs out at a
+  // slant, the last plot may be four-sided: its front on the street, its back parallel to it, one side
+  // square to the street and the other along the edge of the land. MIX (the draft model) only.
+  if (isMix) {
+    const typeAreas = cat.types.map((t) => ({ t, a: sftToM2(t.plot_sft[0]) }));
+    const aMin = 0.85 * Math.min(...typeAreas.map((x) => x.a));
+    const aMax = Math.max(1.15, mixGrow) * Math.max(...typeAreas.map((x) => x.a));
+    // KMBR Rule 31 (subdivision): every plot at least 4 m of frontage and 6 m of average width.
+    const minFront = num(input.kmbr, 'rule31_subdivision.min_frontage_m', 'kmbr_rules.yaml');
+    const minAvgW = num(input.kmbr, 'rule31_subdivision.min_avg_width_m', 'kmbr_rules.yaml');
+    const free = (fr: Frame, u: number, b: number): boolean => {
+      const cc = dem.cellAt(toWorld(fr, u, b));
+      return cc !== null && plotLand[cc.j * nx + cc.i] === 1;
+    };
+    let ends = 0;
+    const seeds = [...drafts];
+    for (const p of seeds) {
+      for (const dir of [1, -1] as const) {
+        const u0 = dir > 0 ? p.a0 + p.w : p.a0;
+        // How far the land runs on past the plot, at the front and at the back of the row.
+        const reach = (b: number): number => {
+          let L = 0;
+          while (L < 30 && free(p.f, u0 + dir * (L + 0.5), b)) L += 0.5;
+          return L;
+        };
+        let lf = reach(p.b0 + 0.6);
+        let lb = reach(p.b0 + p.d - 0.6);
+        const lm = reach(p.b0 + p.d / 2);
+        // The far side is straight: never longer at mid-depth than the land allows there.
+        if (lm < (lf + lb) / 2) {
+          const k = lm / Math.max(1e-6, (lf + lb) / 2);
+          lf *= k;
+          lb *= k;
+        }
+        if (Math.min(lf, lb) < 0.5 && Math.max(lf, lb) < minFront) continue;
+        let area = (p.d * (lf + lb)) / 2;
+        if (area > aMax) {
+          const cut = (area - aMax) / p.d;
+          lf -= cut;
+          lb -= cut;
+          area = aMax;
+        }
+        if (area < aMin || lf < minFront || lb < 0) {
+          // Too small for a plot of its own: the end plot takes it in, four-sided, within its growth limit.
+          if (p.area === undefined && Math.max(lf, lb) >= 0.5) {
+            const uIn = dir > 0 ? p.a0 : p.a0 + p.w;
+            const grown: Ring = [
+              toWorld(p.f, uIn, p.b0),
+              toWorld(p.f, u0 + dir * lf, p.b0),
+              toWorld(p.f, u0 + dir * lb, p.b0 + p.d),
+              toWorld(p.f, uIn, p.b0 + p.d),
+            ] as Ring;
+            const gArea = (p.d * (2 * p.w + lf + lb)) / 2;
+            const strip: Ring = [toWorld(p.f, u0, p.b0), toWorld(p.f, u0 + dir * lf, p.b0), toWorld(p.f, u0 + dir * lb, p.b0 + p.d), toWorld(p.f, u0, p.b0 + p.d)] as Ring;
+            if (gArea <= mixGrow * sftToM2(ruleOf(p.kind).plot_sft[0]) && !plotIndex.overlaps(strip) && clearOfRoads(strip)) {
+              plotIndex.add(strip);
+              p.ring = grown;
+              p.area = gArea;
+              ends += 1;
+            }
+          }
+          continue;
+        }
+        const quad = (f2: number, b2: number): Ring =>
+          [
+            toWorld(p.f, u0, p.b0),
+            toWorld(p.f, u0 + dir * f2, p.b0),
+            toWorld(p.f, u0 + dir * b2, p.b0 + p.d),
+            toWorld(p.f, u0, p.b0 + p.d),
+          ] as Ring;
+        let ring = quad(lf, lb);
+        // Shrink the far side until the plot is clear of the others and of every road.
+        let tries = 0;
+        while ((plotIndex.overlaps(ring) || !clearOfRoads(ring)) && tries < 20) {
+          lf -= 0.5;
+          lb -= 0.5;
+          ring = quad(lf, lb);
+          tries += 1;
+        }
+        area = (p.d * (lf + lb)) / 2;
+        if (tries >= 20 || area < aMin || lf < minFront || lb < 0 || (lf + lb) / 2 < minAvgW) continue;
+        // Its type: the one nearest its area, the one furthest behind its share where two are near.
+        const zc = kindCount.get(p.zone) ?? new Map<VillaKind, number>();
+        const placed = [...zc.values()].reduce((a, b) => a + b, 0);
+        const near = typeAreas.filter((x) => area >= 0.85 * x.a && area <= 1.15 * x.a);
+        const pickT = (near.length > 0 ? near : [...typeAreas].sort((a, b) => Math.abs(a.a - area) - Math.abs(b.a - area)).slice(0, 1)).sort(
+          (a, b) => ((b.t.share ?? 0) * (placed + 1) - (zc.get(b.t.name) ?? 0)) - ((a.t.share ?? 0) * (placed + 1) - (zc.get(a.t.name) ?? 0)),
+        )[0]!.t;
+        const core = Math.max(0.5, Math.min(lf, lb));
+        drafts.push({
+          ring,
+          area,
+          f: p.f,
+          a0: dir > 0 ? u0 : u0 - core,
+          b0: p.b0,
+          w: core,
+          d: p.d,
+          road: p.road,
+          zone: p.zone,
+          facingDeg: p.facingDeg,
+          kind: pickT.name,
+        });
+        plotIndex.add(ring);
+        if (p.road) p.road.plots += 1;
+        zc.set(pickT.name, (zc.get(pickT.name) ?? 0) + 1);
+        kindCount.set(p.zone, zc);
+        ends += 1;
+      }
+    }
+    // Where the edge of the land cuts across the back of a row, the plot is four-sided the other way:
+    // its front on the street, its back along the edge, widened so it keeps its type's area.
+    const yMinH = yardsFor(sftToM2(minRule.plot_sft[0]), buaOf(minRule.name));
+    const minDepth = yMinH.front + yMinH.rear + num(planning, 'villas.house.min_house_side_m');
+    let shallow = 0;
+    for (const r of roads) {
+      if (!r.kept || !r.row) continue;
+      const line = plotLine(r.centreline);
+      for (let q = 1; q < line.length; q += 1) {
+        const A = line[q - 1]!;
+        const B = line[q]!;
+        const len = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (len < 6) continue;
+        const t: Pt = [(B[0] - A[0]) / len, (B[1] - A[1]) / len];
+        const off = r.widthM / 2 + 0.25;
+        for (const side of [1, -1] as const) {
+          const v: Pt = [-t[1] * side, t[0] * side];
+          const f: Frame = side > 0 ? { c: A, u: t, v } : { c: A, u: [-t[0], -t[1]], v };
+          const depthAt = (u: number): number => {
+            let dd = 0;
+            while (dd < plotD && free(f, u, off + dd + 0.5)) dd += 0.5;
+            return dd;
+          };
+          for (let x = 0; x + 4 <= len; ) {
+            let placed = 0;
+            for (const kind of kindsAt(toWorld(f, side > 0 ? x + plotW / 2 : -(x + plotW / 2), off + plotD / 2))) {
+              const target = sftToM2(ruleOf(kind).plot_sft[0]);
+              for (let w = widthOf(kind); w <= Math.min(2.2 * widthOf(kind), len - x) && placed === 0; w += 0.5) {
+                const ua = side > 0 ? x : -(x + w);
+                const ub = ua + w;
+                const dl = depthAt(ua + 0.4);
+                const dr = depthAt(ub - 0.4);
+                if (Math.min(dl, dr) < minDepth || Math.min(dl, dr) >= plotD - 0.5) continue;
+                const area = (w * (dl + dr)) / 2;
+                if (area < 0.95 * target) continue;
+                if (area > 1.15 * target) break;
+                const ring: Ring = [toWorld(f, ua, off), toWorld(f, ub, off), toWorld(f, ub, off + dr), toWorld(f, ua, off + dl)];
+                if (plotIndex.overlaps(ring) || !clearOfRoads(ring)) continue;
+                const cc = dem.cellAt(toWorld(f, ua + w / 2, off + Math.min(dl, dr) / 2));
+                if (!cc || !villaLand[cc.j * nx + cc.i]) continue;
+                const zi = zoneOf[cc.j * nx + cc.i]!;
+                const zoneName = zi >= 0 ? zones[zi]!.name : '';
+                const core = Math.min(dl, dr);
+                drafts.push({
+                  ring,
+                  area,
+                  f,
+                  a0: ua,
+                  b0: off,
+                  w,
+                  d: core,
+                  road: r,
+                  zone: zoneName,
+                  facingDeg: (((Math.atan2(-f.v[0], -f.v[1]) * 180) / Math.PI) + 360) % 360,
+                  kind,
+                });
+                plotIndex.add(ring);
+                r.plots += 1;
+                const zc = kindCount.get(zoneName) ?? new Map<VillaKind, number>();
+                zc.set(kind, (zc.get(kind) ?? 0) + 1);
+                kindCount.set(zoneName, zc);
+                shallow += 1;
+                placed = w;
+              }
+              if (placed > 0) break;
+            }
+            x += placed > 0 ? placed : 1;
+          }
+        }
+      }
+    }
+    if (ends + shallow > 0) {
+      notes.push(`${ends + shallow} plots at the ends and edges of rows are four-sided, one side along the edge of the land (owner 7 Oct)`);
+    }
+  }
+
   // Second pass (owner 28 Sep): the pockets the first pass left, at row ends,
   // corners and zone edges, filled with plots that flex in width and depth
   // within their type's range, square to the road they front, and free to run
@@ -1778,7 +2048,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     let deepened = 0;
     for (const p of drafts) {
       const t = ruleOf(p.kind);
-      const dMax = maxFlexArea(t) / p.w;
+      const dMax = (isMix ? mixGrow * sftToM2(t.plot_sft[0]) : maxFlexArea(t)) / p.w;
+      if (p.area !== undefined) continue; // a four-sided end plot keeps its shape
       if (dMax < p.d + 0.5) continue;
       for (let dNew = dMax; dNew >= p.d + 0.5; dNew -= 0.5) {
         // Not into a size whose yards leave the house short of its BUA (above KMBR's small-plot limit).
@@ -2668,7 +2939,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const plots: PlanPlot[] = keptDrafts.map((d, i) => {
     const smp = rectSamples(d.f, d.a0, d.a0 + d.w, d.b0, d.b0 + d.d, 1);
     const pf = platformFor(dem, smp, plotLimit, delta);
-    const area = d.w * d.d;
+    const area = d.area ?? d.w * d.d;
     const centre = toWorld(d.f, d.a0 + d.w / 2, d.b0 + d.d / 2);
     const cc = dem.cellAt(centre);
     const bi = cc ? blockOf[cc.j * nx + cc.i]! : -1;
