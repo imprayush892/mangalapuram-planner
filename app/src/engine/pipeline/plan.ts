@@ -3,7 +3,7 @@ import type { MultiPoly, Pt, Ring } from '../geom/types';
 import type { SiteFeature } from '../site/types';
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
-import { bufferPolyline, roadFromEdge } from '../geom/offset';
+import { bufferPolyline, roadFromEdge, roadStrip } from '../geom/offset';
 import { difference, intersect as intersectPolys, union } from '../geom/boolean';
 import { pointInMulti } from '../geom/planar';
 import { coverageFsi, highRise, gapBetweenBuildingsM } from '../rules/kmbr';
@@ -462,6 +462,17 @@ function ringGap(a: Ring, b: Ring): number {
     return hit;
   };
   if (a.some((p) => inside(p, b)) || b.some((p) => inside(p, a))) return 0;
+  // Two rings can cross like a plus sign with no corner of either inside the other: their edges cross.
+  const cross = (p: Pt, q: Pt, r: Pt): number => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  for (let i = 0; i < a.length; i += 1) {
+    const p1 = a[i]!;
+    const p2 = a[(i + 1) % a.length]!;
+    for (let j = 0; j < b.length; j += 1) {
+      const q1 = b[j]!;
+      const q2 = b[(j + 1) % b.length]!;
+      if (cross(p1, p2, q1) * cross(p1, p2, q2) < 0 && cross(q1, q2, p1) * cross(q1, q2, p2) < 0) return 0;
+    }
+  }
   let m = Number.POSITIVE_INFINITY;
   for (const p of a) for (let i = 0; i < b.length; i += 1) m = Math.min(m, segDist(p, b[i]!, b[(i + 1) % b.length]!));
   for (const p of b) for (let i = 0; i < a.length; i += 1) m = Math.min(m, segDist(p, a[i]!, a[(i + 1) % a.length]!));
@@ -1101,7 +1112,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       tier,
       centreline: line,
       widthM: width[tier],
-      geom: bufferPolyline(line, width[tier]),
+      geom: roadStrip(line, width[tier]),
       lengthM: lineLength(line),
       limit: lim[tier],
       terrainMaxGrade: prof.terrainMaxGrade,
@@ -2346,6 +2357,16 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   ): { floors: number; wings: Placed[]; wingPlate: number; key: string; coverage: number } | null => {
     const cf = coverageFsi(input.kmbr, occ);
     const land = siteLand(z);
+    // One building's wings stand together on one piece of land, no road between them (largest piece first);
+    // only if no piece holds them all may they take the zone's land as a whole.
+    const lands: Mask[] = patches(dem, land)
+      .sort((x, y) => y.length - x.length)
+      .map((piece) => {
+        const m = emptyMask(dem);
+        for (const k of piece) m[k] = 1;
+        return m;
+      });
+    if (lands.length > 1) lands.push(land);
     let first = Math.max(1, fromFloors);
     while (first < maxFloors && buaM2 / first > (cf.coveragePct / 100) * z.areaM2) first += 1;
     // Square to the land's own frame at every floor count first; only a zone that holds none of
@@ -2357,8 +2378,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         const wingPlate = plate / nW;
         for (const turn of turns) {
           for (const asp of plateAspects) {
-            const wings = pickCompact(candidatesIn(land, plateDims(wingPlate, asp), setback, turn), nW, gap);
-            if (wings.length === nW) return { floors, wings, wingPlate, key: cf.key, coverage: cf.coveragePct };
+            for (const piece of lands.length > 0 ? lands : [land]) {
+              const wings = pickCompact(candidatesIn(piece, plateDims(wingPlate, asp), setback, turn), nW, gap);
+              if (wings.length === nW) return { floors, wings, wingPlate, key: cf.key, coverage: cf.coveragePct };
+            }
           }
         }
       }
@@ -2844,22 +2867,73 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   }
   if (seniorLeft > 0 && !zones.some((z) => z.use === 'senior' && progOf(z))) notes.push(`${seniorLeft} senior buildings (G+${sen.floors - 1}) do not fit in the senior living zone's buildable land`);
 
-  // A drive to every building that no road reaches.
+  // A drive to every building that no road reaches. It stops at the building's edge (its centreline half its
+  // width plus a metre off the wall) and goes round every building on the way, not through one.
   const reachM = 12;
+  const driveOff = width.secondary / 2 + 1;
+  const allBuilt = rasterise(
+    dem,
+    draftsB.map((q) => [q.podium?.ring ?? q.placed.ring]),
+  );
+  const keepClear = dilate(dem, allBuilt, driveOff - 0.5);
+  // ...and keeps its half width off the villa plots (routing alone only keeps its centreline off them), with 2 m
+  // more for the line straightened from the routed cells (1.5 m) and the cells themselves.
+  const plotsClear = dilate(dem, rasterise(dem, drafts.map((p) => [p.ring])), width.secondary / 2 + 2);
+  const distToRing = (q: Pt, ring: Ring): number => {
+    let m = Infinity;
+    for (let i = 0; i < ring.length; i += 1) {
+      const A = ring[i]!;
+      const B = ring[(i + 1) % ring.length]!;
+      const dx = B[0] - A[0];
+      const dy = B[1] - A[1];
+      const L2 = dx * dx + dy * dy;
+      const t = L2 > 0 ? Math.max(0, Math.min(1, ((q[0] - A[0]) * dx + (q[1] - A[1]) * dy) / L2)) : 0;
+      m = Math.min(m, Math.hypot(q[0] - A[0] - t * dx, q[1] - A[1] - t * dy));
+    }
+    return m;
+  };
+  // One drive serves a campus: the wings of a school, a hospital, a clubhouse or a senior enclave share it (their
+  // own paths link them); each apartment tower has its own.
+  const reachedGroup = new Set<string>();
+  const groupOf = (b: DraftBuilding): string | null => (b.use === 'apartments' ? null : `${b.zone.name}|${b.use}`);
   for (const b of draftsB) {
     const ring = b.podium?.ring ?? b.placed.ring;
     const own = rasterise(dem, [[ring]]);
     const near = cellsOf(dilate(dem, own, reachM));
-    if (nearNetwork(near, 0)) continue;
-    const target = and(dilate(dem, own, 3), terrain);
+    const grp = groupOf(b);
+    if (nearNetwork(near, 0)) {
+      if (grp) reachedGroup.add(grp);
+      continue;
+    }
+    if (grp && reachedGroup.has(grp)) continue;
+    // A campus's drive goes to whichever of its wings is nearest, not between them to the first one listed.
+    const wings = grp ? draftsB.filter((q) => groupOf(q) === grp).map((q) => q.podium?.ring ?? q.placed.ring) : [ring];
+    const groupMask = rasterise(dem, wings.map((w) => [w]));
+    const target = and(dilate(dem, groupMask, 3), terrain);
+    const ownClear = dilate(dem, groupMask, driveOff - 0.5);
     const cost = Float32Array.from(baseCost);
     for (let k = 0; k < n; k += 1) if (target[k]) cost[k] = Math.min(Number.isFinite(cost[k]!) ? cost[k]! : 5, 5);
-    const r = route({ dem, cost, grade: lim.secondary, overGradePenalty: penalty, sources: networkCells(), targets: target, dirWeight });
+    for (let k = 0; k < n; k += 1) if ((keepClear[k] && !ownClear[k]) || plotsClear[k]) cost[k] = Number.POSITIVE_INFINITY;
+    const r = route({ dem, cost, grade: lim.secondary, overGradePenalty: penalty, sources: networkCells().filter((k) => !plotsClear[k]), targets: target, dirWeight });
     if (!r.path) {
       notes.push(`no drive can be built to a ${b.use} building in ${b.zone.name}`);
       continue;
     }
-    const rd = addRoad('secondary', lineOf(r.path), `drive to the ${b.use} building${b.use === 'apartments' ? "'s podium" : ''} in ${b.zone.name}`);
+    // The drive stops short of the wall: its centreline half its width and a metre off.
+    const line = lineOf(r.path);
+    const distToWings = (q: Pt): number => Math.min(...wings.map((w) => distToRing(q, w)));
+    while (line.length > 2 && distToWings(line[line.length - 1]!) < driveOff) line.pop();
+    const last = line[line.length - 1]!;
+    const prev = line[line.length - 2]!;
+    const dLast = distToWings(last);
+    if (dLast < driveOff) {
+      // Pull the end back along the last step until it is clear.
+      const dPrev = distToWings(prev);
+      const t = dPrev > dLast ? Math.min(1, (driveOff - dLast) / (dPrev - dLast)) : 1;
+      line[line.length - 1] = [last[0] + (prev[0] - last[0]) * t, last[1] + (prev[1] - last[1]) * t];
+    }
+    const rd = addRoad('secondary', line, `drive to the ${b.use} building${b.use === 'apartments' ? "'s podium" : ''} in ${b.zone.name}`);
+    if (grp) reachedGroup.add(grp);
     if (rd) {
       rd.access = true;
       for (const k of rd.cells) baseCost[k] = Math.min(baseCost[k]!, c.road);

@@ -373,3 +373,17 @@ Each of these is a switch or an editable assumption, not a silent decision.
   the pocket pass took only its own zone's plots off, though one grid runs across zones. Both fixed; the plot index
   also files a long plot under every cell it covers. The plots' reported share now matches their drawn land:
   80.8% (D1) and 81.4% (D2). The test checks that no two plots overlap.
+
+## 7 Oct 2026 · no building, plot or road on another (owner: "why are these blocks overlapping")
+
+- Hospital blocks (1,161 m2), retail blocks (348 m2) and two school wings (206 m2) overlapped: the clear-distance
+  test between wings measured corner to edge, and two blocks crossing like a plus sign have no corner inside the
+  other. It now also tests whether their edges cross.
+- A trunk road was drawn across a tower 5.6 m from its centreline: the routed line turns in short steps and a mitred
+  corner throws a spike up to the full width. The plan's roads are drawn with round joins (`roadStrip`), the same
+  half-width test the clearances use.
+- Drives to buildings ran into their walls and through other buildings and plots. A drive now ends half its width
+  and a metre off the wall, goes round every other building and keeps its half width (plus 2 m for the straightened
+  line) off the villa plots. One drive serves a campus (school, hospital, clubhouse, senior enclave), to its nearest
+  wing; each apartment tower keeps its own. A building's wings stand on one piece of land, no road between them.
+- D1 and D2: no two buildings or plots overlap and no road crosses a plot or a building (tested).

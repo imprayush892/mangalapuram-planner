@@ -6,6 +6,8 @@ import type { PlanResult } from '../pipeline/plan';
 import { basisOf, planBasis } from '../pipeline/basis';
 import { pick } from '../data/config';
 import { m2ToAcres } from '../units';
+import { intersect } from '../geom/boolean';
+import { multiPolyArea } from '../geom/planar';
 
 // Owner 7 Oct 2026: the plan on the owner's draft financial model ("Draft model.xlsx"): its programme
 // (config/programme_draft_model.yaml) on the zoning drawn for it (tools/zoning/draft_model.py).
@@ -124,6 +126,21 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     expect(overlaps).toBe(0);
     // Owner 7 Oct ("80-81% is workable"): about four fifths of the villa land in plots.
     expect(p.option.plottedShare).toBeGreaterThan(0.79);
+  });
+
+  it('keeps every building clear of the other buildings, the roads and the plots, and the roads off the plots', async () => {
+    const p = await plan();
+    const roads = p.roads.flatMap((r) => r.geom);
+    const clash = (a: [number, number][], b: [number, number][]): number => multiPolyArea(intersect([[a]], [[b]]));
+    for (const [i, b] of p.buildings.entries()) {
+      const ring = b.ring as [number, number][];
+      for (const o of p.buildings.slice(i + 1)) expect(clash(ring, o.ring as [number, number][]), `${b.id} on ${o.id}`).toBeLessThan(1);
+      expect(multiPolyArea(intersect([[ring]], roads)), `${b.id} on a road`).toBeLessThan(1);
+      for (const q of p.plots) expect(clash(ring, q.ring as [number, number][]), `${b.id} on ${q.id}`).toBeLessThan(1);
+    }
+    // and no road runs over a plot (a square metre of drawing either way).
+    const onRoads = p.plots.reduce((t, q) => t + multiPolyArea(intersect([[q.ring as [number, number][]]], roads)), 0);
+    expect(onRoads).toBeLessThan(5);
   });
 
   it('reports the model apartments, massed in towers under the airport limit', async () => {

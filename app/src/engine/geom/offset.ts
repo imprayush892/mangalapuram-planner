@@ -97,14 +97,29 @@ export function insetMulti(mp: MultiPoly, distance: number): MultiPoly {
  * Clipper2 halves the delta for open paths, so the delta passed is the whole width. (Before 7 Oct 2026
  * this passed width / 2 and every strip came out half as wide as asked.)
  */
-export function bufferPolyline(line: readonly Pt[], width: number, square = true): MultiPoly {
+export function bufferPolyline(line: readonly Pt[], width: number, square = true, roundJoins = false): MultiPoly {
   if (line.length < 2 || width <= 0) return [];
   const paths = new Paths64();
   const path = new Path64();
   for (const [x, y] of line) path.push(new Point64(Math.round(x * SCALE), Math.round(y * SCALE)));
   paths.push(path);
-  const out = Clipper.InflatePaths(paths, width * SCALE, JoinType.Miter, square ? EndType.Butt : EndType.Round, 2);
+  const out = Clipper.InflatePaths(
+    paths,
+    width * SCALE,
+    roundJoins ? JoinType.Round : JoinType.Miter,
+    square ? EndType.Butt : EndType.Round,
+    2,
+  );
   return fromPaths(out);
+}
+
+/**
+ * A road drawn from its centreline: everything within half its width of the line, the same test the plan's
+ * clearances use. Round joins and ends: a routed line turns in short steps, and a mitred corner on a tight
+ * turn throws a spike up to the full width beyond the road (it once drew a road across a tower 5.6 m away).
+ */
+export function roadStrip(line: readonly Pt[], width: number): MultiPoly {
+  return bufferPolyline(line, width, false, true);
 }
 
 /**
