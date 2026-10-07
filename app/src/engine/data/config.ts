@@ -12,6 +12,8 @@ export interface ConfigBundle {
   kmbr: YamlDoc;
   client: YamlDoc;
   programme: YamlDoc;
+  /** The owner's draft financial model (config/programme_draft_model.yaml), read with options.basis: draft_model. */
+  programmeDraft: YamlDoc;
   assumptions: YamlDoc;
   siting: YamlDoc;
   /** Owner overrides (config/planning_rules.yaml): win where they overlap client rules. */
@@ -19,10 +21,11 @@ export interface ConfigBundle {
 }
 
 export async function loadConfig(src: AssetSource): Promise<ConfigBundle> {
-  const [kmbr, client, programme, assumptions, siting, planning] = await Promise.all([
+  const [kmbr, client, programme, programmeDraft, assumptions, siting, planning] = await Promise.all([
     src.text('config/kmbr_rules.yaml'),
     src.text('config/client_rules.yaml'),
     src.text('config/programme.yaml'),
+    src.text('config/programme_draft_model.yaml'),
     src.text('config/assumptions.yaml'),
     src.text('config/siting_rules.yaml'),
     src.text('config/planning_rules.yaml'),
@@ -31,6 +34,7 @@ export async function loadConfig(src: AssetSource): Promise<ConfigBundle> {
     kmbr: parseYaml(kmbr) as YamlDoc,
     client: parseYaml(client) as YamlDoc,
     programme: parseYaml(programme) as YamlDoc,
+    programmeDraft: parseYaml(programmeDraft) as YamlDoc,
     assumptions: parseYaml(assumptions) as YamlDoc,
     siting: parseYaml(siting) as YamlDoc,
     planning: parseYaml(planning) as YamlDoc,

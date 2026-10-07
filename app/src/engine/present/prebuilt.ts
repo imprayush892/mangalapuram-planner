@@ -2,29 +2,24 @@ import type { AssetSource } from '../data/source';
 import type { PlanResult } from '../pipeline/plan';
 
 /**
- * The eight master plans worked out ahead of time, for a hosted copy of the app:
+ * The master plans worked out ahead of time, for a hosted copy of the app:
  * sizing a plan's villas can take a minute, longer on a tablet, and
  * a host may not start workers at all. Each file carries a fingerprint of the
  * rules and the site it was planned on; the app uses a file only when the
  * fingerprint matches what it has loaded, so a prebuilt plan is never stale.
  */
 
-export type PresentOptionId = 'A1' | 'A2' | 'B1' | 'B2' | 'B3' | 'B4' | 'C1' | 'C2';
+export type PresentOptionId = 'D1' | 'D2';
 
 /**
- * The eight master plans (owner 25 and 28 Sep): villa category (planning_rules.yaml
- * villas.categories) by road layout. The one list the panel, the presentation
- * and the prebuild all read.
+ * The master plans on the owner's draft financial model (owner 7 Oct 2026: planning_rules.yaml
+ * options.basis draft_model): its programme and zoning, its four villa plot types (MIX), by road
+ * layout. The one list the panel, the presentation and the prebuild all read. (The client-basis
+ * options A1-C2 of 28 Sep run with options.basis: client.)
  */
-export const PRESENT_PLAN_OPTIONS: { id: PresentOptionId; sizing: 'A' | 'B' | 'B_count' | 'C'; roads: 'terrain' | 'north_south'; label: string }[] = [
-  { id: 'A1', sizing: 'A', roads: 'terrain', label: 'Large villas · roads to the ground' },
-  { id: 'A2', sizing: 'A', roads: 'north_south', label: 'Large villas · north–south roads' },
-  { id: 'B1', sizing: 'B', roads: 'terrain', label: 'Client plot size held · roads to the ground' },
-  { id: 'B2', sizing: 'B', roads: 'north_south', label: 'Client plot size held · north–south roads' },
-  { id: 'B3', sizing: 'B_count', roads: 'terrain', label: 'Client 700 units held (G+2) · roads to the ground' },
-  { id: 'B4', sizing: 'B_count', roads: 'north_south', label: 'Client 700 units held (G+2) · north–south roads' },
-  { id: 'C1', sizing: 'C', roads: 'terrain', label: 'Standard and premium · roads to the ground' },
-  { id: 'C2', sizing: 'C', roads: 'north_south', label: 'Standard and premium · north–south roads' },
+export const PRESENT_PLAN_OPTIONS: { id: PresentOptionId; sizing: 'A' | 'B' | 'B_count' | 'C' | 'MIX'; roads: 'terrain' | 'north_south'; label: string }[] = [
+  { id: 'D1', sizing: 'MIX', roads: 'terrain', label: 'Draft model · roads to the ground' },
+  { id: 'D2', sizing: 'MIX', roads: 'north_south', label: 'Draft model · north–south roads (Vastu)' },
 ];
 
 /** What a plan depends on, relative to the data directory. */
@@ -34,9 +29,11 @@ export const FINGERPRINT_FILES = [
   'config/kmbr_rules.yaml',
   'config/planning_rules.yaml',
   'config/programme.yaml',
+  'config/programme_draft_model.yaml',
   'processed/dem_2m.json',
   'processed/parcel.geojson',
   'processed/zones_client_registered.geojson',
+  'processed/zones_draft_model.geojson',
   'processed/site_features.geojson',
 ];
 

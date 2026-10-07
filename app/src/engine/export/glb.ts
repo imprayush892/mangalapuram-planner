@@ -52,6 +52,9 @@ const PLAN_COLOURS: Record<Exclude<Typology, 'open' | 'golf' | 'reserved' | 'fut
   school: 0xc4dcf4,
   clubhouse: 0xc8ecc8,
   commercial: 0xf2c9e0,
+  retail: 0xf2c9e0,
+  office: 0xe2c4dc,
+  hospital: 0xb9d6e0,
   batching: 0xc9b9a6,
 };
 

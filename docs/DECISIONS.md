@@ -294,3 +294,26 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - The south primary road follows the owner's sketch along the parcel's south edge (roads.owner_routes) instead of
   crossing the Phase 3 apartment zone: the zone was fixed, and with the road at its edge the Phase 3 tower fits in every
   option (A1 lost it before).
+
+## 7 Oct 2026 · the owner's draft financial model becomes the basis
+
+- The plan is drawn on the owner's "Draft model.xlsx" (planning_rules.yaml `options.basis: draft_model`): 73 ac,
+  its 20 components (config/programme_draft_model.yaml, each figure cited to its Inputs cell), four phases. The client's
+  cashflow V4 and zoning plan stay available as `options.basis: client`.
+- A new zoning was drawn for it (tools/zoning/draft_model.py -> data/processed/zones_draft_model.geojson): one zone per
+  component at the model's land, cut from the client's zones, none on waterlogged ground:
+  - phases run outward from the main gate (north, on the Mangalapuram-Pothencode road);
+  - the hospital (5 ac) stays on the site, on the main road on the highway side (NH66 is at Mangalapuram, ~3 km
+    south-west): the north-west lobe; the office and the retail street are on the main road too;
+  - apartment towers go where they hide the least of the villas' views (first-floor sight-lines from every villa,
+    tools/zoning): the north-east corner, the east lobe and the south-west low ground.
+- The client's 18 m N-S entry road from the main gate is an owner road on this basis, along the gate arm's west
+  edge; the retail street is the strip east of it.
+- Villas: the model's four plot types (1,800 / 2,250 / 2,500 / 2,800 sq ft; villas 2,000-2,700 sq ft) in its mix
+  (20/40/30/10%), each villa zone at its component's count (48 / 80 / 96 / 96). Plots are the model's sizes, not ranges.
+- The model sells 85% of the villa land as plots (Inputs C41). The test fits plot about 50-60% of it (188 and 222 of
+  320 villas): roads, slope and the zones' shapes take the rest. Either the villa land or the count needs revisiting
+  in the model.
+- Hospital, retail and office are blocks to their construction area, coverage from KMBR Table 6 (C, F, E). Floors
+  are assumptions (hospital up to 8, retail up to G+4 on its narrow strip, office up to 12). A senior zone that holds
+  too few G+3 blocks lets them rise to G+5 (ASSUMPTION).

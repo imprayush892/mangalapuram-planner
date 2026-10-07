@@ -32,6 +32,10 @@ export interface Zone {
   inScopeAc: number;
   computedInScopeAc: number;
   confidence: GeometryConfidence;
+  /** Draft-model zones (zones_draft_model.geojson) carry their use, phase and programme component. */
+  use?: string;
+  phase?: number;
+  component?: string;
 }
 
 export interface SiteFeature {

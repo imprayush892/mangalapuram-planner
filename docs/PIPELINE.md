@@ -77,6 +77,16 @@ Shared by all six (owner, 25 Sep, revised):
 
 The web app's plan panel switches between the four options (the count options take about a minute).
 
+## The basis: whose programme, on whose zoning (owner, 7 Oct)
+
+`options.basis` in planning_rules.yaml picks what the plan is drawn on. `draft_model` (the default since 7 Oct):
+the owner's draft financial model (config/programme_draft_model.yaml) on the zoning drawn for it
+(data/processed/zones_draft_model.geojson, made by tools/zoning/draft_model.py from the analysis layers that
+`node app/scripts/export-layers.mjs` writes), with the rules under `bases.draft_model` replacing the client-basis
+values. Each draft zone carries its use, phase and component; the plan builds each zone to its own programme line and
+reports one row per component. `client`: the client's cashflow V4 on the client's zoning plan (options A1-C2).
+The app's options are D1 (roads to the ground) and D2 (north-south roads) on the draft model.
+
 ## What the plan does not do yet
 - The hotel and the business hub have no zone in the client's zoning plan and are not placed.
 - The airport limit uses an estimated TBM level (70.6 m AMSL from SRTM, about ±10 m) until the

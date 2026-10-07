@@ -9,6 +9,7 @@ import type { ConfigBundle } from './data/config';
 import { runAnalysis } from './pipeline/analysis';
 import type { AnalysisResult } from './pipeline/analysis';
 import { runPlanSized } from './pipeline/plan';
+import { planBasis } from './pipeline/basis';
 import type { PlanResult } from './pipeline/plan';
 import { generateVillaLayouts } from './generators/villa';
 import type { RoadDirection } from './generators/villa';
@@ -110,6 +111,7 @@ async function loadContext(
       kmbr: applyOverrides(baseConfig.kmbr, overrides.kmbr),
       client: applyOverrides(baseConfig.client, overrides.client),
       programme: applyOverrides(baseConfig.programme, overrides.programme),
+      programmeDraft: baseConfig.programmeDraft,
       assumptions: applyOverrides(baseConfig.assumptions, overrides.assumptions),
       siting: applyOverrides(baseConfig.siting, overrides.siting),
       planning: applyOverrides(baseConfig.planning, overrides.planning ?? {}),
@@ -143,12 +145,10 @@ export async function runPipelineJob(
     {
       dem: site.dem,
       features: site.features,
-      zones: site.zones.map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc })),
       kmbr: config.kmbr,
       client: config.client,
       assumptions: config.assumptions,
-      planning: config.planning,
-      programme: config.programme,
+      ...planBasis(site, config),
     },
     analysis,
   );

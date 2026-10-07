@@ -256,7 +256,7 @@ interface PresentState {
 }
 
 function optionOf(plan: PlanResult): OptionId {
-  return PRESENT_OPTIONS.find((o) => o.sizing === plan.option.villaSizing && o.roads === plan.option.roads)?.id ?? 'A1';
+  return PRESENT_OPTIONS.find((o) => o.sizing === plan.option.villaSizing && o.roads === plan.option.roads)?.id ?? 'D1';
 }
 
 /** The plan as a step shows it: only the building uses it has reached. */
@@ -407,7 +407,7 @@ async function prepare(overrides: OverrideSet): Promise<void> {
 export const usePresent = create<PresentState>((set, get) => ({
   active: false,
   step: 0,
-  option: 'A1',
+  option: 'D1',
   plans: {},
   prep: {},
   errors: {},
@@ -427,7 +427,7 @@ export const usePresent = create<PresentState>((set, get) => ({
     };
     // The plan on screen answers the rules as they stand: it is one of the four.
     const plans: Partial<Record<OptionId, PlanResult>> = {};
-    let option: OptionId = 'A1';
+    let option: OptionId = 'D1';
     if (pl.plan) {
       option = optionOf(pl.plan);
       plans[option] = pl.plan;

@@ -116,7 +116,11 @@ export default function PipelinePlanSection(): React.ReactElement {
           <div className="mb-1 text-[10px] text-muted">
             Villas: {plan.plots.length} plots{plan.option.villaTarget > 0 ? ` of ${plan.option.villaTarget}` : ''} ·{' '}
             {plan.option.types
-              .map((t) => `${t.count} ${t.name} ${fmt(t.plotM2 * 10.7639)} sq ft plot, ${fmt(t.buaSft)} sq ft BUA`)
+              .map((t) =>
+                plan.option.villaSizing === 'MIX'
+                  ? `${t.count} × ${t.name} (${fmt(t.buaSft)} sq ft BUA)`
+                  : `${t.count} ${t.name} ${fmt(t.plotM2 * 10.7639)} sq ft plot, ${fmt(t.buaSft)} sq ft BUA`,
+              )
               .join(' · ')}{' '}
             · gross FSI {plan.option.grossFsi.toFixed(2)} · plots {Math.round(plan.option.plottedShare * 100)}% of the villa land
           </div>
@@ -128,8 +132,8 @@ export default function PipelinePlanSection(): React.ReactElement {
         ) : (
           <div className="flex flex-col gap-1 text-[11px]">
             <div className="text-[10px] text-muted">
-              Planned in {(planMs / 1000).toFixed(1)} s. Every use sits in its zone of the client's zoning plan; the water and
-              the slope above take ground from a zone only to give it to open space.
+              Planned in {(planMs / 1000).toFixed(1)} s. Every use sits in its zone of the zoning; the water and the slope
+              above take ground from a zone only to give it to open space.
             </div>
 
             <div className="mt-1 font-semibold text-fg">What the programme asked, and what fits</div>
@@ -145,7 +149,7 @@ export default function PipelinePlanSection(): React.ReactElement {
               </tbody>
             </table>
 
-            <div className="mt-2 font-semibold text-fg">The client's zones</div>
+            <div className="mt-2 font-semibold text-fg">The zones</div>
             <table className="w-full text-[10px]">
               <tbody>
                 {plan.zones.map((z) => (
@@ -206,8 +210,12 @@ export default function PipelinePlanSection(): React.ReactElement {
                 <div className="mt-2 font-semibold text-fg">Steps 9–11 · villa plots</div>
                 <Row
                   label="Plots"
-                  value={`${plotStats.n} · ${plotStats.standard} standard, ${plotStats.n - plotStats.standard} compact`}
-                  hint="standard 2,500-3,000 sq ft, compact 2,000-2,500 where a standard one will not fit; 15 m wide at least; FSI 1.0; on both sides of every road through villa land"
+                  value={
+                    plan.option.villaSizing === 'MIX'
+                      ? `${plotStats.n} · ${plan.option.types.map((t) => `${t.count} × ${t.name}`).join(', ')}`
+                      : `${plotStats.n} · ${plotStats.standard} standard, ${plotStats.n - plotStats.standard} other`
+                  }
+                  hint="plots on both sides of every road through villa land, each at its type's size"
                 />
                 <Row
                   label="Within 1:5 as the ground lies"

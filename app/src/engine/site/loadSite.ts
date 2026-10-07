@@ -29,6 +29,11 @@ export interface SiteModel {
   parcelAreaM2: number;
   parcelAreaAc: number;
   zones: Zone[];
+  /**
+   * The zoning drawn for the owner's draft financial model (tools/zoning/draft_model.py), planned
+   * with options.basis: draft_model. Empty where the file is not shipped.
+   */
+  draftZones: Zone[];
   features: SiteFeature[];
   contours: ContourLine[];
   dem: Dem;
@@ -63,6 +68,9 @@ interface ParcelProps {
 
 interface ZoneProps {
   name: string;
+  use?: string;
+  phase?: number;
+  component?: string;
   label_area_ac: number;
   drawn_area_ac: number;
   in_scope_ac: number;
@@ -102,6 +110,9 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
     src.json<GeoJsonFeatureCollection<ContourProps>>('processed/contours_1m.geojson'),
     src.json<DemMeta>('processed/dem_2m.json'),
   ]);
+  const draftFc = await src
+    .json<GeoJsonFeatureCollection<ZoneProps>>('processed/zones_draft_model.geojson')
+    .catch(() => ({ type: 'FeatureCollection', features: [] }) as unknown as GeoJsonFeatureCollection<ZoneProps>);
 
   const demBuffer = await src.binary('processed/dem_2m.f32');
   const dem = demFromBuffer(demMeta, demBuffer);
@@ -146,7 +157,7 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
   const parcel = union(...parcelParts.filter((p) => p.status === 'in_scope').map((p) => p.geom));
   const parcelAreaM2 = multiPolyArea(parcel);
 
-  const zones: Zone[] = zonesFc.features.map((f, i) => {
+  const toZone = (f: GeoJsonFeatureCollection<ZoneProps>['features'][number], i: number): Zone => {
     const drawnGeom = geometryToMulti(f.geometry);
     const geom = intersect(drawnGeom, parcel);
     return {
@@ -159,8 +170,11 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
       inScopeAc: f.properties.in_scope_ac,
       computedInScopeAc: m2ToAcres(multiPolyArea(geom)),
       confidence: f.properties.geometry_confidence,
+      ...(f.properties.use ? { use: f.properties.use, phase: f.properties.phase, component: f.properties.component } : {}),
     };
-  });
+  };
+  const zones: Zone[] = zonesFc.features.map(toZone);
+  const draftZones: Zone[] = draftFc.features.filter((f) => f.geometry).map(toZone);
 
   const features: SiteFeature[] = featuresFc.features.map((f) => ({
     layer: f.properties.layer,
@@ -197,6 +211,7 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
     parcelAreaM2,
     parcelAreaAc: m2ToAcres(parcelAreaM2),
     zones,
+    draftZones,
     features,
     contours,
     dem,

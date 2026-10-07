@@ -1,0 +1,45 @@
+# PROGRAMME — the owner's draft financial model ("Draft model.xlsx", owner 7 Oct 2026).
+# Read with options.basis: draft_model (planning_rules.yaml). Every figure cites its cell on the
+# model's Inputs sheet. One line per component; each is planned in the zone of the same id in
+# data/processed/zones_draft_model.geojson (tools/zoning/draft_model.py).
+# Areas: saleable sft (column J) and construction sft (column M = saleable x area factor, column L).
+version: 2026-10-07
+source: "Draft model.xlsx, Inputs rows 97-116 (section 10), 123-145 (section 11), 151-172 (section 12)"
+scope:
+  township_land_ac: 73               # Inputs C16
+  roads_infrastructure_ac: 10.76     # Inputs C36 = 73 x 12% + 2
+  open_space_ac: 8.3                 # Inputs C38 = 73 x 10% + 1
+  villa_land_ac: 19.94               # Inputs C40 (the balance)
+  villa_plot_efficiency: 0.85        # Inputs C41: share of villa land sold as plots
+lines:
+  - {id: C01, use: site_office, phase: 1, bua_sft: 12000, land_ac: 0, name: "Sales office, arch, road & bellmouth"}           # row 97
+  - {id: C02, use: apartments, phase: 1, units: 93, saleable_sft: 149000, bua_sft: 171350, land_ac: 1.2}    # row 98
+  - {id: C03, use: villas, phase: 1, units: 48, saleable_sft: 114800, bua_sft: 114800, land_ac: 2.991}     # row 99
+  - {id: C08, use: club, phase: 1, bua_sft: 5000, land_ac: 0.5, name: "Villa clubhouse 1"}                    # row 100
+  - {id: C04, use: senior, phase: 1, units: 32, plinth_sft: 1000, saleable_sft: 32000, bua_sft: 38400, land_ac: 1.0}   # row 101
+  - {id: C05, use: school, phase: 2, bua_sft: 70000, land_ac: 2.5, name: "School stage A: primary & middle"}  # row 102
+  - {id: C06, use: hospital, phase: 2, bua_sft: 300000, land_ac: 5.0, name: "Hospital: core, shell & MEP"}    # row 103
+  - {id: C15, use: club, phase: 2, bua_sft: 5000, land_ac: 0.3, name: "Senior-living clubhouse"}               # row 104
+  - {id: C07, use: senior, phase: 2, units: 160, plinth_sft: 1000, saleable_sft: 160000, bua_sft: 192000, land_ac: 5.0}  # row 105
+  - {id: C09, use: villas, phase: 2, units: 80, saleable_sft: 191600, bua_sft: 191600, land_ac: 4.985}     # row 106
+  - {id: C17, use: villas, phase: 3, units: 96, saleable_sft: 230150, bua_sft: 230150, land_ac: 5.982}     # row 107
+  - {id: C18, use: villas, phase: 4, units: 96, saleable_sft: 230150, bua_sft: 230150, land_ac: 5.982}     # row 108
+  - {id: C10, use: club, phase: 3, bua_sft: 10000, land_ac: 1.2, name: "Villa clubhouse 2, with mini-golf"}    # row 109
+  - {id: C13, use: school, phase: 3, bua_sft: 40000, land_ac: 1.5, name: "School stage B: senior wing"}        # row 110
+  - {id: C11, use: apartments, phase: 2, units: 234, saleable_sft: 374600, bua_sft: 430790, land_ac: 3.0}   # row 111
+  - {id: C19, use: apartments, phase: 3, units: 304, saleable_sft: 486600, bua_sft: 559590, land_ac: 3.9}   # row 112
+  - {id: C20, use: apartments, phase: 4, units: 304, saleable_sft: 486600, bua_sft: 559590, land_ac: 3.9}   # row 113
+  - {id: C12, use: retail, phase: 3, saleable_sft: 75000, bua_sft: 90000, land_ac: 1.5, name: "Retail high street, mainly F&B (leased)"}   # row 114
+  - {id: C16, use: office, phase: 4, saleable_sft: 225000, bua_sft: 258750, land_ac: 2.5, name: "Commercial office (strata)"}               # row 115
+  - {id: C14, use: club, phase: 4, bua_sft: 18000, land_ac: 1.0, name: "Apartment clubhouse"}                  # row 116
+# Villa plot types: mix of units, villa size (saleable = built up, area factor 1), plot (rows 130-133).
+villa_types:
+  - {name: "1,800 sq ft plot", share: 0.2, plot_sft: 1800, bua_sft: 2000}
+  - {name: "2,250 sq ft plot", share: 0.4, plot_sft: 2250, bua_sft: 2400}
+  - {name: "2,500 sq ft plot", share: 0.3, plot_sft: 2500, bua_sft: 2550}
+  - {name: "2,800 sq ft plot", share: 0.1, plot_sft: 2800, bua_sft: 2700}
+# Apartment typologies (rows 161-163); carpet = saleable x 0.7 (C150).
+apartment_types:
+  - {name: 2BHK, share: 0.3, saleable_sft: 1200}
+  - {name: 3BHK, share: 0.5, saleable_sft: 1600}
+  - {name: 4BHK, share: 0.2, saleable_sft: 2200}

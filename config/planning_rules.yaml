@@ -19,8 +19,42 @@ version: 2026-09-25
 
 # The six master-plan options (owner 25 and 28 Sep): villa category x road orientation.
 options:
-  villa_sizing: A                # A, B, B_count or C: villas.categories
+  # Owner 7 Oct 2026: the plan is drawn on the owner's draft financial model ("Draft model.xlsx"):
+  # its programme (config/programme_draft_model.yaml) on the zoning drawn for it
+  # (data/processed/zones_draft_model.geojson, tools/zoning/draft_model.py), with the rules under
+  # bases.draft_model below. `client` is the client's cashflow V4 on the client's zoning plan.
+  basis: draft_model             # draft_model or client
+  villa_sizing: A                # client basis: A, B, B_count or C (villas.categories); draft model: MIX
   road_orientation: terrain      # terrain = least cut and fill; north_south = Vastu, primary and secondary N-S
+
+# Rules that replace the client-basis values on the draft-model basis (dotted path: value).
+bases:
+  draft_model:
+    options.villa_sizing: MIX
+    # The draft zones carry their own use and phase: none of the client-plan zoning moves apply.
+    zoning.clubhouse_dry_side_to: null
+    zoning.senior_zone_to_clubhouse: false
+    zoning.phase_land: []
+    # Each apartment zone holds its component's flats (programme_draft_model.yaml): towers as many
+    # as the flats need, at the floors the airport limit allows. The client-basis tower set is dropped.
+    apartments.towers_per_zone: null
+    apartments.towers_by_zone: []
+    apartments.units_total: null
+    apartments.tower_sites: []
+    apartments.tower_floors: null
+    apartments.tower_flats_per_floor: null
+    # The model's construction area is 1.15 x saleable for apartments (Inputs L98): 1 / 1.15 = 0.87.
+    apartments.plan_efficiency: 0.87
+    # The model sells 85% of the villa land as plots (Inputs C41); the plan reports against it.
+    villas.land_split: {plots: 0.85, roads: 0.15, tolerance: 0.05}
+    # Owner's roads: the client's 18 m entry road from the main gate on the Mangalapuram-Pothencode
+    # road south to the existing road (zoning plan: "Main gate / commercial strip, 18 m N-S road"),
+    # through the retail street; and the south road along the parcel edge (owner 28 Sep).
+    roads.owner_routes:
+      - {tier: primary, why: "the main entry road from the gate on the Mangalapuram-Pothencode road (client zoning plan, 18 m N-S road)",
+         points: [[340, 662], [334, 630], [331, 600], [329, 575], [326, 540], [325, 440], [330, 360], [345, 300]]}   # along the gate arm's west edge
+      - {tier: primary, why: "the owner's south road, along the parcel edge",
+         points: [[471, 11], [527, 28], [585, 30], [632, 37], [646, 57], [649, 72], [675, 87]]}
 
 zoning:
   source: client                           # data/processed/zones_client_registered.geojson
@@ -180,6 +214,13 @@ villas:
       # ASSUMPTION: premium in the client's premium zone, or where at least half the ground within
       # 250 m lies 5 m or more below the plot (an open outlook).
       premium_when: {zones: ["PREMIUM"], outlook_min: 0.5}
+    MIX:   # draft-model basis (owner 7 Oct): the model's four plot types in its mix, a set count per zone
+      # Types, shares, plots and villa sizes from programme_draft_model.yaml villa_types (Inputs rows
+      # 130-133); each villa zone's count is its component's units (Inputs column H). Plots are the
+      # model's sizes, not ranges; each next plot takes the type furthest behind its share.
+      types_from_programme: true
+      count: true
+      types: []
   # Plots are cut at one point in their type's range, searched from the largest down until the
   # category's target (count or gross FSI) is met.
   sizing_steps: 6
@@ -206,6 +247,7 @@ villas:
 
 senior_living:                             # replaces client "senior = villa-style plots"
   min_floors: 4                            # G+3 minimum
+  max_floors: 6                            # ASSUMPTION (draft model): where a zone fits too few G+3 blocks, they may rise to G+5
   min_clear_between_buildings_m: 12
   # Units and unit size come from programme.yaml (use: senior). DEFAULTS pending owner:
   units_per_floor: 6
@@ -299,6 +341,15 @@ commercial:                                # the client's COMMERCIAL & CONVENTIO
   max_wing_plate_m2: 2500                  # ASSUMPTION
   setback_m: 3.0                           # KMBR Table 4 front average; height-driven yards to be checked
   convention_floor_height_m: 8             # ASSUMPTION: one hall-height floor for the programme's convention hall
+
+# Draft model (owner 7 Oct): the hospital, retail street and office as blocks to their construction
+# area (programme_draft_model.yaml), coverage from KMBR Table 6 for the occupancy. ASSUMPTIONS: the
+# most floors each may take, and floor heights.
+blocks:
+  hospital: {occupancy: C_hospital, max_floors: 8, floor_height_m: 4.0}
+  # A high street: long blocks along the entry road in the gate arm, up to G+4 (ASSUMPTION: wing size, shapes, floors).
+  retail: {occupancy: F_commercial, max_floors: 5, floor_height_m: 4.5, wing_max_m2: 1800, aspects: [4, 3, 2], wing_gap_m: 6}
+  office: {occupancy: E_office, max_floors: 12, floor_height_m: 3.6}
 
 batching_plant:                            # the client's BATCHING PLANT zone: a temporary works yard
   plant_footprint_m: [30, 20]              # ASSUMPTION: mixer, silos and aggregate bins
