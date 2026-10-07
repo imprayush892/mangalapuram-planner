@@ -509,7 +509,9 @@ function rectsOverlap(a: Ring, b: Ring, tol = 0.05): boolean {
       const p = r[i]!;
       const q = r[(i + 1) % r.length]!;
       const ax: Pt = [-(q[1] - p[1]), q[0] - p[0]];
-      const L = Math.hypot(ax[0], ax[1]) || 1;
+      const L = Math.hypot(ax[0], ax[1]);
+      // A repeated corner has no edge, and so no axis to separate on (taking one gave false "clear" answers).
+      if (L < 1e-9) continue;
       const proj = (ring: Ring): [number, number] => {
         let lo = Infinity;
         let hi = -Infinity;
@@ -653,25 +655,33 @@ class SegIndex {
 class RingIndex {
   private readonly cells = new Map<string, Ring[]>();
   constructor(private readonly size: number) {}
-  private at(r: Ring): [number, number] {
-    const cx = r.reduce((s, p) => s + p[0], 0) / r.length;
-    const cy = r.reduce((s, p) => s + p[1], 0) / r.length;
-    return [Math.floor(cx / this.size), Math.floor(cy / this.size)];
+  /** The grid cells a ring's bounding box covers (a long plot or wedge spans several). */
+  private keys(r: Ring): string[] {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const [x, y] of r) {
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+    const out: string[] = [];
+    for (let i = Math.floor(x0 / this.size); i <= Math.floor(x1 / this.size); i += 1) {
+      for (let j = Math.floor(y0 / this.size); j <= Math.floor(y1 / this.size); j += 1) out.push(`${i},${j}`);
+    }
+    return out;
   }
   add(r: Ring): void {
-    const [i, j] = this.at(r);
-    const k = `${i},${j}`;
-    const list = this.cells.get(k);
-    if (list) list.push(r);
-    else this.cells.set(k, [r]);
+    for (const k of this.keys(r)) {
+      const list = this.cells.get(k);
+      if (list) list.push(r);
+      else this.cells.set(k, [r]);
+    }
   }
   overlaps(r: Ring): boolean {
-    const [i, j] = this.at(r);
-    for (let di = -1; di <= 1; di += 1) {
-      for (let dj = -1; dj <= 1; dj += 1) {
-        for (const o of this.cells.get(`${i + di},${j + dj}`) ?? []) if (rectsOverlap(o, r)) return true;
-      }
-    }
+    for (const k of this.keys(r)) for (const o of this.cells.get(k) ?? []) if (rectsOverlap(o, r)) return true;
     return false;
   }
 }
@@ -1757,6 +1767,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   };
   const drafts: DraftPlot[] = [];
   const plotIndex = new RingIndex(25);
+
   // The plot's front line off the road's edge. MIX (owner 7 Oct: 85% in plots): on the edge, so no strip of
   // land runs between every road and the plots along it.
   const frontGap = isMix ? 0.02 : 0.25;
@@ -2132,7 +2143,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       }
     }
     if (deepened > 0) notes.push(`${deepened} plots deepened into the strip behind them, within their range, so it is not left over`);
-    // MIX (owner 7 Oct: the model's 85% is plots): where the edge of the land runs at a slant behind a
+      // MIX (owner 7 Oct: the model's 85% is plots): where the edge of the land runs at a slant behind a
     // plot, its back follows the edge, so the wedge is the plot's garden, not left over. Still four-sided:
     // the front and both sides as they were, the back along the edge.
     if (isMix) {
@@ -3069,7 +3080,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       const zg = input.zones[zi]!.geom;
       const zName = zones[zi]!.name;
       const near = keptDrafts.filter((q) => q.zone === zName || pointInMulti(q.ring[0]!, zg));
-      let left = difference(zg, roadPolys, near.map((q) => [q.ring] as Ring[]));
+      // Every plot comes off, whichever zone it counts in: one grid runs across the zones, so a plot may cross a line.
+      let left = difference(zg, roadPolys, keptDrafts.map((q) => [q.ring] as Ring[]));
       for (const q of near) {
         for (const ext of extents(q)) {
           if (left.length === 0) break;
@@ -3096,7 +3108,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             const area = ringArea(ring);
             if (area > capOf(q) || Math.abs(area - (now + pa)) > 0.05 * (now + pa) + 1) continue;
             // Straightening the outline must not reach into a neighbour or a road.
-            if (near.some((o) => o !== q && rectsOverlap(o.ring, ring, 0.1)) || !clearOfRoads(ring)) continue;
+            if (keptDrafts.some((o) => o !== q && rectsOverlap(o.ring, ring, 0.1)) || !clearOfRoads(ring)) continue;
             q.ring = ring;
             q.area = area;
             left = difference(left, [[piece]]);

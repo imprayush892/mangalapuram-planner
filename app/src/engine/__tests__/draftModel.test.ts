@@ -105,6 +105,23 @@ describe('the draft model basis (owner, 7 Oct)', () => {
       }
     }
     expect(rects / p.plots.length).toBeGreaterThan(0.7);
+    // No two plots overlap (separating axes; both are convex).
+    const apart = (a: [number, number][], b: [number, number][]): boolean =>
+      [a, b].some((r) =>
+        r.some((v, i) => {
+          const w = r[(i + 1) % r.length]!;
+          const ax = [-(w[1] - v[1]), w[0] - v[0]];
+          const L = Math.hypot(ax[0]!, ax[1]!);
+          if (L < 1e-9) return false;
+          const pr = (q: [number, number][]) => q.map((u) => (u[0] * ax[0]! + u[1] * ax[1]!) / L);
+          const [pa, pb] = [pr(a), pr(b)];
+          return Math.min(Math.max(...pa), Math.max(...pb)) - Math.max(Math.min(...pa), Math.min(...pb)) <= 0.2;
+        }),
+      );
+    let overlaps = 0;
+    for (let i = 0; i < p.plots.length; i += 1)
+      for (let j = i + 1; j < p.plots.length; j += 1) if (!apart(p.plots[i]!.ring as [number, number][], p.plots[j]!.ring as [number, number][])) overlaps += 1;
+    expect(overlaps).toBe(0);
     // Owner 7 Oct ("80-81% is workable"): about four fifths of the villa land in plots.
     expect(p.option.plottedShare).toBeGreaterThan(0.79);
   });

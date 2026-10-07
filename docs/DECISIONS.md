@@ -368,3 +368,8 @@ Each of these is a switch or an editable assumption, not a silent decision.
   model's units (935) as met; the massing shows the towers held under the 140 m AMSL limit. The web app's
   metrics panel shows the plan's own figures on this basis (flats, villa land in plots, land by use from the
   draft zones) instead of the earlier engine's client-programme figures.
+- Fixed: plots could overlap (about 1,200-2,000 m2 in all, D1/D2). The plots' overlap test took a repeated corner
+  as an edge and found a false gap, so a slanted back that kept one corner could run into the plot behind it; and
+  the pocket pass took only its own zone's plots off, though one grid runs across zones. Both fixed; the plot index
+  also files a long plot under every cell it covers. The plots' reported share now matches their drawn land:
+  80.8% (D1) and 81.4% (D2). The test checks that no two plots overlap.
