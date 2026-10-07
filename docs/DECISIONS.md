@@ -405,3 +405,15 @@ Each of these is a switch or an editable assumption, not a silent decision.
   are trimmed off its exact edge (or taken out where they cannot be).
 - Cost: the pockets take flat villa land, the land gained is the south hillside: D1 284 villas (was 290), D2 279
   (was 289); plots 79.3% / 78.6% of the villa land.
+
+## 7 Oct 2026 · open space on the land that sells least; the villas keep the land added (owner)
+
+- Owner: "why will I not put villas there": the green pocket in the middle of Phase 4 sat on land with more outlook
+  (0.54 of directions) than the phase's average (0.47). The view analysis (first-floor eye, ground 5 m below seen
+  within 300 m, as for the towers) now picks where the open space goes: Phase 2's steep west edge (0.38), Phase 3's
+  Rule 22 slope, and the low bowl by the south pond (0.22), with small parks on leftover land reached from a road
+  (south-west corner, by the apartment clubhouse, the pond's bank). Pocket 3 in Phase 4 is villas again.
+- The land added south of Phase 4 and Phase 2 stays villa land: 20.90 ac (model 19.94). Open space stays the
+  model's 8.3 ac net of roads (D1 8.37, D2 8.31).
+- The township's 320 villas: a phase whose land holds more than its count makes up those short (reported).
+- Result: D1 306 villas, D2 303 (were 284, 279); plots 80% of the villa land.

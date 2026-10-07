@@ -43,13 +43,13 @@ describe('the draft model basis (owner, 7 Oct)', () => {
       const z = s.draftZones.find((q) => q.component === l.id);
       expect(z, l.id).toBeDefined();
       expect(z!.use === l.use || (z!.use === 'clubhouse' && l.use === 'club'), `${l.id} use`).toBe(true);
-      // Owner 7 Oct: the villa phases trade land with the green pockets (Phase 3's Rule 22 slope to Phase 4).
-      const tol = l.use === 'villas' ? 0.35 : 0.06;
-      expect(Math.abs(z!.computedInScopeAc - l.land_ac!), `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeLessThan(tol);
+      // Owner 7 Oct: the villas keep the land added south of Phase 4 and Phase 2, less the green pockets.
+      if (l.use === 'villas') expect(z!.computedInScopeAc, `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeGreaterThan(l.land_ac! - 0.35);
+      else expect(Math.abs(z!.computedInScopeAc - l.land_ac!), `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeLessThan(0.06);
     }
     const villaModel = zoned.filter((l) => l.use === 'villas').reduce((a, l) => a + l.land_ac!, 0);
     const villaDrawn = s.draftZones.filter((z) => z.use === 'villas').reduce((a, z) => a + z.computedInScopeAc, 0);
-    expect(Math.abs(villaDrawn - villaModel), `villa land ${villaDrawn.toFixed(2)} ac`).toBeLessThan(0.06);
+    expect(villaDrawn, `villa land ${villaDrawn.toFixed(2)} ac`).toBeGreaterThanOrEqual(villaModel - 0.06);
   });
 
   it('designates the model open space, each piece usable and reached (KMBR Rule 31(v)-(vi))', async () => {

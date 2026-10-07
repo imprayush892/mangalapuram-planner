@@ -250,17 +250,38 @@ kept_ac = sum(g.area for g in KEPT) / AC
 # The villa streets run on through the pockets (so each fronts a street): the pockets are drawn larger by the
 # streets' share of the grid, 6.5 m of street to every 46.5 m (14%), so the open space net of them is the model's.
 POCKET_STREETS = 0.14
-pockets_net = OS_TARGET - kept_ac
-pockets_ac = pockets_net / (1 - POCKET_STREETS)
-# The villa land the pockets take is given back from the south land and the strip south of Phase 2.
+# Owner 7 Oct (second pass): the land added stays villa land (the model's 320 villas need about 21-22 ac of it at
+# the plots the ground allows), and the open space goes where a villa would sell least: little outlook (the view
+# analysis, tools/zoning/views.py), steep slopes, the ponds' rims and the verges. Land with an outlook is villas.
 strip = FREE.intersection(box(300, 150, 465, 190))
 strip = max(getattr(strip, "geoms", [strip]), key=lambda g: g.area)
 south_all = piece_at(FREE, (540, 130))
-south, south_rim = take(south_all, pockets_ac - strip.area / AC, "N")
 ZD["C09"]["geom"] = unary_union([ZD["C09"]["geom"], strip]).buffer(0)
-ZD["C18"]["geom"] = unary_union([ZD["C18"]["geom"], south]).buffer(0)
-# The pockets: Phase 2 gives back what the strip added (on its steep west edge by the west lake), Phase 3 its
-# Rule 22 slope, Phase 4 the rest (its middle, and its south edge stepping down to the south pond).
+ZD["C18"]["geom"] = unary_union([ZD["C18"]["geom"], south_all]).buffer(0)
+VILLAS = unary_union([ZD[c]["geom"] for c in ("C03", "C09", "C17", "C18")])
+FREE2 = free_land()
+
+
+def pieces_at(f, pts):
+    out = []
+    for pt in pts:
+        near = [g for g in getattr(f, "geoms", [f]) if g.distance(Point(pt)) < 2 and g.area >= 200]
+        if near:
+            g = max(near, key=lambda q: q.area)
+            if all(g.distance(o) > 0.01 or not g.equals(o) for o in out):
+                out.append(g)
+    return out
+
+
+# Small parks on the land the zoning leaves, low in outlook and reached from a road: the south-west corner, beside
+# the apartment clubhouse, and the south pond's banks.
+EXTRA_AT = ((322, 63, 4), (461, 81, 4), (502, 36, 4), (607, 43, 4))
+EXTRA = []
+for x, y, ph in EXTRA_AT:
+    got = pieces_at(FREE2, [(x, y)])
+    if got and all(not got[0].equals(e) for e, _ in EXTRA):
+        EXTRA.append((got[0], ph))
+extra_ac = sum(g.area for g, _ in EXTRA) / AC
 
 
 def carve(comp, region, acres, side):
@@ -290,20 +311,27 @@ def carve_disk(comp, centre, acres):
 
 
 from shapely.ops import nearest_points
-g1 = carve("C09", box(0, 205, 5000, 285), strip.area / AC, "W")          # Phase 2's steep west edge, by the west lake
-g2 = carve_disk("C17", (522, 245), 0.30)                                 # Phase 3's Rule 22 slope
-rest = pockets_ac - (g1.area + g2.area) / AC
-g3 = carve_disk("C18", (585, 215), rest / 2)                             # the middle of Phase 4
+# Green pockets, each on land the villas sell least on: Phase 2's steep west edge by the west lake (outlook 0.38
+# against the phase's 0.44), Phase 3's Rule 22 slope, and Phase 4's low bowl by the south pond (outlook 0.22
+# against 0.47), sized so the open space comes to the model's 8.3 ac net of the streets that cross the pockets.
+g1 = carve("C09", box(0, 205, 5000, 285), strip.area / AC, "W")
+g2 = carve_disk("C17", (522, 245), 0.30)
+pockets_net = OS_TARGET - kept_ac - extra_ac
+g4_ac = pockets_net / (1 - POCKET_STREETS) - (g1.area + g2.area) / AC
 to_pond = nearest_points(ZD["C18"]["geom"], Point(560, 55))[0]
-g4 = carve_disk("C18", (to_pond.x, to_pond.y), rest - g3.area / AC)      # Phase 4's south edge, down to the south pond
-for i, (g, where) in enumerate(((g1, "by the west lake"), (g2, "Phase 3"), (g3, "Phase 4"), (g4, "to the south pond")), 1):
-    Z.append(dict(component=f"OS-G{i}", name=f"GREEN POCKET {i} ({where})", use="park", phase=0, model_ac=round(g.area / AC, 3), geom=g.buffer(0), within="villas"))
-for i, (g, where) in enumerate(zip(KEPT, ("NORTH POND", "GATE WEST WING", "NORTH-WEST CORNER", "SOUTH-EAST CORNER")), 1):
-    Z.append(dict(component=f"OS-{i}", name=f"OPEN SPACE · {where}", use="park", phase=0, model_ac=round(g.area / AC, 3), geom=g.buffer(0)))
+g4 = carve_disk("C18", (to_pond.x, to_pond.y), g4_ac)
+for i, (g, where, ph) in enumerate(((g1, "by the west lake", 2), (g2, "Phase 3 slope", 3), (g4, "by the south pond", 4)), 1):
+    Z.append(dict(component=f"OS-G{i}", name=f"GREEN POCKET {i} ({where})", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0), within="villas"))
+for i, (g, where, ph) in enumerate(zip(KEPT, ("NORTH POND", "GATE WEST WING", "NORTH-WEST CORNER", "SOUTH-EAST CORNER"), (1, 1, 2, 2)), 1):
+    Z.append(dict(component=f"OS-{i}", name=f"OPEN SPACE · {where}", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0)))
+for k, (g, ph) in enumerate(EXTRA, 5):
+    Z.append(dict(component=f"OS-{k}", name=f"OPEN SPACE · POCKET PARK {k - 4}", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0)))
 for c in ("C09", "C17", "C18"):
-    ZD[c]["model_ac_note"] = "villa land after the open-space swap"
-print(f"open space: kept {kept_ac:.2f} ac + pockets {pockets_ac:.2f} ac drawn ({pockets_net:.2f} ac net of streets) = {kept_ac + pockets_net:.2f} ac net (model {OS_TARGET}); "
-      f"villa land {sum(ZD[c]['geom'].area for c in ('C03', 'C09', 'C17', 'C18')) / AC:.2f} ac (model 19.94); south rim left open {south_rim.area / AC:.2f} ac")
+    ZD[c]["model_ac"] = round(ZD[c]["geom"].area / AC, 3)
+print(f"open space: kept {kept_ac:.2f} + small parks {extra_ac:.2f} + pockets {(g1.area + g2.area + g4.area) / AC:.2f} drawn "
+      f"({pockets_net:.2f} net of streets) = {kept_ac + extra_ac + pockets_net:.2f} ac net (model {OS_TARGET}); "
+      f"villa land {sum(ZD[c]['geom'].area for c in ('C03', 'C09', 'C17', 'C18')) / AC:.2f} ac (model 19.94)")
+
 
 def main():
     feats = []

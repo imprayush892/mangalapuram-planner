@@ -3024,6 +3024,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     const steepFirst = [...keptDrafts].sort((a, b) => gAt(b) - gAt(a));
     const gone = new Set<DraftPlot>();
     let merged = 0;
+    const carried: string[] = [];
     if (isMix) {
       // Each zone stops at its component's units. Owner 7 Oct (85% of the villa land in plots): a plot over the
       // count is not left empty; its row neighbours share it, each still a rectangle, within the growth limit.
@@ -3063,9 +3064,16 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         }
         return true;
       };
+      // Owner 7 Oct: the model's 320 villas are the township's; a phase whose land holds more than its count
+      // makes up the phases that fall short (the plan reports which phase carries which villas).
+      const countIn = (zn: string): number => keptDrafts.filter((p) => p.zone === zn).length;
+      let spare = [...zoneVillaTarget].reduce((t, [zn, want]) => t + Math.max(0, want - countIn(zn)), 0);
       for (const [zn, t] of zoneVillaTarget) {
         const inZone = steepFirst.filter((p) => p.zone === zn);
-        let over = inZone.length - t;
+        const extra = Math.min(Math.max(0, inZone.length - t), spare);
+        spare -= extra;
+        if (extra > 0) carried.push(`${zn.charAt(0)}${zn.slice(1).toLowerCase()} holds ${extra} villas over its count of ${t}, making up the phases short of theirs`);
+        let over = inZone.length - t - extra;
         for (const p of inZone) {
           if (over <= 0) break;
           if (!share(p)) continue;
@@ -3098,6 +3106,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       keptDrafts.length = 0;
       keptDrafts.push(...keep);
     }
+    for (const c of carried) notes.push(c);
     if (merged > 0) notes.push(`${merged} plots over a zone's count are shared by their row neighbours, which widen and stay rectangles (owner 7 Oct: 85% of the villa land in plots)`);
   }
   if (keptDrafts.length < drafts.length) notes.push(`${drafts.length - keptDrafts.length} plots on streets taken out, or over a zone's count, are not laid`);
