@@ -126,6 +126,12 @@ roads:
   zone_interior_cost: {villas: 2.5, apartments: 2.5, commercial: 2.5, batching: 2.5, senior: 25, school: 25, clubhouse: 25, reserved: 25}
   zone_edge_band_m: 10                     # ASSUMPTION: what counts as the edge of a zone
   outside_zones_cost: 0.8                  # the zoning plan's own gaps between zones
+  # Owner 28 Sep (sketch): roads drawn by the owner, laid before any road is routed, in local metres.
+  # The south primary keeps to the parcel's south edge (5-6 m in) instead of crossing the Phase 3
+  # apartment zone, so the zone stays whole and its tower fits.
+  owner_routes:
+    - {tier: primary, why: "the owner's south road, along the parcel edge clear of the Phase 3 apartment zone",
+       points: [[471, 11], [527, 28], [585, 30], [632, 37], [646, 57], [649, 72], [675, 87]]}
   # A buildable piece of a zone at least this big gets its own primary road; smaller pieces
   # are reached by the villa streets or become green. ASSUMPTION.
   primary_serves_pieces_over_m2: 2000

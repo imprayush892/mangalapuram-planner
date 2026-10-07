@@ -288,3 +288,9 @@ Each of these is a switch or an editable assumption, not a silent decision.
   with a second floor (G+2), a front garden, a first-floor balcony that the first floor can grow into; the owner's 1.5 m
   setbacks are set aside for these small plots and KMBR Table 4's yards govern (the small-plot row up to 125 m² of plot
   and 200 m² of BUA). Gross FSI stays at the client's (about 0.91 on 35 ac).
+- The deck reports the client's cashflow numbers in every option (owner): villa land 35 ac and villa BUA 13,85,000 sq ft
+  (Outflow E9 + E17), gross FSI 0.91; only the count and size of the villas change. Villa massing adds floors up to a
+  full G+2 and stops there; shortfalls against the Excel are not shown (the massing is broad-brush).
+- The south primary road follows the owner's sketch along the parcel's south edge (roads.owner_routes) instead of
+  crossing the Phase 3 apartment zone: the zone was fixed, and with the road at its edge the Phase 3 tower fits in every
+  option (A1 lost it before).

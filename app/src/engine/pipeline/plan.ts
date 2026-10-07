@@ -1109,6 +1109,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     const k0 = first ? cellsOf(zoneLand(first))[0] : undefined;
     if (k0 !== undefined) network[k0] = 1;
   }
+  // Owner's roads first (roads.owner_routes): laid as drawn, the routed roads then join them.
+  for (const or of pick<{ tier: Exclude<RoadTier, 'existing'>; why: string; points: Pt[] }[]>(planning, 'roads.owner_routes', [])) {
+    addRoad(or.tier, or.points, or.why);
+  }
   const minPiece = num(planning, 'roads.primary_serves_pieces_over_m2');
   let unreached = 0;
   const zoneOrder = zones
@@ -1736,10 +1740,18 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   // A building stands on its zone's buildable land, off every road.
   const siteLand = (z: ZoneInfo): Mask => minus(zoneLand(z), network);
   const aspects = pick<number[]>(planning, 'amenities.plate_aspects', [2]);
-  const candidatesIn = (land: Mask, dims: { L: number; D: number }, inset: number): Cand[] => {
+  const candidatesIn = (land: Mask, dims: { L: number; D: number }, inset: number, turnDeg = 0): Cand[] => {
     const cells = cellsOf(land);
     if (cells.length === 0) return [];
-    const f = frameFor(dem, cells);
+    const f0 = frameFor(dem, cells);
+    const t = (turnDeg * Math.PI) / 180;
+    const f: Frame = turnDeg
+      ? {
+          c: f0.c,
+          u: [Math.cos(t) * f0.u[0] + Math.sin(t) * f0.v[0], Math.cos(t) * f0.u[1] + Math.sin(t) * f0.v[1]],
+          v: [-Math.sin(t) * f0.u[0] + Math.cos(t) * f0.v[0], -Math.sin(t) * f0.u[1] + Math.cos(t) * f0.v[1]],
+        }
+      : f0;
     const ins = erode(dem, land, inset);
     let umin = Infinity;
     let umax = -Infinity;
@@ -2115,7 +2127,13 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             ? Math.ceil(perTower / flatsPerFloor)
             : Math.floor((apt.fsi * z.areaM2) / (zoneTowers * aptPlate));
         const P = apt.podium;
-        const cands = candidatesIn(siteLand(z), dims, apt.setback + P);
+        let cands = candidatesIn(siteLand(z), dims, apt.setback + P);
+        // A set number of towers on a tight zone: where the frame of the land holds none, turn the
+        // tower off the contours in 15 degree steps until one fits.
+        for (const turn of [15, 30, 45, 60, 75]) {
+          if (!zoneTowers || cands.length > 0) break;
+          cands = candidatesIn(siteLand(z), dims, apt.setback + P, turn);
+        }
         type T = Cand & { ring: Ring; pod: Ring; pLo: number; pHi: number; floorsCap: number; bc: number; hid: number };
         const pins = towerSites.filter((ts) => z.name.toUpperCase().startsWith(ts.match.toUpperCase())).map((ts) => ts.at);
         const towers: T[] = [];
