@@ -49,7 +49,7 @@ bases:
     villas.land_split: {plots: 0.85, roads: 0.15, tolerance: 0.05}
     # The model's villa land is net of the trunk roads (Inputs C36): trunk roads keep out of the villa
     # zones' interiors, and the villa streets take the cross streets' place less often.
-    roads.zone_interior_cost: {villas: 25, apartments: 2.5, commercial: 2.5, retail: 25, office: 25, hospital: 25, batching: 2.5, senior: 25, school: 25, clubhouse: 25, reserved: 25}
+    roads.zone_interior_cost: {villas: 400, apartments: 25, commercial: 2.5, retail: 25, office: 25, hospital: 25, batching: 2.5, senior: 25, school: 25, clubhouse: 25, reserved: 25}
     roads.cross_street_every_plots: 1000      # no cross streets through the rows: the streets link to the network at their ends
     # Owner's roads: the client's 18 m entry road from the main gate on the Mangalapuram-Pothencode
     # road south to the existing road (zoning plan: "Main gate / commercial strip, 18 m N-S road"),

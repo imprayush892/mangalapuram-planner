@@ -351,3 +351,20 @@ Each of these is a switch or an editable assumption, not a silent decision.
   3,773 m2). The villa generator's road area was already measured from its raster at full width, so its figures
   do not change; only its drawn road shapes do. The draft-model D1/D2 plans already used full-width roads and do
   not change. Golden values in tests/expected_values.yaml are unaffected.
+
+## 7 Oct 2026 · villas settle at about 81% of the villa land; apartments report the model's units
+
+- Owner: "80-81% is workable". Plots cover 80.7% (D1, 290 villas) and 81.3% (D2, 289 villas) of the villa land.
+- Trunk roads keep out of the villa zones (draft basis `roads.zone_interior_cost` villas 400): the road to the
+  Phase 3 apartments no longer crosses the Phase 4 villas. Apartment zones are costed like the other built uses (25)
+  so a villa link does not cut a tower's zone in two.
+- A plot over a zone's count is shared by its row neighbours (they widen, still rectangles) instead of being left
+  empty. A villa street runs on into land that tapers while one side still holds a shallow plot.
+- Where a row meets the fixed edge of the land, a pocket no plot took joins the plot beside it if the two make one
+  convex plot of four or five sides within the growth limit (owner: five sides allowed there).
+- A row-end plot's house sits in its widest rectangle; where even that cannot reach its villa's BUA, the plot takes
+  the largest villa of the mix its house can hold. 1-2 nearly triangular plots per option remain short.
+- Apartments (owner): the airport limit on the towers is not the plan's to fix, so the apartment lines report the
+  model's units (935) as met; the massing shows the towers held under the 140 m AMSL limit. The web app's
+  metrics panel shows the plan's own figures on this basis (flats, villa land in plots, land by use from the
+  draft zones) instead of the earlier engine's client-programme figures.

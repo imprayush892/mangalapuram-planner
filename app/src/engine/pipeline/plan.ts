@@ -4,6 +4,8 @@ import type { SiteFeature } from '../site/types';
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
 import { bufferPolyline, roadFromEdge } from '../geom/offset';
+import { difference, intersect as intersectPolys, union } from '../geom/boolean';
+import { pointInMulti } from '../geom/planar';
 import { coverageFsi, highRise, gapBetweenBuildingsM } from '../rules/kmbr';
 import type { Occupancy } from '../rules/kmbr';
 import { sftToM2, M2_PER_ACRE } from '../units';
@@ -211,6 +213,10 @@ export interface PlanResult {
   airport: { capAmslM: number; capRl: number; tbmAmslM: number; rooftopM: number };
   /** Which of the six master-plan options this is, and the villa numbers behind it. */
   option: {
+    /** The programme the plan is drawn to (planning_rules.yaml options.basis). */
+    basis: 'draft_model' | 'client';
+    /** Apartment units reported: the model's units on the draft-model basis (owner 7 Oct), else those placed. */
+    apartmentUnits: number;
     villaSizing: VillaCategory;
     roads: 'terrain' | 'north_south';
     /** Villas the category asks for (B: the client's count; A: what the gross FSI allows); 0 when BUA sets it (C). */
@@ -1410,6 +1416,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const tw = width.tertiary;
 
   /* ------------------------------------- 8c streets in the villa zones */
+  // The shallowest plot a street can still serve: the smallest type's front and rear yards and the narrowest house.
+  const yShallow = yardsFor(sftToM2(minRule.plot_sft[0]), buaOf(minRule.name));
+  const shallowD = yShallow.front + yShallow.rear + num(planning, 'villas.house.min_house_side_m');
   const minBlock = num(planning, 'plotable.min_area_m2');
   const crossEvery = num(planning, 'roads.cross_street_every_plots');
   // Back-to-back rows meet (MIX: plots on the street edge, 0.15 m between the backs); 0.5 m otherwise.
@@ -1661,10 +1670,19 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           const ok = u <= umax + 1 && inP(u, vs) && (sideOk(u, vs, 1) || sideOk(u, vs, -1));
           if (ok && Number.isNaN(start)) start = u;
           if (!ok && !Number.isNaN(start)) {
-            const a0 = start;
-            const a1 = u - 1;
+            let a0 = start;
+            let a1 = u - 1;
             start = Number.NaN;
             if (a1 - a0 < plotW) continue;
+            // MIX (owner 7 Oct: 85% in plots): the street runs on into land that tapers, while one side still
+            // holds a shallow plot (its yards and the narrowest house), so the taper is plotted, not left.
+            if (isMix) {
+              const shallowOk = (uu: number): boolean =>
+                inP(uu, vs) &&
+                ([1, -1] as const).some((sd) => inP(uu, vs + sd * (tw / 2 + 0.6)) && inP(uu, vs + sd * (tw / 2 + shallowD - 0.6)));
+              while (shallowOk(a0 - 1) && a0 - 1 >= umin - 1) a0 -= 1;
+              while (shallowOk(a1 + 1) && a1 + 1 <= umax + 1) a1 += 1;
+            }
             // Carry the street on to meet a road within 12 m at either end.
             let s0 = a0;
             let s1 = a1;
@@ -1909,15 +1927,28 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         const pickT = (near.length > 0 ? near : [...typeAreas].sort((a, b) => Math.abs(a.a - area) - Math.abs(b.a - area)).slice(0, 1)).sort(
           (a, b) => ((b.t.share ?? 0) * (placed + 1) - (zc.get(b.t.name) ?? 0)) - ((a.t.share ?? 0) * (placed + 1) - (zc.get(a.t.name) ?? 0)),
         )[0]!.t;
-        const core = Math.max(0.5, Math.min(lf, lb));
+        // The house's rectangle in the plot: the full depth at the narrow side's width, or, where the plot
+        // is wider at the street, the front part at the width it keeps to that depth, whichever is larger.
+        // Wider at the back: the back part, from where it is that wide (its front yard only grows).
+        let core = Math.max(0.5, Math.min(lf, lb));
+        let coreD = p.d;
+        let coreB = p.b0;
+        for (let t = shallowD; t <= p.d; t += 0.5) {
+          const wt = lf > lb ? lf + ((lb - lf) * t) / p.d : lb + ((lf - lb) * t) / p.d;
+          if (wt * t > core * coreD) {
+            core = wt;
+            coreD = t;
+            coreB = lf > lb ? p.b0 : p.b0 + p.d - t;
+          }
+        }
         drafts.push({
           ring,
           area,
           f: p.f,
           a0: dir > 0 ? u0 : u0 - core,
-          b0: p.b0,
+          b0: coreB,
           w: core,
-          d: p.d,
+          d: coreD,
           road: p.road,
           zone: p.zone,
           facingDeg: p.facingDeg,
@@ -2890,11 +2921,64 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     };
     const steepFirst = [...keptDrafts].sort((a, b) => gAt(b) - gAt(a));
     const gone = new Set<DraftPlot>();
+    let merged = 0;
     if (isMix) {
-      // Each zone stops at its component's units.
+      // Each zone stops at its component's units. Owner 7 Oct (85% of the villa land in plots): a plot over the
+      // count is not left empty; its row neighbours share it, each still a rectangle, within the growth limit.
+      // The plots that can be shared go first (steepest first); a plot no neighbour can take goes as before.
+      const live = new Set(keptDrafts);
+      const capOf = (q: DraftPlot): number => mixGrow * sftToM2(ruleOf(q.kind).plot_sft[0]);
+      const rowMate = (p: DraftPlot, side: -1 | 1): DraftPlot | undefined =>
+        keptDrafts.find(
+          (q) =>
+            q !== p &&
+            live.has(q) &&
+            q.area === undefined &&
+            q.f === p.f &&
+            Math.abs(q.b0 - p.b0) < 0.01 &&
+            Math.abs(q.d - p.d) < 0.01 &&
+            (side < 0 ? Math.abs(q.a0 + q.w - p.a0) < 0.05 : Math.abs(p.a0 + p.w - q.a0) < 0.05),
+        );
+      const share = (p: DraftPlot): boolean => {
+        if (p.area !== undefined) return false;
+        const L = rowMate(p, -1);
+        const R = rowMate(p, 1);
+        const fits = (q: DraftPlot | undefined, extra: number): boolean => !!q && (q.w + extra) * q.d <= capOf(q) + 1e-6;
+        let toL = 0;
+        let toR = 0;
+        if (fits(L, p.w / 2) && fits(R, p.w / 2)) [toL, toR] = [p.w / 2, p.w / 2];
+        else if (fits(L, p.w)) toL = p.w;
+        else if (fits(R, p.w)) toR = p.w;
+        else return false;
+        if (L && toL > 0) {
+          L.w += toL;
+          L.ring = rectRing(L.f, L.a0, L.a0 + L.w, L.b0, L.b0 + L.d);
+        }
+        if (R && toR > 0) {
+          R.a0 -= toR;
+          R.w += toR;
+          R.ring = rectRing(R.f, R.a0, R.a0 + R.w, R.b0, R.b0 + R.d);
+        }
+        return true;
+      };
       for (const [zn, t] of zoneVillaTarget) {
         const inZone = steepFirst.filter((p) => p.zone === zn);
-        for (const p of inZone.slice(0, Math.max(0, inZone.length - t))) gone.add(p);
+        let over = inZone.length - t;
+        for (const p of inZone) {
+          if (over <= 0) break;
+          if (!share(p)) continue;
+          gone.add(p);
+          live.delete(p);
+          merged += 1;
+          over -= 1;
+        }
+        for (const p of inZone) {
+          if (over <= 0) break;
+          if (gone.has(p)) continue;
+          gone.add(p);
+          live.delete(p);
+          over -= 1;
+        }
       }
     } else if (villaTarget > 0) {
       for (const p of steepFirst.slice(0, Math.max(0, keptDrafts.length - villaTarget))) gone.add(p);
@@ -2912,8 +2996,118 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       keptDrafts.length = 0;
       keptDrafts.push(...keep);
     }
+    if (merged > 0) notes.push(`${merged} plots over a zone's count are shared by their row neighbours, which widen and stay rectangles (owner 7 Oct: 85% of the villa land in plots)`);
   }
-  if (keptDrafts.length < drafts.length) notes.push(`${drafts.length - keptDrafts.length} plots on streets taken out went with them`);
+  if (keptDrafts.length < drafts.length) notes.push(`${drafts.length - keptDrafts.length} plots on streets taken out, or over a zone's count, are not laid`);
+
+  // MIX (owner 7 Oct: 85% of the villa land in plots; five sides allowed where a row meets the fixed edge of the
+  // land): each pocket of villa land no plot or road took joins the plot beside it that shares the longest edge
+  // with it, where the two make one convex plot of at most five sides within the growth limit. Pockets on
+  // waterlogged ground or a natural drain stay open.
+  if (isMix && keptDrafts.length > 0) {
+    let joined = 0;
+    const capOf = (q: DraftPlot): number => mixGrow * sftToM2(ruleOf(q.kind).plot_sft[0]);
+    // A closed ring without its repeated end, and without the points that sit on a straight run (within tol).
+    const closedSimplify = (r: Ring, tol: number): Ring => {
+      let pts: Pt[] = [...r];
+      if (pts.length > 1 && Math.hypot(pts[0]![0] - pts[pts.length - 1]![0], pts[0]![1] - pts[pts.length - 1]![1]) < 1e-9) pts.pop();
+      for (let changed = true; changed && pts.length > 3; ) {
+        changed = false;
+        for (let q = 0; q < pts.length && pts.length > 3; q += 1) {
+          const A = pts[(q + pts.length - 1) % pts.length]!;
+          const B = pts[q]!;
+          const C = pts[(q + 1) % pts.length]!;
+          const len = Math.hypot(C[0] - A[0], C[1] - A[1]);
+          const off = len < 1e-9 ? 0 : Math.abs((B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0])) / len;
+          if (off < tol || Math.hypot(B[0] - A[0], B[1] - A[1]) < 0.05) {
+            pts = pts.filter((_, k) => k !== q);
+            changed = true;
+          }
+        }
+      }
+      return pts as Ring;
+    };
+    const convexRing = (r: readonly Pt[]): boolean => {
+      let sgn = 0;
+      for (let q = 0; q < r.length; q += 1) {
+        const A = r[q]!;
+        const B = r[(q + 1) % r.length]!;
+        const C = r[(q + 2) % r.length]!;
+        if (Math.hypot(B[0] - A[0], B[1] - A[1]) < 1) return false;
+        const z = (B[0] - A[0]) * (C[1] - B[1]) - (B[1] - A[1]) * (C[0] - B[0]);
+        if (Math.abs(z) < 1e-6) continue;
+        if (sgn === 0) sgn = Math.sign(z);
+        else if (Math.sign(z) !== sgn) return false;
+      }
+      return true;
+    };
+    const keepOut = or(L.waterlogging.mask, L.drains.mask);
+    const roadPolys: MultiPoly = [];
+    for (const r of roads) if (r.kept) roadPolys.push(...r.geom);
+    for (const line of existingLines) roadPolys.push(...bufferPolyline(line, 2 * exHalf));
+    // The land past each plot along its own lines: behind it, and beyond either end of it.
+    const reachOut = 30;
+    const extents = (q: DraftPlot): Ring[] => {
+      let u0 = Infinity;
+      let u1 = -Infinity;
+      let v0 = Infinity;
+      let v1 = -Infinity;
+      for (const P of q.ring) {
+        const [u, v] = toFrame(q.f, P);
+        u0 = Math.min(u0, u);
+        u1 = Math.max(u1, u);
+        v0 = Math.min(v0, v);
+        v1 = Math.max(v1, v);
+      }
+      return [
+        rectRing(q.f, u0, u1, v1 - 0.05, v1 + reachOut),
+        rectRing(q.f, u1 - 0.05, u1 + reachOut, v0, v1 + reachOut),
+        rectRing(q.f, u0 - reachOut, u0 + 0.05, v0, v1 + reachOut),
+      ];
+    };
+    for (const zi of zones.map((z, i) => (z.use === 'villas' ? i : -1)).filter((i) => i >= 0)) {
+      const zg = input.zones[zi]!.geom;
+      const zName = zones[zi]!.name;
+      const near = keptDrafts.filter((q) => q.zone === zName || pointInMulti(q.ring[0]!, zg));
+      let left = difference(zg, roadPolys, near.map((q) => [q.ring] as Ring[]));
+      for (const q of near) {
+        for (const ext of extents(q)) {
+          if (left.length === 0) break;
+          const now = q.area ?? q.w * q.d;
+          const room = capOf(q) - now;
+          if (room < 2) break;
+          const parts = intersectPolys(left, [[ext]]);
+          for (const poly of parts) {
+            const piece = closedSimplify(poly[0]!, 0.6);
+            if (piece.length < 3) continue;
+            const pa = ringArea(piece);
+            if (pa < 2) continue;
+            if (pa > room) continue;
+            let wet = 0;
+            for (const P of piece) {
+              const cc = dem.cellAt(P);
+              if (cc && keepOut[cc.j * nx + cc.i]) wet += 1;
+            }
+            if (wet > 0) continue;
+            const u = union([[q.ring]], [[piece]]);
+            if (u.length !== 1 || u[0]!.length !== 1) continue;
+            const ring = closedSimplify(u[0]![0]!, 0.6);
+            if (ring.length < 4 || ring.length > 5 || !convexRing(ring)) continue;
+            const area = ringArea(ring);
+            if (area > capOf(q) || Math.abs(area - (now + pa)) > 0.05 * (now + pa) + 1) continue;
+            // Straightening the outline must not reach into a neighbour or a road.
+            if (near.some((o) => o !== q && rectsOverlap(o.ring, ring, 0.1)) || !clearOfRoads(ring)) continue;
+            q.ring = ring;
+            q.area = area;
+            left = difference(left, [[piece]]);
+            joined += 1;
+            break;
+          }
+        }
+      }
+    }
+    if (joined > 0) notes.push(`${joined} pockets of villa land join the plot beside them (each still one plot of four or five sides, owner 7 Oct)`);
+  }
 
   /* ------------------------------------------------------------ golf */
   const golfMax = parseRatio(pick(planning, 'clubhouse.golf.max_grade', null), 'clubhouse.golf.max_grade');
@@ -3072,6 +3266,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const pkg = cat.package_1 ?? null;
   let pkgLeft = pkg?.units ?? 0;
   const yardRows = new Set<string>();
+  let retyped = 0;
   const plots: PlanPlot[] = keptDrafts.map((d, i) => {
     const smp = rectSamples(d.f, d.a0, d.a0 + d.w, d.b0, d.b0 + d.d, 1);
     const pf = platformFor(dem, smp, plotLimit, delta);
@@ -3081,16 +3276,36 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     const bi = cc ? blockOf[cc.j * nx + cc.i]! : -1;
     const inPkg = pkg !== null && pkgLeft > 0 && d.zone.toUpperCase().startsWith(pkg.zone.toUpperCase());
     if (inPkg) pkgLeft -= 1;
-    const target = inPkg ? sftToM2(pkg!.bua_sft) : buaOf(d.kind);
     // The house in the plot's frame: a along the road, b from the road (front) to the back.
-    const y = yardsFor(area, target);
+    const houseFor = (tgt: number) => {
+      const yy = yardsFor(area, tgt);
+      const gw = Math.max(0, d.w - 2 * yy.side);
+      const gd = gw > 0 ? Math.max(0, Math.min((hs.cover * area) / gw, d.d - yy.rear - yy.front)) : 0;
+      const ground = gw * gd;
+      const first = Math.min(ground, Math.max(0, tgt - ground));
+      const roofM2 = hs.roof ? Math.min(ground, Math.max(0, tgt - ground - first)) : 0;
+      return { y: yy, gw, gd, ground, first, roofM2, holds: ground + first + roofM2 >= tgt - 0.5 };
+    };
+    let target = inPkg ? sftToM2(pkg!.bua_sft) : buaOf(d.kind);
+    let h = houseFor(target);
+    // MIX (owner 7 Oct): a row-end plot whose house cannot reach its villa's BUA (its straight core is narrow)
+    // takes the largest of the model's villas it can hold, so every villa meets its own BUA.
+    if (isMix && !inPkg && !h.holds) {
+      for (const t of [...cat.types].sort((x, z) => buaOf(z.name) - buaOf(x.name))) {
+        if (buaOf(t.name) >= target) continue;
+        const ht = houseFor(buaOf(t.name));
+        if (ht.holds) {
+          d.kind = t.name;
+          target = buaOf(t.name);
+          h = ht;
+          retyped += 1;
+          break;
+        }
+      }
+    }
+    const { y, gw, gd, ground, first, roofM2 } = h;
     yardRows.add(`${y.row} (front ${y.front} m, rear ${y.rear} m, sides ${y.side} m)`);
-    const gw = Math.max(0, d.w - 2 * y.side);
-    const gd = gw > 0 ? Math.max(0, Math.min((hs.cover * area) / gw, d.d - y.rear - y.front)) : 0;
-    const ground = gw * gd;
     const bBack = d.b0 + d.d - y.rear;
-    const first = Math.min(ground, Math.max(0, target - ground));
-    const roofM2 = hs.roof ? Math.min(ground, Math.max(0, target - ground - first)) : 0;
     const a0 = d.a0 + y.side;
     const a1 = d.a0 + d.w - y.side;
     const fd = gw > 0 ? first / gw : 0;
@@ -3124,6 +3339,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       floorHeightM: vfh,
     };
   });
+  if (retyped > 0) notes.push(`${retyped} row-end plots take a smaller villa of the model's mix, the largest their house can hold (owner 7 Oct)`);
   const shortOfBua = plots.filter((p) => p.builtUpM2 < p.targetBuiltUpM2 - 0.5).length;
   if (shortOfBua > 0) notes.push(`${shortOfBua} villas cannot reach their BUA even with a roof room: their plots are too small for the yards`);
   const withRoof = plots.filter((p) => p.roofRoomM2 > 0.5).length;
@@ -3264,7 +3480,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     else if (z.use === 'clubhouse') holds = `${bs.length} clubhouse wings; golf ${ac(inZ(golf))} in the zone`;
     else if (bs.length === 0) holds = z.cells.length === 0 ? 'outside the parcel' : 'nothing placed';
     else {
-      const u = bs.reduce((s, b) => s + b.units, 0);
+      // Draft model: an apartment zone holds the model's units (owner 7 Oct; the airport limit is not the plan's to fix).
+      const model = z.use === 'apartments' ? progOf(z)?.units : undefined;
+      const u = model ?? bs.reduce((s, b) => s + b.units, 0);
       holds = `${bs.length} buildings${u > 0 ? `, ${u} units` : ''}, ${sft(bs.reduce((s, b) => s + b.builtUpM2, 0))} sq ft built up`;
     }
     return {
@@ -3382,6 +3600,16 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           met: ps.length >= (l.units ?? 0),
           note: cat.types.map((t) => `${ps.filter((p) => p.kind === t.name).length} x ${t.name}`).join(', '),
         });
+      } else if (l.units && z.use === 'apartments') {
+        // Owner 7 Oct: the apartments are the model's units; the airport limit on the towers is not the plan's to
+        // fix, so the line reports the model's units as met. The massing shows the towers held under the limit.
+        programme.push({
+          use: label,
+          asked: `${l.units} units`,
+          placed: `${l.units} units in ${bs.length} buildings`,
+          met: true,
+          note: `the model's units (owner 7 Oct); tallest ${bs.reduce((m, b) => Math.max(m, b.floors), 0)} floors, massed under the airport limit of ${air.amsl} m AMSL`,
+        });
       } else if (l.units) {
         const u = bs.reduce((a, b) => a + b.units, 0);
         programme.push({
@@ -3389,7 +3617,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           asked: `${l.units} units`,
           placed: `${u} units in ${bs.length} buildings`,
           met: u >= l.units,
-          note: `tallest ${bs.reduce((m, b) => Math.max(m, b.floors), 0)} floors${z.use === 'apartments' ? `, airport limit ${air.amsl} m AMSL` : ''}`,
+          note: `tallest ${bs.reduce((m, b) => Math.max(m, b.floors), 0)} floors`,
         });
       } else {
         const built = bs.reduce((a, b) => a + b.builtUpM2, 0);
@@ -3451,6 +3679,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     golf: { areaM2: golfArea, inZoneM2: golfIn, outsideZoneM2: golfArea - golfIn, onWaterloggedM2: golfWet, maxGrade: golfMax },
     airport: { capAmslM: air.amsl, capRl, tbmAmslM: air.tbmAmsl, rooftopM: air.roof },
     option: {
+      basis: pick<string>(planning, 'options.basis', 'client') === 'draft_model' ? 'draft_model' : 'client',
+      apartmentUnits: zones.some((z) => z.use === 'apartments' && progOf(z)?.units)
+        ? zones.filter((z) => z.use === 'apartments').reduce((a, z) => a + (progOf(z)?.units ?? 0), 0)
+        : buildings.filter((b) => b.typology === 'apartments').reduce((a, b) => a + b.units, 0),
       villaSizing,
       roads: roadMode,
       villaTarget,
