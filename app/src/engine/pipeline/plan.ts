@@ -3,7 +3,7 @@ import type { MultiPoly, Pt, Ring } from '../geom/types';
 import type { SiteFeature } from '../site/types';
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
-import { bufferPolyline, stripAlong } from '../geom/offset';
+import { bufferPolyline, roadFromEdge } from '../geom/offset';
 import { coverageFsi, highRise, gapBetweenBuildingsM } from '../rules/kmbr';
 import type { Occupancy } from '../rules/kmbr';
 import { sftToM2, M2_PER_ACRE } from '../units';
@@ -847,7 +847,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       if (f.kind !== 'existing_road_edge') continue;
       for (const line of f.lines) {
         if (line.length < 2) continue;
-        const m = rasterise(dem, bufferPolyline(line, exW));
+        const m = rasterise(dem, roadFromEdge(line, exW));
         for (let k = 0; k < n; k += 1) if (m[k]) roadAll[k] = 1;
       }
     }
@@ -1085,7 +1085,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       tier,
       centreline: line,
       widthM: width[tier],
-      geom: stripAlong(line, width[tier]),
+      geom: bufferPolyline(line, width[tier]),
       lengthM: lineLength(line),
       limit: lim[tier],
       terrainMaxGrade: prof.terrainMaxGrade,

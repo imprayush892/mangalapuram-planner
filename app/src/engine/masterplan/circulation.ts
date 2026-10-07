@@ -2,7 +2,7 @@ import type { WaterModel } from '../terrain/water';
 import type { Dem } from '../terrain/dem';
 import type { MultiPoly, Pt } from '../geom/types';
 import type { SiteFeature } from '../site/types';
-import { bufferPolyline } from '../geom/offset';
+import { bufferPolyline, roadFromEdge } from '../geom/offset';
 import { intersect, union } from '../geom/boolean';
 import { bboxOfMulti, multiPolyArea, pointInMulti } from '../geom/planar';
 
@@ -380,7 +380,7 @@ function publicRoads(input: CirculationInput): CirculationRoad[] {
   let n = 0;
   for (const line of edges.flatMap((f) => f.lines)) {
     if (line.length < 2) continue;
-    const geom = intersect(bufferPolyline(line, input.publicWidthM), input.parcel);
+    const geom = intersect(roadFromEdge(line, input.publicWidthM), input.parcel);
     if (geom.length === 0) continue;
     const prof = profile(input.dem, line);
     n += 1;

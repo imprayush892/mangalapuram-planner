@@ -92,35 +92,29 @@ export function insetMulti(mp: MultiPoly, distance: number): MultiPoly {
   return intersectMulti(shrunk, mp);
 }
 
-/** Buffer an open polyline into a strip of the given total width. */
+/**
+ * Buffer an open polyline into a strip of the given total width (width / 2 either side of the line).
+ * Clipper2 halves the delta for open paths, so the delta passed is the whole width. (Before 7 Oct 2026
+ * this passed width / 2 and every strip came out half as wide as asked.)
+ */
 export function bufferPolyline(line: readonly Pt[], width: number, square = true): MultiPoly {
   if (line.length < 2 || width <= 0) return [];
   const paths = new Paths64();
   const path = new Path64();
   for (const [x, y] of line) path.push(new Point64(Math.round(x * SCALE), Math.round(y * SCALE)));
   paths.push(path);
-  const out = Clipper.InflatePaths(
-    paths,
-    (width / 2) * SCALE,
-    JoinType.Miter,
-    square ? EndType.Butt : EndType.Round,
-    2,
-  );
+  const out = Clipper.InflatePaths(paths, width * SCALE, JoinType.Miter, square ? EndType.Butt : EndType.Round, 2);
   return fromPaths(out);
 }
 
 /**
- * A strip of the given total width along an open polyline. (bufferPolyline above returns a strip half
- * the width it is given: Clipper's open-path inflate takes the delta as the whole width. Its callers
- * are left as they are; new code uses this.)
+ * An existing road given by one of its surveyed edges (site_features `existing_road_edge`, SPEC: "these
+ * are road edges"), to be kept at `roadWidth`. Each edge is buffered by a quarter of the width either side,
+ * so a road's two edges, about 6 m apart on the survey (median spacing), span about roadWidth + 1 m: the
+ * road with its widening. Buffering an edge by the full width would claim roadWidth / 2 beyond each edge.
  */
-export function stripAlong(line: readonly Pt[], width: number): MultiPoly {
-  if (line.length < 2 || width <= 0) return [];
-  const paths = new Paths64();
-  const path = new Path64();
-  for (const [x, y] of line) path.push(new Point64(Math.round(x * SCALE), Math.round(y * SCALE)));
-  paths.push(path);
-  return fromPaths(Clipper.InflatePaths(paths, width * SCALE, JoinType.Miter, EndType.Butt, 2));
+export function roadFromEdge(edge: readonly Pt[], roadWidth: number): MultiPoly {
+  return bufferPolyline(edge, roadWidth / 2);
 }
 
 /** Union via Clipper (used where polygon-clipping's robustness is not enough). */

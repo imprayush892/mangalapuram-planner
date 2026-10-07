@@ -334,3 +334,20 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - Result: plots on 78% (D1, 285 villas) and 79% (D2, 286 villas) of the villa land; streets 12-13%, trunk roads 1-2%.
   The remaining 7-8% is fixed geometry: the existing road and the out-of-scope strip run diagonally along Phases
   1, 3 and 4, a Rule 22 slope sits in Phase 3, and trunk roads to the school and the east apartments cross Phase 4.
+
+## 7 Oct 2026 · road strips at their full width
+
+- `bufferPolyline(line, width)` (app/src/engine/geom/offset.ts) returned a strip half as wide as asked: Clipper2
+  halves the delta for open paths and the function also passed width / 2. It now gives the full width, and the
+  plan's `stripAlong` (the earlier workaround) is folded into it. Centreline callers now draw their roads at full
+  width: the tower access road, the villa generator's streets and cross roads, the masterplan spine and zone access
+  roads, and the junction stubs.
+- The site's existing roads come as their surveyed edges (SPEC: "these are road edges"), about 6 m apart, kept
+  and widened to 10 m. Buffering each edge by the full width would claim 5 m beyond each edge (a 16 m road), so
+  they go through `roadFromEdge`, which keeps their geometry as it was: a quarter of the width either side of
+  each edge, about 11 m in all (analysis existing-roads layer, plan existing-roads raster, masterplan public roads).
+- What moved: the masterplan's road area 41,360 -> 47,931 m2 and villa plots 346 -> 342 (wider junction stubs and
+  access roads take four plots); the tower generator's access road area rises (P-2 apartments, 7 towers: 3,112 ->
+  3,773 m2). The villa generator's road area was already measured from its raster at full width, so its figures
+  do not change; only its drawn road shapes do. The draft-model D1/D2 plans already used full-width roads and do
+  not change. Golden values in tests/expected_values.yaml are unaffected.

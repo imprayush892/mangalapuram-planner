@@ -3,7 +3,7 @@ import type { MultiPoly } from '../geom/types';
 import type { SiteFeature } from '../site/types';
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
-import { bufferPolyline } from '../geom/offset';
+import { roadFromEdge } from '../geom/offset';
 import { hydrologyParams, stormFor, stormRunoffCoeff, waterModelFor } from '../terrain/hydrology';
 import type { StormResult } from '../terrain/hydrology';
 import { unbuildableSlopeDeg } from '../rules/kmbr';
@@ -192,7 +192,7 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
     if (f.kind !== 'existing_road_edge') continue;
     for (const line of f.lines) {
       if (line.length < 2) continue;
-      roads = or(roads, rasterise(dem, bufferPolyline(line, roadWidth)));
+      roads = or(roads, rasterise(dem, roadFromEdge(line, roadWidth)));
       roadLines += 1;
     }
   }
