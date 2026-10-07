@@ -71,9 +71,15 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
       return 'The school, the clubhouse, senior living, commercial and the batching plant, each as one compact group in its zone.';
     case 'massing':
       return plan ? `${plan.plots.length} villas, ground and first floor, each on its own platform.` : '';
+    case 'phase-1':
+      return 'The township is built outward from the main gate: Phase 1 first, beside it, with the trunk roads.';
+    case 'phase-2':
+      return 'Phase 2 adds the next ring: more villas and apartments, the hospital, the senior enclave and the first school stage.';
+    case 'phase-3':
+      return 'Phase 3 reaches the middle of the site, with the retail street, the second clubhouse and the senior school wing.';
     case 'masterplan':
       return plan
-        ? `${plan.plots.length} villas, ${plan.buildings.filter((b) => b.typology === 'apartments').length} towers, ${(plan.roads.reduce((s, r) => s + r.lengthM, 0) / 1000).toFixed(1)} km of new roads.`
+        ? `Phase 4 completes it: ${plan.plots.length} villas, ${plan.buildings.filter((b) => b.typology === 'apartments').length} towers, ${(plan.roads.reduce((s, r) => s + r.lengthM, 0) / 1000).toFixed(1)} km of new roads.`
         : '';
     case 'figures-land':
       return "The 73 acres as the draft model allocates them: what each product type takes, and in which phases.";
@@ -92,7 +98,7 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
  * Page Up / Down (a clicker) and the space bar step; 1-8 pick a plan; Esc ends.
  */
 export default function PresentBar(): React.ReactElement {
-  const { step, option, plans, prep, errors, next, back, go, choose, stop } = usePresent();
+  const { step, option, plans, prep, errors, next, back, go, choose, stop, cards, toggleCards } = usePresent();
   const s = PRESENT_STEPS[step]!;
   const analysis = useAnalysisForViews();
   const site = useSite((st) => st.site);
@@ -114,6 +120,8 @@ export default function PresentBar(): React.ReactElement {
         usePresent.getState().back();
       } else if (e.key === 'Escape') {
         usePresent.getState().stop();
+      } else if (e.key === 'f' || e.key === 'F') {
+        usePresent.getState().toggleCards();
       } else if (/^[1-9]$/.test(e.key) && Number(e.key) <= PRESENT_OPTIONS.length && usePresent.getState().step >= FORK_STEP) {
         usePresent.getState().choose(PRESENT_OPTIONS[Number(e.key) - 1]!.id);
       }
@@ -129,7 +137,7 @@ export default function PresentBar(): React.ReactElement {
     <GlassPanel className="pointer-events-auto w-full max-w-[860px] px-5 py-3">
       <div className="flex items-baseline justify-between gap-4">
         <p className="text-[11px] uppercase tracking-[0.18em] text-accent">
-          {s.num === '0' ? 'The zoning' : s.card ? `The draft model · ${s.num}` : `Step ${s.num}`}
+          {s.num === '0' ? 'The zoning' : s.card ? `The draft model · ${s.num}` : s.phase !== undefined ? `Built in phases · ${s.num}` : `Step ${s.num}`}
           {forked && (
             <span className="text-muted">
               {' '}
@@ -137,9 +145,19 @@ export default function PresentBar(): React.ReactElement {
             </span>
           )}
         </p>
-        <button type="button" onClick={stop} className="text-[11px] text-muted hover:text-fg" title="End the presentation (Esc)">
-          End ✕
-        </button>
+        <span className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleCards}
+            className={`rounded border px-2 py-0.5 text-[11px] ${cards ? 'border-accent/60 text-accent' : 'border-line text-muted hover:text-fg'}`}
+            title={cards ? 'Hide the figures (F)' : 'Show the figures (F)'}
+          >
+            Figures {cards ? 'on' : 'off'}
+          </button>
+          <button type="button" onClick={stop} className="text-[11px] text-muted hover:text-fg" title="End the presentation (Esc)">
+            End ✕
+          </button>
+        </span>
       </div>
       <h2 className="mt-1 text-[22px] font-semibold leading-tight text-fg">{s.title}</h2>
       <p className="mt-1 min-h-[20px] text-[13px] leading-snug text-muted">

@@ -11,6 +11,7 @@ import type { GenerateResponse, PipelineRequest } from '../engine/runGeneration'
 import type { OverrideSet } from '../engine/data/overrides';
 import { fetchSource } from '../engine/data/source';
 import { PRESENT_PLAN_OPTIONS, loadPrebuiltPlans } from '../engine/present/prebuilt';
+import { pointInMulti } from '../engine/geom/planar';
 import type { PresentOptionId } from '../engine/present/prebuilt';
 
 /**
@@ -44,6 +45,8 @@ export interface PresentStep {
   fork?: boolean;
   /** The draft model's One-Page Summary figures shown over the plan (ui/PresentFigures.tsx). */
   card?: 'land' | 'tickets' | 'funding';
+  /** The plan built up to this phase (owner 7 Oct: the master plan develops phase by phase). */
+  phase?: number;
 }
 
 export const PRESENT_STEPS: PresentStep[] = [
@@ -213,10 +216,25 @@ export const PRESENT_STEPS: PresentStep[] = [
     uses: 'all',
     villas: true,
   },
+  // Built phase by phase, outward from the gate (owner 7 Oct): each step adds a phase's roads, plots and buildings.
+  ...[1, 2, 3].map(
+    (n): PresentStep => ({
+      key: `phase-${n}`,
+      num: `P${n}`,
+      title: n === 1 ? 'Phase 1, by the gate' : `Phases 1–${n}`,
+      layers: ['waterlogging'],
+      raster: 'none',
+      zones: 'off',
+      plan: ['roads', 'blocks', 'plots', 'buildings'],
+      uses: 'all',
+      villas: true,
+      phase: n,
+    }),
+  ),
   {
     key: 'masterplan',
     num: '16',
-    title: 'The master plan',
+    title: 'Phase 4: the master plan',
     layers: ['waterlogging'],
     raster: 'none',
     zones: 'off',
@@ -284,6 +302,9 @@ interface PresentState {
   prep: Partial<Record<OptionId, string>>;
   errors: Partial<Record<OptionId, string>>;
   saved: Saved | null;
+  /** The figure cards over the views: on unless the presenter closes them (F, or the card's ✕). */
+  cards: boolean;
+  toggleCards: () => void;
   start: () => void;
   stop: () => void;
   go: (step: number) => void;
@@ -298,15 +319,47 @@ function optionOf(plan: PlanResult): OptionId {
   return PRESENT_OPTIONS.find((o) => o.sizing === plan.option.villaSizing && o.roads === plan.option.roads)?.id ?? 'D1';
 }
 
-/** The plan as a step shows it: only the building uses it has reached. */
+/**
+ * The phase each piece of the plan is built in: a zone's own (open space comes with the first phase); a road
+ * the earliest phase of the zones it runs through, or the first phase where it runs through none (the trunk).
+ */
+export function phaseOf(plan: PlanResult): { zone: (name: string | null) => number; road: (r: PlanResult['roads'][number]) => number } {
+  const byName = new Map(plan.zones.map((z) => [z.name, Math.max(1, z.phase ?? 1)]));
+  const zones = (useSite.getState().site?.draftZones ?? []).filter((z) => z.phase !== undefined && byName.has(z.name));
+  const zone = (name: string | null): number => (name ? (byName.get(name) ?? 1) : 1);
+  const road = (r: PlanResult['roads'][number]): number => {
+    let best = Infinity;
+    for (const p of r.centreline) {
+      for (const z of zones) if (pointInMulti(p, z.geom)) best = Math.min(best, Math.max(1, z.phase ?? 1));
+    }
+    return Number.isFinite(best) ? best : 1;
+  };
+  return { zone, road };
+}
+
+/** Whether the plan carries phases (the draft model's zoning does; the client's does not). */
+export const hasPhases = (plan: PlanResult | undefined): boolean => Boolean(plan?.zones.some((z) => (z.phase ?? 0) > 0));
+
+/** The plan as a step shows it: only the building uses it has reached, and only up to its phase. */
 function shownPlan(plan: PlanResult | undefined, step: PresentStep): PlanResult | null {
   if (!plan) return null;
-  if (step.uses === 'all') return plan;
-  const uses = step.uses === 'none' ? [] : step.uses;
-  return {
-    ...plan,
-    buildings: plan.buildings.filter((b) => uses.includes(b.typology)),
-  };
+  let p = plan;
+  if (step.uses !== 'all') {
+    const uses = step.uses === 'none' ? [] : step.uses;
+    p = { ...p, buildings: p.buildings.filter((b) => uses.includes(b.typology)) };
+  }
+  if (step.phase !== undefined && hasPhases(plan)) {
+    const n = step.phase;
+    const ph = phaseOf(plan);
+    p = {
+      ...p,
+      roads: p.roads.filter((r) => ph.road(r) <= n),
+      blocks: p.blocks.filter((b) => ph.zone(b.zone) <= n),
+      plots: p.plots.filter((q) => ph.zone(q.zone) <= n),
+      buildings: p.buildings.filter((b) => ph.zone(b.zone) <= n),
+    };
+  }
+  return p;
 }
 
 function apply(): void {
@@ -451,6 +504,8 @@ export const usePresent = create<PresentState>((set, get) => ({
   prep: {},
   errors: {},
   saved: null,
+  cards: true,
+  toggleCards: () => set((st) => ({ cards: !st.cards })),
   start: () => {
     if (get().active) return;
     const site = useSite.getState();

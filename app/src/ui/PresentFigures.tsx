@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { usePresent, PRESENT_STEPS } from '../state/presentStore';
+import { usePresent, PRESENT_STEPS, hasPhases } from '../state/presentStore';
+import { useAnalysisForViews } from '../state/planningStore';
+import { useSite } from '../state/store';
+import { Heading, colourOf, n0, n1 } from './presentKit';
+import { stepStats } from './PresentStats';
 import { useRules } from '../state/useRules';
 import { pick } from '../engine/data/config';
-import { TYPOLOGY_RGB } from './planningStyle';
-import type { Typology } from '../engine/pipeline/plan';
 import { GlassPanel } from './shell/Glass';
 
 /**
@@ -42,47 +44,8 @@ interface TicketRow {
   row: number;
 }
 
-const n0 = (v: number): string => Math.round(v).toLocaleString('en-IN');
-const n1 = (v: number): string => v.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const rgb = (t: [number, number, number]): string => `rgb(${t[0]},${t[1]},${t[2]})`;
-
-/** The colour the plan gives each product type, so the figures read against the map behind them. */
-function colourOf(use: string): string {
-  const u = use.toLowerCase();
-  const t: Typology | null = u.startsWith('apart')
-    ? 'apartments'
-    : u.startsWith('villa')
-      ? 'villas'
-      : u.startsWith('senior')
-        ? 'senior'
-        : u.startsWith('retail')
-          ? 'retail'
-          : u.includes('office') && !u.startsWith('sales')
-            ? 'office'
-            : u.startsWith('school')
-              ? 'school'
-              : u.startsWith('hospital')
-                ? 'hospital'
-                : u.startsWith('club')
-                  ? 'clubhouse'
-                  : u.includes('open space')
-                    ? 'park'
-                    : null;
-  return t ? rgb(TYPOLOGY_RGB[t]) : 'rgb(120,130,136)';
-}
-
 const short = (use: string): string => use.replace(/\s*\((.*)\)\s*$/, '');
 const note = (use: string): string | null => use.match(/\((.*)\)\s*$/)?.[1] ?? null;
-
-function Heading({ kicker, title, sub }: { kicker: string; title: string; sub?: string }): React.ReactElement {
-  return (
-    <div className="mb-4">
-      <p className="text-[10px] uppercase tracking-[0.22em] text-accent">{kicker}</p>
-      <h3 className="mt-1 text-[22px] font-semibold leading-tight text-fg">{title}</h3>
-      {sub && <p className="mt-0.5 text-[12px] text-muted">{sub}</p>}
-    </div>
-  );
-}
 
 function Source({ cells }: { cells: string }): React.ReactElement {
   return <p className="mt-4 text-[10px] text-muted/80">Draft model.xlsx · One-Page Summary · {cells}</p>;
@@ -233,33 +196,55 @@ function Funding({ rows }: { rows: FundRow[] }): React.ReactElement {
   );
 }
 
-/** The card for the step on screen, faded in when the step changes. */
+/** The card for the step on screen, faded in when the step changes; closed with its ✕ or F. */
 export default function PresentFigures(): React.ReactElement | null {
-  const step = usePresent((s) => s.step);
+  const step = usePresent((st) => st.step);
+  const cardsOn = usePresent((st) => st.cards);
+  const toggle = usePresent((st) => st.toggleCards);
+  const plan = usePresent((st) => st.plans[st.option]);
   const rules = useRules();
-  const card = PRESENT_STEPS[step]?.card;
+  const a = useAnalysisForViews();
+  const site = useSite((st) => st.site);
+  const s = PRESENT_STEPS[step];
+  const key = s?.card ?? s?.key ?? '';
   const [shown, setShown] = useState(false);
   useEffect(() => {
     setShown(false);
     const t = setTimeout(() => setShown(true), 30);
     return () => clearTimeout(t);
-  }, [card]);
-  if (!card || !rules) return null;
+  }, [key]);
+  if (!s || !cardsOn || !rules) return null;
   const doc = rules.programmeDraft;
-  const land = pick<LandRow[]>(doc, 'summary.land', []);
-  const funding = pick<FundRow[]>(doc, 'summary.funding', []);
-  const tickets = pick<TicketRow[]>(doc, 'summary.tickets', []);
-  if (land.length === 0) return null;
+  let body: React.ReactElement | null = null;
+  if (s.card === 'land') body = <Land rows={pick<LandRow[]>(doc, 'summary.land', [])} total={pick<number>(doc, 'summary.land_total_ac', 73)} />;
+  else if (s.card === 'tickets')
+    body = (
+      <Tickets
+        rows={pick<TicketRow[]>(doc, 'summary.tickets', [])}
+        avg={pick(doc, 'summary.tickets_average', null)}
+        footnote={pick<string | null>(doc, 'summary.tickets_note', null)}
+      />
+    );
+  else if (s.card === 'funding') body = <Funding rows={pick<FundRow[]>(doc, 'summary.funding', [])} />;
+  else body = stepStats(s.key, s.phase, a, site?.dem ?? null, site?.measured ?? null, plan, hasPhases(plan));
+  if (!body) return null;
   return (
     <div className="pointer-events-none absolute right-4 top-16 z-30 flex justify-end">
       <GlassPanel
-        className={`pointer-events-auto w-[640px] max-w-[calc(100vw-2rem)] px-6 py-5 transition-all duration-500 ${shown ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'}`}
+        className={`pointer-events-auto relative w-[620px] max-w-[calc(100vw-2rem)] px-6 py-5 transition-all duration-500 ${
+          shown ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+        }`}
       >
-        {card === 'land' && <Land rows={land} total={pick<number>(doc, 'summary.land_total_ac', 73)} />}
-        {card === 'tickets' && (
-          <Tickets rows={tickets} avg={pick(doc, 'summary.tickets_average', null)} footnote={pick<string | null>(doc, 'summary.tickets_note', null)} />
-        )}
-        {card === 'funding' && <Funding rows={funding} />}
+        <button
+          type="button"
+          onClick={toggle}
+          title="Close the figures (F brings them back)"
+          aria-label="Close the figures"
+          className="absolute right-3 top-3 rounded px-1.5 text-[13px] leading-none text-muted hover:bg-line/60 hover:text-fg"
+        >
+          ✕
+        </button>
+        {body}
       </GlassPanel>
     </div>
   );

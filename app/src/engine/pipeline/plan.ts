@@ -193,6 +193,8 @@ export interface ProgrammeRow {
 export interface ZoneReport {
   name: string;
   use: Typology;
+  /** Draft model: the phase it is built in (0 for open space, which comes with what it serves). */
+  phase?: number;
   areaM2: number;
   buildableM2: number;
   /** Taken from the zone: waterlogged at the planning storm's peak, Rule 22 slope, natural drains. */
@@ -3641,6 +3643,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     return {
       name: z.name,
       use: z.use,
+      ...(z.phase !== undefined ? { phase: z.phase } : {}),
       areaM2: z.areaM2,
       buildableM2: inZ(buildable),
       waterM2: inZ(L.waterlogging.mask),
