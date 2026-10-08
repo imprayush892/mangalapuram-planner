@@ -1620,9 +1620,18 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         const cc = dem.cellAt(toWorld(f, a, b));
         return cc !== null && pm[cc.j * nx + cc.i] === 1;
       };
-      // Cross streets up the slope, at the angle whose rise is the secondary limit.
+      // Cross streets up the slope, at the angle whose rise is the secondary limit. Owner 8 Oct (terrain option):
+      // square to the rows instead, and only where the ground along the street is within the secondary limit;
+      // elsewhere the rows link to the network at their ends (a slanting cross street cut every row into wedges).
       const g = zoneGrade(dem, piece);
-      const sinA = roadMode === 'north_south' ? 1 : g > lim.secondary ? lim.secondary / g : 1;
+      const squareOnly = roadMode !== 'north_south' && pick<boolean>(planning, 'roads.cross_street_square_only', false);
+      const sinA = roadMode === 'north_south' || squareOnly ? 1 : g > lim.secondary ? lim.secondary / g : 1;
+      // The ground's rise along the street (the frame's v) at a point, over 10 m.
+      const riseAlong = (u: number, v: number): number => {
+        const z0 = dem.sampleBilinear(toWorld(f, u, v - 5));
+        const z1 = dem.sampleBilinear(toWorld(f, u, v + 5));
+        return Number.isFinite(z0) && Number.isFinite(z1) ? Math.abs(z1 - z0) / 10 : Infinity;
+      };
       const cot = Math.sqrt(Math.max(0, 1 - sinA * sinA)) / sinA;
       let wmin = Infinity;
       let wmax = -Infinity;
@@ -1635,17 +1644,20 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       const w0 = (wmin + wmax) / 2 - (cols * crossPitch) / 2;
       const crossWhy = roadMode === 'north_south'
         ? `north-south cross street every ${crossEvery} plots, within ${nsTol}° of north (Vastu, owner 25 Sep)`
-        : sinA < 1
+        : squareOnly
+          ? `cross street every ${crossEvery} plots, square to the rows, where the ground along it is within 1:${Math.round(1 / lim.secondary)}`
+          : sinA < 1
           ? `cross street every ${crossEvery} plots, climbing at ${Math.round((Math.asin(sinA) * 180) / Math.PI)}° to the contours so the ${(g * 100).toFixed(0)}% ground rises at 1:${Math.round(1 / lim.secondary)}`
           : `cross street every ${crossEvery} plots, straight up ground gentler than the limit`;
       for (let m = 1; m < cols; m += 1) {
         const wc = w0 + m * crossPitch;
         let start = Number.NaN;
         for (let y = vmin - 1; y <= vmax + 2; y += 1) {
-          const inside = inP(wc + y * cot, y);
+          const inside = inP(wc + y * cot, y) && (!squareOnly || riseAlong(wc, y) <= lim.secondary * 1.05);
           if (inside && Number.isNaN(start)) start = y;
           if ((!inside || y > vmax + 1) && !Number.isNaN(start)) {
-            if (y - start >= 20) {
+            // Square-only: long enough to join at least two villa streets (a street and its two rows of plots).
+            if (y - start >= (squareOnly ? pitch : 20)) {
               const line: Pt[] = [toWorld(f, wc + start * cot, start), toWorld(f, wc + (y - 1) * cot, y - 1)];
               const prof = gradeLimitedProfile(dem, line, lim.secondary);
               let earth = 0;
@@ -1767,6 +1779,51 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     if (dropped > 0) {
       notes.push(`${dropped} villa streets could not be joined to the network within 400 m and were left out`);
       rebuildNetwork();
+    }
+  }
+
+  // Owner 8 Oct: the villa rows link to the roads round the block at both ends. An end that meets no other road gets
+  // a short link (at most 80 m, 1:6 like any villa street); one that cannot have one stays a cul-de-sac (KMBR Rule
+  // 31: 250 m at most).
+  if (isMix) {
+    let linked = 0;
+    const dead: number[] = [];
+    const reachCells = Math.ceil((width.tertiary / 2 + 2) / dem.cell);
+    for (const r of [...roads]) {
+      if (!r.kept || !r.row || r.tier !== 'tertiary' || r.centreline.length < 2) continue;
+      const own = new Set(r.cells);
+      const others = emptyMask(dem);
+      for (let k = 0; k < n; k += 1) if (network[k] && !own.has(k)) others[k] = 1;
+      let open = 0;
+      for (const end of [r.centreline[0]!, r.centreline[r.centreline.length - 1]!]) {
+        const c = dem.cellAt(end);
+        if (!c) continue;
+        let meets = false;
+        for (let dj = -reachCells; dj <= reachCells && !meets; dj += 1) {
+          for (let di = -reachCells; di <= reachCells && !meets; di += 1) {
+            const i = c.i + di;
+            const j = c.j + dj;
+            if (i >= 0 && j >= 0 && i < nx && j < ny && others[j * nx + i]) meets = true;
+          }
+        }
+        if (meets) continue;
+        const rr = route({ dem, cost: baseCost, grade: lim.tertiary, overGradePenalty: penalty, sources: [c.j * nx + c.i], targets: others, dirWeight });
+        if (rr.path && rr.path.length * dem.cell <= 80) {
+          const link = addRoad('tertiary', lineOf(rr.path), "joins a villa street's end to the roads round the block (rows linked at both ends, owner 8 Oct)");
+          if (link) {
+            linked += 1;
+            for (const k of link.cells) network[k] = 1;
+            continue;
+          }
+        }
+        open += 1;
+      }
+      if (open > 0) dead.push(lineLength(r.centreline));
+    }
+    if (linked > 0) notes.push(`${linked} villa-street ends linked to the roads round their block, so the rows are joined at both ends`);
+    if (dead.length > 0) {
+      const over = dead.filter((L0) => L0 > 250).length;
+      notes.push(`${dead.length} villa streets stay cul-de-sacs, no road within reach at one end${over > 0 ? ` (${over} longer than KMBR's 250 m)` : ', all within the KMBR 250 m'}`);
     }
   }
 

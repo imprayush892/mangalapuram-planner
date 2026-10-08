@@ -52,6 +52,9 @@ bases:
     # both ends, without the street every 8 plots that cut the rows into wedges on the slopes.
     roads.cross_street_every_plots: 16
     roads.cross_street_min_spacing_m: 120
+    # Owner 8 Oct (terrain option, D1): cross streets square to the rows, only where the ground along them is within
+    # the secondary limit (1:7); elsewhere the rows link to the network at their ends. North-south (D2) is unchanged.
+    roads.cross_street_square_only: true
     roads.zone_interior_cost: {villas: 25, park: 400, apartments: 25, commercial: 2.5, retail: 25, office: 25, hospital: 25, batching: 2.5, senior: 25, school: 25, clubhouse: 25, reserved: 25}
     # Owner's roads: the client's 18 m entry road from the main gate on the Mangalapuram-Pothencode
     # road south to the existing road (zoning plan: "Main gate / commercial strip, 18 m N-S road"),

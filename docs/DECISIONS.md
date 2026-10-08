@@ -433,3 +433,15 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - The villa land (27.1 ac) is filled: every villa it holds is laid (`villas.categories.MIX.fill`). D1 351 villas,
   D2 381 (model 320); plots 74% / 78% of the villa land. By phase, Phases 2 and 4 hold more than their counts and
   Phases 1 (45 / 47 of 48) and 3 (72 / 80 of 96) fewer. New roads 8.2 ac (11.2%) / 7.7 ac (10.5%).
+
+## 8 Oct 2026 · D1's cross streets square to the rows, within the gradient rule (owner)
+
+- Road gradient rule: primary 1:8, secondary 1:7, tertiary 1:6 (planning_rules roads.max_gradient).
+- D1 (to the ground) laid its cross streets slanting up the slope so they climbed at 1:7; a slanting street cut
+  every row it crossed into wedges (D1 351 villas against D2's 381). Now (roads.cross_street_square_only) a cross
+  street is square to the rows and only where the ground along it is within 1:7 over at least a block; on this
+  ground none qualifies (the villa land's median slope is 20-36%), so D1's rows are joined at their ends instead.
+- Both options: a villa street end that meets no other road gets a link to the roads round the block (at most
+  80 m, 1:6): D1 12 links, D2 14; the streets left as cul-de-sacs (D1 1, D2 2) are within KMBR's 250 m.
+- D1 373 villas, plots 76% of the villa land, cut 43,300 / fill 61,300 m3; D2 370 villas, 75%, cut 57,800 / fill
+  75,200 m3. Roads 8.2 ac (11.2%) in both.
