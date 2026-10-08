@@ -18,6 +18,7 @@ interface Line {
   units?: number;
   bua_sft?: number;
   land_ac?: number;
+  deferred?: string;
 }
 
 let planned: Promise<PlanResult> | null = null;
@@ -37,7 +38,8 @@ describe('the draft model basis (owner, 7 Oct)', () => {
   it('draws one zone per component, each at the land the model gives it', async () => {
     const [s, c] = await Promise.all([site(), config()]);
     const lines = pick<Line[]>(c.programmeDraft, 'lines', []);
-    const zoned = lines.filter((l) => (l.land_ac ?? 0) > 0);
+    // Owner 8 Oct: the hospital is built on the 26 ac deferred land; its lobe here is villas.
+    const zoned = lines.filter((l) => (l.land_ac ?? 0) > 0 && !l.deferred);
     expect(s.draftZones.filter((z) => z.use !== 'park').length).toBe(zoned.length);
     for (const l of zoned) {
       const z = s.draftZones.find((q) => q.component === l.id);
@@ -73,13 +75,15 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     for (const q of p.plots) for (const z of open) expect(multiPolyArea(intersect([[q.ring as [number, number][]]], z.geom)), `${q.id} in ${z.name}`).toBeLessThan(5);
   });
 
-  it('places the hospital, the school stages, the clubhouses, retail, office, senior living and apartments in full', async () => {
+  it('places the school stages, the clubhouses, retail, office, senior living and apartments in full; the hospital goes to the deferred land', async () => {
     const p = await plan();
     for (const r of p.programme) {
       if (/villas/i.test(r.use)) continue;
       expect(r.met, `${r.use}: asked ${r.asked}, placed ${r.placed}`).toBe(true);
     }
-    for (const u of ['hospital', 'retail', 'office'] as const) expect(p.buildings.some((b) => b.typology === u), u).toBe(true);
+    for (const u of ['retail', 'office'] as const) expect(p.buildings.some((b) => b.typology === u), u).toBe(true);
+    expect(p.buildings.some((b) => b.typology === 'hospital')).toBe(false);
+    expect(p.programme.find((r) => /hospital/i.test(r.use))?.placed).toMatch(/not in these 73 ac/);
   });
 
   it('keeps each villa zone to its component count and the model plot mix', async () => {
@@ -87,6 +91,8 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     const types = pick<{ name: string; share: number; plot_sft: number }[]>(c.programmeDraft, 'villa_types', []);
     expect(p.option.villaSizing).toBe('MIX');
     expect(p.option.villaTarget).toBe(320);
+    // Owner 8 Oct: the villa land is filled; the township holds at least the model's 320.
+    expect(p.plots.length).toBeGreaterThanOrEqual(320);
     for (const z of p.zones.filter((q) => q.use === 'villas')) {
       const ps = p.plots.filter((q) => q.zone === z.name);
       expect(ps.length).toBeGreaterThan(0);
@@ -151,8 +157,9 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     for (let i = 0; i < p.plots.length; i += 1)
       for (let j = i + 1; j < p.plots.length; j += 1) if (!apart(p.plots[i]!.ring as [number, number][], p.plots[j]!.ring as [number, number][])) overlaps += 1;
     expect(overlaps).toBe(0);
-    // Owner 7 Oct ("80-81% is workable"): about four fifths of the villa land in plots.
-    expect(p.option.plottedShare).toBeGreaterThan(0.79);
+    // With cross streets through the rows (owner 8 Oct: the roads the plan wants, not the model's), about three
+    // quarters of the villa land is in plots.
+    expect(p.option.plottedShare).toBeGreaterThan(0.7);
   });
 
   it('keeps every building clear of the other buildings, the roads and the plots, and the roads off the plots', async () => {

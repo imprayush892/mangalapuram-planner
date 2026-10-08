@@ -74,7 +74,7 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
     case 'phase-1':
       return 'The township is built outward from the main gate: Phase 1 first, beside it, with the trunk roads.';
     case 'phase-2':
-      return 'Phase 2 adds the next ring: more villas and apartments, the hospital, the senior enclave and the first school stage.';
+      return 'Phase 2 adds the next ring: more villas (on the hospital lobe too: the hospital goes to the deferred land), apartments, the senior enclave and the first school stage.';
     case 'phase-3':
       return 'Phase 3 reaches the middle of the site, with the retail street, the second clubhouse and the senior school wing.';
     case 'masterplan':

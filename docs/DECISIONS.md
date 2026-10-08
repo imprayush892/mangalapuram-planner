@@ -417,3 +417,19 @@ Each of these is a switch or an editable assumption, not a silent decision.
   model's 8.3 ac net of roads (D1 8.37, D2 8.31).
 - The township's 320 villas: a phase whose land holds more than its count makes up those short (reported).
 - Result: D1 306 villas, D2 303 (were 284, 279); plots 80% of the villa land.
+
+## 8 Oct 2026 · hospital off this land, ponds counted, the roads the plan wants (owner)
+
+- The hospital is built on the 26 ac deferred land, not in these 73 ac (programme_draft_model.yaml C06 `deferred`;
+  the plan reports it as such). Its 5 ac lobe (the NW lobe on the main road) is Phase 2 villa land.
+- Part of the ponds counts toward the 8.3 ac: a pond where a park gives it a landscaped edge (the north pond in its
+  park, 0.86 ac; the south pond with a bank walk, 0.47 ac), off the owner's south road. The south pond's park is a
+  bank walk on the Phase 4 villa land along the water (1.89 ac), sized so the open space is 8.3 ac net of the
+  roads that cross it (D1 8.45, D2 8.44). The 3.1 ac pond park is otherwise villas.
+- Roads are not the model's (its 12% + 2 ac): cross streets through the villa rows again, a block about 170 m long
+  (every 16 plots, at least 120 m apart; every 8 plots cut the terrain option's rows into wedges, 312 villas, 66%
+  plotted); trunk roads may cross a built zone where that is the better line (villas cost 25 to cross, parks 400).
+  Two options as before: D1 to the ground, D2 north-south (Vastu).
+- The villa land (27.1 ac) is filled: every villa it holds is laid (`villas.categories.MIX.fill`). D1 351 villas,
+  D2 381 (model 320); plots 74% / 78% of the villa land. By phase, Phases 2 and 4 hold more than their counts and
+  Phases 1 (45 / 47 of 48) and 3 (72 / 80 of 96) fewer. New roads 8.2 ac (11.2%) / 7.7 ac (10.5%).

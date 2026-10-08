@@ -152,7 +152,9 @@ strip = comm_rest.intersection(above(400)).intersection(below(560))
 h_top, _ = take(strip, 5.0 - P4V.area / AC, "W")
 comm_rest = comm_rest.difference(h_top)
 add("C12", "RETAIL & F&B HIGH STREET", "retail", 3, 1.5, retail)
-add("C06", "HOSPITAL", "hospital", 2, 5.0, unary_union([P4V, h_top]))      # NW lobe: on the main road, highway side
+# Owner 8 Oct: the hospital is built on the 26 ac deferred land, not in these 73 ac; its lobe (the NW lobe on the
+# main road, highway side) becomes Phase 2 villa land.
+HOSP_LOBE = unary_union([P4V, h_top]).buffer(0)
 office, apt_ne = take(APTZ, 2.5, "N")
 add("C16", "COMMERCIAL OFFICE", "office", 4, 2.5, office)
 # --- Phase 1, next to the gate ---
@@ -191,7 +193,7 @@ add("C04", "SENIOR LIVING · PHASE 1", "senior", 1, 1.0, s1)
 a2e, east = take(SCH, 3.0 - apt_ne.area / AC, "N")
 add("C11", "APARTMENTS · PHASE 2", "apartments", 2, 3.0, unary_union([apt_ne, a2e]))
 v2, p2_rest = take(P2V, 4.985, "N")
-add("C09", "VILLAS · PHASE 2", "villas", 2, 4.985, v2)
+add("C09", "VILLAS · PHASE 2", "villas", 2, 4.985, unary_union([v2, HOSP_LOBE]))
 club_n, club_rest = take(CLUB, 5.3 - west.area / AC, "N")
 sch_c, sen2 = take_disk(unary_union([west, club_n]), 0.3, (215, 250))
 add("C07", "SENIOR ENCLAVE · PHASE 2", "senior", 2, 5.0, sen2)
@@ -249,7 +251,7 @@ KEPT = [piece_at(FREE, pt) for pt in ((470, 500), (309, 489), (274, 603), (828, 
 kept_ac = sum(g.area for g in KEPT) / AC
 # The villa streets run on through the pockets (so each fronts a street): the pockets are drawn larger by the
 # streets' share of the grid, 6.5 m of street to every 46.5 m (14%), so the open space net of them is the model's.
-POCKET_STREETS = 0.14
+POCKET_STREETS = 0.30   # owner 8 Oct: cross streets are back, so more of a pocket is street (measured ~30%)
 # Owner 7 Oct (second pass): the land added stays villa land (the model's 320 villas need about 21-22 ac of it at
 # the plots the ground allows), and the open space goes where a villa would sell least: little outlook (the view
 # analysis, tools/zoning/views.py), steep slopes, the ponds' rims and the verges. Land with an outlook is villas.
@@ -312,24 +314,44 @@ def carve_disk(comp, centre, acres):
 
 from shapely.ops import nearest_points
 # Green pockets, each on land the villas sell least on: Phase 2's steep west edge by the west lake (outlook 0.38
-# against the phase's 0.44), Phase 3's Rule 22 slope, and Phase 4's low bowl by the south pond (outlook 0.22
-# against 0.47), sized so the open space comes to the model's 8.3 ac net of the streets that cross the pockets.
+# against the phase's 0.44) and Phase 3's Rule 22 slope.
 g1 = carve("C09", box(0, 205, 5000, 285), strip.area / AC, "W")
 g2 = carve_disk("C17", (522, 245), 0.30)
-pockets_net = OS_TARGET - kept_ac - extra_ac
-g4_ac = pockets_net / (1 - POCKET_STREETS) - (g1.area + g2.area) / AC
-to_pond = nearest_points(ZD["C18"]["geom"], Point(560, 55))[0]
-g4 = carve_disk("C18", (to_pond.x, to_pond.y), g4_ac)
-for i, (g, where, ph) in enumerate(((g1, "by the west lake", 2), (g2, "Phase 3 slope", 3), (g4, "by the south pond", 4)), 1):
+# Owner 8 Oct: part of the ponds counts toward the 8.3 ac: a pond counts where a park gives it a landscaped edge
+# (the north pond in its park, the south pond with a bank walk). The south pond's park is that bank, a strip of the
+# Phase 4 villa land along the water, as wide as the open space still needs (6 m at least, KMBR Rule 31(vi)).
+WATER = mask_poly(layer("waterlogging")).intersection(PARCEL).buffer(0)
+north_pond = max((g for g in getattr(WATER.intersection(KEPT[0].buffer(6)), "geoms", [WATER.intersection(KEPT[0].buffer(6))])), key=lambda g: g.area)
+north_pond = [g for g in getattr(WATER, "geoms", [WATER]) if g.intersects(north_pond)]
+south_pond = [g for g in getattr(WATER, "geoms", [WATER]) if g.distance(Point(560, 55)) < 25]
+taken_now = unary_union([z["geom"] for z in Z] + KEPT + [g for g, _ in EXTRA] + [g1, g2])
+# Off the owner's south road, which runs along the south pond.
+LAKES = [(unary_union(north_pond).difference(taken_now).difference(SOUTH_ROAD).buffer(0), "NORTH POND (WATER)", 1),
+         (unary_union(south_pond).difference(taken_now).difference(SOUTH_ROAD).buffer(0), "SOUTH POND (WATER)", 4)]
+lakes_ac = sum(g.area for g, _, _ in LAKES) / AC
+# 0.1 ac over, for the trunk roads that cross the parks' edges (the open space net of them is the model's 8.3 ac).
+need = OS_TARGET + 0.1 - kept_ac - extra_ac - lakes_ac - (g1.area + g2.area) / AC * (1 - POCKET_STREETS)
+SOUTH_WATER = unary_union(south_pond)
+bank = None
+for w in [6 + 0.5 * k for k in range(0, 120)]:
+    bank = ZD["C18"]["geom"].intersection(SOUTH_WATER.buffer(w + 3)).buffer(0)
+    if bank.area / AC >= need:
+        break
+ZD["C18"]["geom"] = ZD["C18"]["geom"].difference(bank).buffer(0)
+for i, (g, where, ph) in enumerate(((g1, "by the west lake", 2), (g2, "Phase 3 slope", 3)), 1):
     Z.append(dict(component=f"OS-G{i}", name=f"GREEN POCKET {i} ({where})", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0), within="villas"))
+Z.append(dict(component="OS-G3", name="SOUTH POND BANK WALK", use="park", phase=4, model_ac=round(bank.area / AC, 3), geom=bank))
 for i, (g, where, ph) in enumerate(zip(KEPT, ("NORTH POND", "GATE WEST WING", "NORTH-WEST CORNER", "SOUTH-EAST CORNER"), (1, 1, 2, 2)), 1):
     Z.append(dict(component=f"OS-{i}", name=f"OPEN SPACE · {where}", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0)))
 for k, (g, ph) in enumerate(EXTRA, 5):
     Z.append(dict(component=f"OS-{k}", name=f"OPEN SPACE · POCKET PARK {k - 4}", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0)))
+for k, (g, where, ph) in enumerate(LAKES, 1):
+    Z.append(dict(component=f"OS-W{k}", name=f"LAKE · {where}", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g, water=True))
+pockets_net = (g1.area + g2.area) / AC * (1 - POCKET_STREETS) + bank.area / AC
 for c in ("C09", "C17", "C18"):
     ZD[c]["model_ac"] = round(ZD[c]["geom"].area / AC, 3)
-print(f"open space: kept {kept_ac:.2f} + small parks {extra_ac:.2f} + pockets {(g1.area + g2.area + g4.area) / AC:.2f} drawn "
-      f"({pockets_net:.2f} net of streets) = {kept_ac + extra_ac + pockets_net:.2f} ac net (model {OS_TARGET}); "
+print(f"open space: kept {kept_ac:.2f} + small parks {extra_ac:.2f} + ponds {lakes_ac:.2f} + pockets and bank {pockets_net:.2f} net "
+      f"= {kept_ac + extra_ac + lakes_ac + pockets_net:.2f} ac (model {OS_TARGET}); "
       f"villa land {sum(ZD[c]['geom'].area for c in ('C03', 'C09', 'C17', 'C18')) / AC:.2f} ac (model 19.94)")
 
 
@@ -343,7 +365,7 @@ def main():
         feats.append({"type": "Feature", "geometry": geom, "properties": {
             "name": z["name"], "use": z["use"], "phase": z["phase"], "component": z["component"],
             "label_area_ac": z["model_ac"], "drawn_area_ac": round(ac, 3), "in_scope_ac": round(ac, 3), "geometry_confidence": "drawn",
-            **({"within": z["within"]} if z.get("within") else {})}})
+            **({"within": z["within"]} if z.get("within") else {}), **({"water": True} if z.get("water") else {})}})
         flag = "" if abs(ac - z["model_ac"]) <= 0.05 else "   <-- off the model"
         print(f"{z['component']} P{z['phase']} {z['name']:30s} model {z['model_ac']:5.2f}  drawn {ac:5.2f}{flag}")
     used = unary_union([z["geom"] for z in Z])

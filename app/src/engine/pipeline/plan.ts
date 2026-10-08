@@ -564,6 +564,8 @@ interface ProgrammeLine {
   land_ac?: number | Record<string, number>;
   phase?: number;
   name?: string;
+  /** Moved off this land by the owner: where it goes instead. */
+  deferred?: string;
 }
 
 /* ---------------------------------------------------------------- run */
@@ -3025,7 +3027,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     const gone = new Set<DraftPlot>();
     let merged = 0;
     const carried: string[] = [];
-    if (isMix) {
+    const fill = isMix && pick<boolean>(planning, `villas.categories.${villaSizing}.fill`, false);
+    if (fill) {
+      // Owner 8 Oct: every villa the land holds is laid; nothing is trimmed to the model's counts.
+    } else if (isMix) {
       // Each zone stops at its component's units. Owner 7 Oct (85% of the villa land in plots): a plot over the
       // count is not left empty; its row neighbours share it, each still a rectangle, within the growth limit.
       // The plots that can be shared go first (steepest first); a plot no neighbour can take goes as before.
@@ -3800,6 +3805,19 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           note: `${z.use}, phase ${l.phase ?? z.phase ?? '-'}`,
         });
       }
+    }
+  }
+  // A component the owner has moved off this land (draft model: the hospital, to the 26 ac deferred land).
+  if (compZones.length > 0) {
+    for (const l of lines) {
+      if (!l.deferred) continue;
+      programme.push({
+        use: `${l.id} · ${(l.name ?? l.use).split(':')[0]}`,
+        asked: l.bua_sft ? `${l.bua_sft.toLocaleString('en-IN')} sq ft` : `${l.units ?? 0} units`,
+        placed: 'not in these 73 ac',
+        met: true,
+        note: l.deferred,
+      });
     }
   }
   const unzoned = compZones.length > 0 ? [] : ['hotel', 'office'].filter((u) => byUse(u).length > 0);

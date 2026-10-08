@@ -45,12 +45,14 @@ bases:
     apartments.tower_flats_per_floor: null
     # The model's construction area is 1.15 x saleable for apartments (Inputs L98): 1 / 1.15 = 0.87.
     apartments.plan_efficiency: 0.87
-    # The model sells 85% of the villa land as plots (Inputs C41); the plan reports against it.
-    villas.land_split: {plots: 0.85, roads: 0.15, tolerance: 0.05}
-    # The model's villa land is net of the trunk roads (Inputs C36): trunk roads keep out of the villa
-    # zones' interiors, and the villa streets take the cross streets' place less often.
-    roads.zone_interior_cost: {villas: 400, park: 400, apartments: 25, commercial: 2.5, retail: 25, office: 25, hospital: 25, batching: 2.5, senior: 25, school: 25, clubhouse: 25, reserved: 25}
-    roads.cross_street_every_plots: 1000      # no cross streets through the rows: the streets link to the network at their ends
+    # Owner 8 Oct: the roads are not the model's (its 12% + 2 ac): the network the ground and the plan want, cross
+    # streets through the villa rows as in the earlier options (roads.cross_street_every_plots), trunk roads free
+    # to cross a zone where that is the better line (built zones cost as much to cross as each other; parks more).
+    # Cross streets: a block no longer than about 170 m (16 plots of the model's mix), walkable and served from
+    # both ends, without the street every 8 plots that cut the rows into wedges on the slopes.
+    roads.cross_street_every_plots: 16
+    roads.cross_street_min_spacing_m: 120
+    roads.zone_interior_cost: {villas: 25, park: 400, apartments: 25, commercial: 2.5, retail: 25, office: 25, hospital: 25, batching: 2.5, senior: 25, school: 25, clubhouse: 25, reserved: 25}
     # Owner's roads: the client's 18 m entry road from the main gate on the Mangalapuram-Pothencode
     # road south to the existing road (zoning plan: "Main gate / commercial strip, 18 m N-S road"),
     # through the retail street; and the south road along the parcel edge (owner 28 Sep).
@@ -231,6 +233,9 @@ villas:
       # ASSUMPTION (owner 7 Oct: 85% of the villa land in plots): after every plot of the model's sizes is
       # laid, an end or edge plot takes in the land left beside or behind it, up to 2 x its type's area.
       max_plot_growth: 2.0
+      # Owner 8 Oct (the hospital's lobe and the pond park become villas): the villa land is filled, every
+      # villa the ground holds is laid; the phases report against the model's counts (48 / 80 / 96 / 96).
+      fill: true
   # Plots are cut at one point in their type's range, searched from the largest down until the
   # category's target (count or gross FSI) is met.
   sizing_steps: 6

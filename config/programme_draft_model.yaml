@@ -18,7 +18,7 @@ lines:
   - {id: C08, use: club, phase: 1, bua_sft: 5000, land_ac: 0.5, name: "Villa clubhouse 1"}                    # row 100
   - {id: C04, use: senior, phase: 1, units: 32, plinth_sft: 1000, saleable_sft: 32000, bua_sft: 38400, land_ac: 1.0}   # row 101
   - {id: C05, use: school, phase: 2, bua_sft: 70000, land_ac: 2.5, name: "School stage A: primary & middle"}  # row 102
-  - {id: C06, use: hospital, phase: 2, bua_sft: 300000, land_ac: 5.0, name: "Hospital: core, shell & MEP"}    # row 103
+  - {id: C06, use: hospital, phase: 2, bua_sft: 300000, land_ac: 5.0, name: "Hospital: core, shell & MEP", deferred: "on the 26 ac deferred land (owner 8 Oct); its 5 ac lobe here is Phase 2 villas"}    # row 103
   - {id: C15, use: club, phase: 2, bua_sft: 5000, land_ac: 0.3, name: "Senior-living clubhouse"}               # row 104
   - {id: C07, use: senior, phase: 2, units: 160, plinth_sft: 1000, saleable_sft: 160000, bua_sft: 192000, land_ac: 5.0}  # row 105
   - {id: C09, use: villas, phase: 2, units: 80, saleable_sft: 191600, bua_sft: 191600, land_ac: 4.985}     # row 106
