@@ -199,7 +199,8 @@ export function runPipeline(overrides: PipelineRequest['overrides']): void {
   if (onlyOptions) {
     const sizing = (overrides.planning?.['options.villa_sizing'] as string | undefined) ?? 'A';
     const roads = (overrides.planning?.['options.road_orientation'] as string | undefined) ?? 'terrain';
-    const opt = PRESENT_PLAN_OPTIONS.find((o) => o.sizing === sizing && o.roads === roads)?.id;
+    const zoning = (overrides.planning?.['options.draft_zoning'] as string | undefined) ?? 'model';
+    const opt = PRESENT_PLAN_OPTIONS.find((o) => o.sizing === sizing && o.roads === roads && o.zoning === zoning)?.id;
     prebuilt ??= loadPrebuiltPlans(fetchSource(dataBaseUrl()));
     void prebuilt.then((plans) => {
       if (id !== latestPipeline) return;

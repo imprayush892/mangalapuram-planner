@@ -23,7 +23,7 @@ try {
   const { nodeSource } = await vite.ssrLoadModule('/src/engine/data/nodeSource.ts');
   const { runPipelineJob } = await vite.ssrLoadModule('/src/engine/runGeneration.ts');
   const { EMPTY_OVERRIDES } = await vite.ssrLoadModule('/src/engine/data/overrides.ts');
-  const { PRESENT_PLAN_OPTIONS, dataFingerprint, encodePlan } = await vite.ssrLoadModule('/src/engine/present/prebuilt.ts');
+  const { PRESENT_PLAN_OPTIONS, dataFingerprint, encodePlan, optionOverrides } = await vite.ssrLoadModule('/src/engine/present/prebuilt.ts');
   const src = nodeSource(dataDir);
   const fingerprint = await dataFingerprint(src);
   for (const d of outDirs) await mkdir(d, { recursive: true });
@@ -31,7 +31,7 @@ try {
     const t0 = Date.now();
     const overrides = {
       ...EMPTY_OVERRIDES,
-      planning: { 'options.villa_sizing': o.sizing, 'options.road_orientation': o.roads },
+      planning: optionOverrides(o),
     };
     const { plan } = await runPipelineJob({ job: 'pipeline', id: 0, baseUrl: '', overrides }, () => {}, src);
     const file = path.join(outDirs[0], `${o.id}.json`);

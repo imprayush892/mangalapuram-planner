@@ -26,6 +26,10 @@ options:
   basis: draft_model             # draft_model or client
   villa_sizing: A                # client basis: A, B, B_count or C (villas.categories); draft model: MIX
   road_orientation: terrain      # terrain = least cut and fill; north_south = Vastu, primary and secondary N-S
+  # Draft model only. model = zones_draft_model.geojson; green_pockets (owner 9 Oct, options D3/D4) =
+  # zones_draft_model_pockets.geojson: the dry ground west of the north pond and the west end of the south pond's
+  # bank walk are villas, and the same open space is nine pocket gardens among the villas (still 8.3 ac).
+  draft_zoning: model
 
 # Rules that replace the client-basis values on the draft-model basis (dotted path: value).
 bases:

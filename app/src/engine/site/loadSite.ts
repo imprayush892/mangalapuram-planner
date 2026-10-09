@@ -34,6 +34,13 @@ export interface SiteModel {
    * with options.basis: draft_model. Empty where the file is not shipped.
    */
   draftZones: Zone[];
+  /**
+   * The draft-model zoning with green pockets (owner 9 Oct 2026, options D3/D4: part of two parks is villas and
+   * the same open space is pocket gardens among the villas); planned with options.draft_zoning: green_pockets.
+   */
+  draftZonesPockets: Zone[];
+  /** The same for north-south roads (D4): its pocket gardens are snapped to D2's plots, not D1's. */
+  draftZonesPocketsNs: Zone[];
   features: SiteFeature[];
   contours: ContourLine[];
   dem: Dem;
@@ -114,6 +121,9 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
   const draftFc = await src
     .json<GeoJsonFeatureCollection<ZoneProps>>('processed/zones_draft_model.geojson')
     .catch(() => ({ type: 'FeatureCollection', features: [] }) as unknown as GeoJsonFeatureCollection<ZoneProps>);
+  const none = (): GeoJsonFeatureCollection<ZoneProps> => ({ type: 'FeatureCollection', features: [] }) as unknown as GeoJsonFeatureCollection<ZoneProps>;
+  const pocketsFc = await src.json<GeoJsonFeatureCollection<ZoneProps>>('processed/zones_draft_model_pockets.geojson').catch(none);
+  const pocketsNsFc = await src.json<GeoJsonFeatureCollection<ZoneProps>>('processed/zones_draft_model_pockets_ns.geojson').catch(none);
 
   const demBuffer = await src.binary('processed/dem_2m.f32');
   const dem = demFromBuffer(demMeta, demBuffer);
@@ -177,6 +187,8 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
   };
   const zones: Zone[] = zonesFc.features.map(toZone);
   const draftZones: Zone[] = draftFc.features.filter((f) => f.geometry).map(toZone);
+  const draftZonesPockets: Zone[] = pocketsFc.features.filter((f) => f.geometry).map(toZone);
+  const draftZonesPocketsNs: Zone[] = pocketsNsFc.features.filter((f) => f.geometry).map(toZone);
 
   const features: SiteFeature[] = featuresFc.features.map((f) => ({
     layer: f.properties.layer,
@@ -214,6 +226,8 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
     parcelAreaAc: m2ToAcres(parcelAreaM2),
     zones,
     draftZones,
+    draftZonesPockets,
+    draftZonesPocketsNs,
     features,
     contours,
     dem,

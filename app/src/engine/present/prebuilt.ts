@@ -9,7 +9,8 @@ import type { PlanResult } from '../pipeline/plan';
  * fingerprint matches what it has loaded, so a prebuilt plan is never stale.
  */
 
-export type PresentOptionId = 'D1' | 'D2';
+export type PresentOptionId = 'D1' | 'D2' | 'D3' | 'D4';
+export type PresentZoning = 'model' | 'green_pockets';
 
 /**
  * The master plans on the owner's draft financial model (owner 7 Oct 2026: planning_rules.yaml
@@ -17,10 +18,18 @@ export type PresentOptionId = 'D1' | 'D2';
  * layout. The one list the panel, the presentation and the prebuild all read. (The client-basis
  * options A1-C2 of 28 Sep run with options.basis: client.)
  */
-export const PRESENT_PLAN_OPTIONS: { id: PresentOptionId; sizing: 'A' | 'B' | 'B_count' | 'C' | 'MIX'; roads: 'terrain' | 'north_south'; label: string }[] = [
-  { id: 'D1', sizing: 'MIX', roads: 'terrain', label: 'Draft model · roads to the ground' },
-  { id: 'D2', sizing: 'MIX', roads: 'north_south', label: 'Draft model · north–south roads (Vastu)' },
+export const PRESENT_PLAN_OPTIONS: { id: PresentOptionId; sizing: 'A' | 'B' | 'B_count' | 'C' | 'MIX'; roads: 'terrain' | 'north_south'; zoning: PresentZoning; label: string }[] = [
+  { id: 'D1', sizing: 'MIX', roads: 'terrain', zoning: 'model', label: 'Draft model · roads to the ground' },
+  { id: 'D2', sizing: 'MIX', roads: 'north_south', zoning: 'model', label: 'Draft model · north–south roads (Vastu)' },
+  // Owner 9 Oct: part of two parks is villas, the same open space is pocket gardens among the villas.
+  { id: 'D3', sizing: 'MIX', roads: 'terrain', zoning: 'green_pockets', label: 'Green pockets · roads to the ground' },
+  { id: 'D4', sizing: 'MIX', roads: 'north_south', zoning: 'green_pockets', label: 'Green pockets · north–south roads (Vastu)' },
 ];
+
+/** The planning overrides that select an option. */
+export function optionOverrides(o: { sizing: string; roads: string; zoning: PresentZoning }): Record<string, string> {
+  return { 'options.villa_sizing': o.sizing, 'options.road_orientation': o.roads, 'options.draft_zoning': o.zoning };
+}
 
 /** What a plan depends on, relative to the data directory. */
 export const FINGERPRINT_FILES = [
@@ -34,6 +43,8 @@ export const FINGERPRINT_FILES = [
   'processed/parcel.geojson',
   'processed/zones_client_registered.geojson',
   'processed/zones_draft_model.geojson',
+  'processed/zones_draft_model_pockets.geojson',
+  'processed/zones_draft_model_pockets_ns.geojson',
   'processed/site_features.geojson',
 ];
 

@@ -445,3 +445,21 @@ Each of these is a switch or an editable assumption, not a silent decision.
   80 m, 1:6): D1 12 links, D2 14; the streets left as cul-de-sacs (D1 1, D2 2) are within KMBR's 250 m.
 - D1 373 villas, plots 76% of the villa land, cut 43,300 / fill 61,300 m3; D2 370 villas, 75%, cut 57,800 / fill
   75,200 m3. Roads 8.2 ac (11.2%) in both.
+
+## 9 Oct 2026 · options D3 and D4: green pockets among the villas (owner)
+
+- Two more options on the draft model, from the owner's sketch: part of the designated open space becomes villas
+  (the dry ground west of the north pond, between the entry road and the pond, 0.8 ac, Phase 1; the west end of the
+  south pond's bank walk, 0.3 ac, Phase 4; the ponds keep a 6 m green rim), and the same open space comes back as
+  nine pocket gardens in the middle of the villa blocks (two in the north-west lobe, five across the middle block,
+  two in the south-east block), to break the long runs of villas. The open space stays the model's 8.3 ac.
+- Each garden is two whole plots side by side on one street (about 21 x 20 m, 0.09-0.13 ac), snapped to the plots of
+  the plan with the same roads, so the rows either side stay whole and the garden fronts a street (KMBR Rule 31(vi)).
+  Square gardens drawn without the rows (27 m) cost 35 villas: the street grid ran through them and trimmed the plots
+  round them. The parks give a fixed piece (so the villa land's outline and its grid stay put), about what the
+  gardens take back: open space net of roads D3 8.44 ac, D4 8.38 ac.
+- Zoning: data/processed/zones_draft_model_pockets.geojson (D3, snapped to D3's own plots) and
+  zones_draft_model_pockets_ns.geojson (D4), written by
+  `python tools/zoning/draft_model.py --pockets <plan.json> <out.geojson>`, chosen with planning_rules
+  options.draft_zoning: green_pockets. D3 lays the roads to the ground (as D1), D4 north-south (as D2).
+- D3 364 villas (D1 373), cut 53,900 / fill 60,400 m3; D4 357 villas (D2 370), cut 57,900 / fill 75,500 m3.

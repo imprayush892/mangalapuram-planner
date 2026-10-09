@@ -10,7 +10,7 @@ import type { BuildingUse, PlanResult } from '../engine/pipeline/plan';
 import type { GenerateResponse, PipelineRequest } from '../engine/runGeneration';
 import type { OverrideSet } from '../engine/data/overrides';
 import { fetchSource } from '../engine/data/source';
-import { PRESENT_PLAN_OPTIONS, loadPrebuiltPlans } from '../engine/present/prebuilt';
+import { PRESENT_PLAN_OPTIONS, loadPrebuiltPlans, optionOverrides } from '../engine/present/prebuilt';
 import { pointInMulti } from '../engine/geom/planar';
 import type { PresentOptionId } from '../engine/present/prebuilt';
 
@@ -316,7 +316,7 @@ interface PresentState {
 }
 
 function optionOf(plan: PlanResult): OptionId {
-  return PRESENT_OPTIONS.find((o) => o.sizing === plan.option.villaSizing && o.roads === plan.option.roads)?.id ?? 'D1';
+  return PRESENT_OPTIONS.find((o) => o.sizing === plan.option.villaSizing && o.roads === plan.option.roads && o.zoning === (plan.option.zoning ?? 'model'))?.id ?? 'D1';
 }
 
 /**
@@ -325,7 +325,9 @@ function optionOf(plan: PlanResult): OptionId {
  */
 export function phaseOf(plan: PlanResult): { zone: (name: string | null) => number; road: (r: PlanResult['roads'][number]) => number } {
   const byName = new Map(plan.zones.map((z) => [z.name, Math.max(1, z.phase ?? 1)]));
-  const zones = (useSite.getState().site?.draftZones ?? []).filter((z) => z.phase !== undefined && byName.has(z.name));
+  const site = useSite.getState().site;
+  const drawn = (plan.option.zoning === 'green_pockets' ? (plan.option.roads === 'north_south' ? site?.draftZonesPocketsNs : site?.draftZonesPockets) : site?.draftZones) ?? [];
+  const zones = drawn.filter((z) => z.phase !== undefined && byName.has(z.name));
   const zone = (name: string | null): number => (name ? (byName.get(name) ?? 1) : 1);
   const road = (r: PlanResult['roads'][number]): number => {
     let best = Infinity;
@@ -447,7 +449,7 @@ async function prepare(overrides: OverrideSet): Promise<void> {
       job: 'pipeline',
       id: prepId++,
       baseUrl: dataBaseUrl(),
-      overrides: { ...overrides, planning: { ...overrides.planning, 'options.villa_sizing': o.sizing, 'options.road_orientation': o.roads } },
+      overrides: { ...overrides, planning: { ...overrides.planning, ...optionOverrides(o) } },
     };
     const onMain = (): void => {
       setPrep(o.id, 'queued on this page (it may pause)…');

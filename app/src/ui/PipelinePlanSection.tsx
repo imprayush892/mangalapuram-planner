@@ -30,6 +30,7 @@ export default function PipelinePlanSection(): React.ReactElement {
   const setOverride = useSettings((s) => s.setOverride);
   const sizing = (overrides.planning?.['options.villa_sizing'] as string | undefined) ?? plan?.option.villaSizing ?? 'A';
   const roadsMode = (overrides.planning?.['options.road_orientation'] as string | undefined) ?? plan?.option.roads ?? 'terrain';
+  const zoning = (overrides.planning?.['options.draft_zoning'] as string | undefined) ?? plan?.option.zoning ?? 'model';
   const OPTIONS = PRESENT_PLAN_OPTIONS;
   const [open, setOpen] = useState<string | null>(null);
 
@@ -96,13 +97,14 @@ export default function PipelinePlanSection(): React.ReactElement {
       >
         <div className="mb-2 grid grid-cols-2 gap-1">
           {OPTIONS.map((o) => {
-            const on = o.sizing === sizing && o.roads === roadsMode;
+            const on = o.sizing === sizing && o.roads === roadsMode && o.zoning === zoning;
             return (
               <button
                 key={o.id}
                 onClick={() => {
                   setOverride('planning', 'options.villa_sizing', o.sizing);
                   setOverride('planning', 'options.road_orientation', o.roads);
+                  setOverride('planning', 'options.draft_zoning', o.zoning);
                 }}
                 title="Sizes the plots to the category's target: can take about a minute"
                 className={`rounded border px-1.5 py-1 text-left text-[10px] ${on ? 'border-accent bg-accent/10 text-fg' : 'border-line text-muted hover:text-fg'}`}

@@ -5,6 +5,12 @@ import { withPath } from './plan';
 import type { PlanInput } from './plan';
 
 export type PlanBasis = 'client' | 'draft_model';
+export type DraftZoning = 'model' | 'green_pockets';
+
+/** Which of the draft-model zonings the plan is drawn on (planning_rules.yaml options.draft_zoning). */
+export function draftZoningOf(planning: YamlDoc): DraftZoning {
+  return pick<string>(planning, 'options.draft_zoning', 'model') === 'green_pockets' ? 'green_pockets' : 'model';
+}
 
 /** Which programme and zoning the plan is drawn on (planning_rules.yaml options.basis). */
 export function basisOf(planning: YamlDoc): PlanBasis {
@@ -29,9 +35,14 @@ export function planBasis(site: SiteModel, config: ConfigBundle): Pick<PlanInput
   for (const [path, value] of Object.entries(pick<Record<string, unknown>>(config.planning, 'bases.draft_model', {}))) {
     planning = withPath(planning, path, value);
   }
+  // Owner 9 Oct: options D3/D4 plan the zoning with green pockets (options.draft_zoning: green_pockets).
+  // The pocket gardens are snapped to whole plots of the base plan with the same roads (D1 for D3, D2 for D4).
+  const ns = pick<string>(planning, 'options.road_orientation', 'terrain') === 'north_south';
+  const pocketZones = ns ? site.draftZonesPocketsNs : site.draftZonesPockets;
+  const pockets = draftZoningOf(planning) === 'green_pockets' && pocketZones.length > 0;
   return {
     planning,
     programme: config.programmeDraft,
-    zones: site.draftZones.map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc, use: z.use, phase: z.phase, component: z.component, within: z.within })),
+    zones: (pockets ? pocketZones : site.draftZones).map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc, use: z.use, phase: z.phase, component: z.component, within: z.within })),
   };
 }

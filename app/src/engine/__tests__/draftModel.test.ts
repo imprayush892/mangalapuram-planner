@@ -75,6 +75,29 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     for (const q of p.plots) for (const z of open) expect(multiPolyArea(intersect([[q.ring as [number, number][]]], z.geom)), `${q.id} in ${z.name}`).toBeLessThan(5);
   });
 
+  it('green pockets (D3/D4, owner 9 Oct): two parks give land to villas, pocket gardens give it back', async () => {
+    const s = await site();
+    const ac = (zs: typeof s.draftZones, use: string): number => zs.filter((z) => z.use === use).reduce((a, z) => a + multiPolyArea(z.geom), 0) / 4046.8564224;
+    // Open space, with the villa streets' share (tools/zoning, 30%) taken out of the pockets the street grid runs
+    // through; the pocket gardens are whole plots between the streets (OS-P*), counted in full.
+    const openNet = (zs: typeof s.draftZones): number =>
+      zs.filter((z) => z.use === 'park').reduce((a, z) => a + multiPolyArea(z.geom) * (z.within && !z.component?.startsWith('OS-P') ? 0.7 : 1), 0) / 4046.8564224;
+    for (const zs of [s.draftZonesPockets, s.draftZonesPocketsNs]) {
+      expect(zs.length).toBeGreaterThan(s.draftZones.length);
+      // The parks give a fixed piece (so the villa land's outline, and the street grid, stay put); the gardens
+      // take back the whole plots nearest the sketch's points: within a tenth of an acre.
+      expect(Math.abs(openNet(zs) - openNet(s.draftZones)), 'open space unchanged').toBeLessThan(0.1);
+      const gardens = zs.filter((z) => z.component?.startsWith('OS-P'));
+      expect(gardens.length).toBe(9);
+      for (const g of gardens) {
+        expect(g.within).toBe('villas');
+        expect(multiPolyArea(g.geom), g.name).toBeGreaterThanOrEqual(200);
+      }
+      // The villa land: what the parks gave, the gardens took back.
+      expect(Math.abs(ac(zs, 'villas') - ac(s.draftZones, 'villas'))).toBeLessThan(0.1);
+    }
+  });
+
   it('places the school stages, the clubhouses, retail, office, senior living and apartments in full; the hospital goes to the deferred land', async () => {
     const p = await plan();
     for (const r of p.programme) {

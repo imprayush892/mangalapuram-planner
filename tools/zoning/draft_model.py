@@ -355,6 +355,64 @@ print(f"open space: kept {kept_ac:.2f} + small parks {extra_ac:.2f} + ponds {lak
       f"villa land {sum(ZD[c]['geom'].area for c in ('C03', 'C09', 'C17', 'C18')) / AC:.2f} ac (model 19.94)")
 
 
+# --- Variant "green pockets" (owner 9 Oct, options D3/D4): two pieces of the designated open space become villas,
+# the dry ground west of the north pond (between the entry road and the pond, Phase 1) and the west end of the south
+# pond's bank walk (Phase 4), and the same open space comes back as small pocket gardens in the middle of the villa
+# blocks, to break the long runs of villas. The open space stays the model's 8.3 ac.
+GREEN_POCKETS = "--pockets" in sys.argv
+if GREEN_POCKETS:
+    # python tools/zoning/draft_model.py --pockets <base plan.json> <out.geojson>: the pockets are snapped to the
+    # base plan's plots (D1 for D3, D2 for D4), so each one replaces whole plots of its rows.
+    _i = sys.argv.index("--pockets")
+    BASE_PLAN = json.load(open(sys.argv[_i + 1], encoding="utf-8"))
+    OUT = os.path.abspath(sys.argv[_i + 2])
+    ZD = {z["component"]: z for z in Z}
+    WET6 = WET.buffer(6)                                        # the ponds keep a 6 m green rim
+    VZ = ("C03", "C09", "C17", "C18")
+    BYNAME = {z["name"]: z for z in Z}
+    # The pocket gardens where the owner's sketch puts them: two in the north-west lobe, five across the middle
+    # block, two in the south-east block. Each is two plots side by side on one street (about 21 x 20 m), so the
+    # rows either side stay whole and the garden fronts the street (KMBR Rule 31(vi)).
+    CENTRES = [(232, 458), (228, 365), (387, 343), (346, 277), (433, 282), (516, 329), (569, 296), (543, 208), (500, 145)]
+    plots = [(Polygon(q["ring"]), q) for q in BASE_PLAN["plots"]]
+    used = set()
+    gardens = []
+    for c in CENTRES:
+        pt = Point(c)
+        cand = sorted((k for k in range(len(plots)) if k not in used), key=lambda k: plots[k][0].centroid.distance(pt))
+        a0 = cand[0]
+        pa, qa = plots[a0]
+        # its neighbour in the row: same street, sharing a side
+        nb = [k for k in cand[1:12] if plots[k][1]["roadId"] == qa["roadId"] and plots[k][0].buffer(0.3).intersection(pa.buffer(0.3)).area > 4]
+        pick = [a0] + nb[:1]
+        used.update(pick)
+        g = unary_union([plots[k][0].buffer(0.25) for k in pick]).buffer(-0.25).buffer(0)
+        zone = BYNAME.get(qa["zone"]) or ZD[min(VZ, key=lambda v: ZD[v]["geom"].distance(pt))]
+        gardens.append((g, zone))
+    pocket_ac = sum(g.area for g, _ in gardens) / AC
+
+    def _to_villas(park, region, villa):
+        g = ZD[park]["geom"].intersection(region).difference(WET6).buffer(-3).buffer(3).buffer(0)
+        ZD[park]["geom"] = ZD[park]["geom"].difference(g).buffer(0)
+        ZD[villa]["geom"] = unary_union([ZD[villa]["geom"], g]).buffer(0)
+        return g.area / AC
+
+    # The parks give the villas about what the gardens take: the west end of the bank walk (to x = 500) and the dry
+    # ground west of the north pond from the entry road to x = 404 (fixed, so the villa land's outline, and with it
+    # the street grid, stays the same whichever plots the gardens are snapped to).
+    moved = _to_villas("OS-G3", box(0, 0, 500, 300), "C18")
+    lo = 404.0
+    moved += _to_villas("OS-1", box(330, 380, lo, 520), "C03")
+    for k, (g, zone) in enumerate(gardens, 1):
+        for v in VZ:                                            # a plot may straddle a phase line
+            ZD[v]["geom"] = ZD[v]["geom"].difference(g).buffer(0)
+        Z.append(dict(component=f"OS-P{k}", name=f"POCKET GARDEN {k}", use="park", phase=zone["phase"], model_ac=round(g.area / AC, 3), geom=g, within="villas", pocket="plots"))
+    for c in VZ + ("OS-1", "OS-G3"):
+        ZD[c]["model_ac"] = round(ZD[c]["geom"].area / AC, 3)
+    print(f"green pockets: {moved:.2f} ac of park to villas (OS-1 to x {lo:.0f}); {len(gardens)} pocket gardens, {pocket_ac:.2f} ac; "
+          f"villa land {sum(ZD[c]['geom'].area for c in VZ) / AC:.2f} ac")
+
+
 def main():
     feats = []
     for z in Z:
@@ -365,7 +423,8 @@ def main():
         feats.append({"type": "Feature", "geometry": geom, "properties": {
             "name": z["name"], "use": z["use"], "phase": z["phase"], "component": z["component"],
             "label_area_ac": z["model_ac"], "drawn_area_ac": round(ac, 3), "in_scope_ac": round(ac, 3), "geometry_confidence": "drawn",
-            **({"within": z["within"]} if z.get("within") else {}), **({"water": True} if z.get("water") else {})}})
+            **({"within": z["within"]} if z.get("within") else {}), **({"water": True} if z.get("water") else {}),
+            **({"pocket": z["pocket"]} if z.get("pocket") else {})}})
         flag = "" if abs(ac - z["model_ac"]) <= 0.05 else "   <-- off the model"
         print(f"{z['component']} P{z['phase']} {z['name']:30s} model {z['model_ac']:5.2f}  drawn {ac:5.2f}{flag}")
     used = unary_union([z["geom"] for z in Z])
@@ -377,6 +436,7 @@ def main():
     print(f"zones {used.area / AC:.2f} ac (model 53.94); left for trunk roads and open space {PARCEL.difference(used).area / AC:.2f} ac (model 19.06)")
     fc = {"type": "FeatureCollection", "name": "zones_draft_model",
           "note": "Draft financial model zoning (tools/zoning/draft_model.py); local metres (site_origin.json)", "features": feats}
+    fc["name"] = os.path.splitext(os.path.basename(OUT))[0]
     json.dump(fc, open(OUT, "w", encoding="utf-8"))
     print("wrote", os.path.relpath(OUT, REPO))
 
