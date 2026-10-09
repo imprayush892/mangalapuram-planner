@@ -360,10 +360,15 @@ print(f"open space: kept {kept_ac:.2f} + small parks {extra_ac:.2f} + ponds {lak
 # pond's bank walk (Phase 4), and the same open space comes back as small pocket gardens in the middle of the villa
 # blocks, to break the long runs of villas. The open space stays the model's 8.3 ac.
 GREEN_POCKETS = "--pockets" in sys.argv
-if GREEN_POCKETS:
-    # python tools/zoning/draft_model.py --pockets <base plan.json> <out.geojson>: the pockets are snapped to the
-    # base plan's plots (D1 for D3, D2 for D4), so each one replaces whole plots of its rows.
-    _i = sys.argv.index("--pockets")
+# --- Variant "green chain" (owner 9 Oct, options D5/D6): the pockets become one continuous chain: each garden runs
+# through its block from one street to the next, and the next block's garden starts across the street, so leaving one
+# you walk into the next, lake to lake. The parks give the villas the same two pieces as for the pockets; the chain is
+# open space on top (owner: "if the villa density goes down let it be", but not below 300 villas).
+GREEN_CHAIN = "--chain" in sys.argv
+if GREEN_POCKETS or GREEN_CHAIN:
+    # python tools/zoning/draft_model.py --pockets|--chain <base plan.json> <out.geojson>: the gardens are snapped to
+    # the base plan's plots (the plan with the same roads), so each one replaces whole plots of its rows.
+    _i = sys.argv.index("--pockets" if GREEN_POCKETS else "--chain")
     BASE_PLAN = json.load(open(sys.argv[_i + 1], encoding="utf-8"))
     OUT = os.path.abspath(sys.argv[_i + 2])
     ZD = {z["component"]: z for z in Z}
@@ -377,7 +382,7 @@ if GREEN_POCKETS:
     plots = [(Polygon(q["ring"]), q) for q in BASE_PLAN["plots"]]
     used = set()
     gardens = []
-    for c in CENTRES:
+    for c in (CENTRES if GREEN_POCKETS else []):
         pt = Point(c)
         cand = sorted((k for k in range(len(plots)) if k not in used), key=lambda k: plots[k][0].centroid.distance(pt))
         a0 = cand[0]
@@ -389,6 +394,28 @@ if GREEN_POCKETS:
         g = unary_union([plots[k][0].buffer(0.25) for k in pick]).buffer(-0.25).buffer(0)
         zone = BYNAME.get(qa["zone"]) or ZD[min(VZ, key=lambda v: ZD[v]["geom"].distance(pt))]
         gardens.append((g, zone))
+    if GREEN_CHAIN:
+        # The chain's line: from the west lake east across the middle block, over the existing road and south through
+        # the south-east block to the south pond's bank walk; and down the north-west lobe from its corner park to the
+        # west lake. Each crosses the villa rows square, so a garden spans its block street to street. Every plot within
+        # CHAIN_HALF of the line is garden (about two plots wide), and the gardens widen to a pocket at the beads.
+        CHAIN = [LineString([(360, 352), (398, 343), (470, 336), (560, 318), (575, 295), (548, 212), (508, 150), (515, 105)]),
+                 LineString([(258, 560), (237, 455), (233, 380), (275, 370)])]
+        BEADS = [(237, 455), (398, 343), (500, 333), (575, 300), (528, 180)]
+        CHAIN_HALF, BEAD_R = float(os.environ.get("CHAIN_HALF", 2)), float(os.environ.get("BEAD_R", 11))
+        line = unary_union(CHAIN)
+        pick = [k for k, (g, _) in enumerate(plots) if g.distance(line) <= CHAIN_HALF or min(g.distance(Point(b)) for b in BEADS) <= BEAD_R]
+        merged = unary_union([plots[k][0].buffer(0.3) for k in pick]).buffer(-0.3).buffer(0)
+        for g in getattr(merged, "geoms", [merged]):
+            if g.area < 200:
+                continue
+            inside = [plots[k][1] for k in pick if plots[k][0].representative_point().within(g.buffer(0.5))]
+            names = [q["zone"] for q in inside]
+            zname = max(set(names), key=names.count) if names else None
+            zone = BYNAME.get(zname) or ZD[min(VZ, key=lambda v: ZD[v]["geom"].distance(g))]
+            gardens.append((g.buffer(0), zone))
+        gardens.sort(key=lambda t: (-t[0].centroid.y, t[0].centroid.x))
+        print(f"green chain: {len(pick)} plots of the base plan's {len(plots)} become garden ({len(plots) - len(pick)} left)")
     pocket_ac = sum(g.area for g, _ in gardens) / AC
 
     def _to_villas(park, region, villa):
@@ -406,10 +433,11 @@ if GREEN_POCKETS:
     for k, (g, zone) in enumerate(gardens, 1):
         for v in VZ:                                            # a plot may straddle a phase line
             ZD[v]["geom"] = ZD[v]["geom"].difference(g).buffer(0)
-        Z.append(dict(component=f"OS-P{k}", name=f"POCKET GARDEN {k}", use="park", phase=zone["phase"], model_ac=round(g.area / AC, 3), geom=g, within="villas", pocket="plots"))
+        tag, nm = ("OS-P", "POCKET GARDEN") if GREEN_POCKETS else ("OS-C", "GREEN CHAIN")
+        Z.append(dict(component=f"{tag}{k}", name=f"{nm} {k}", use="park", phase=zone["phase"], model_ac=round(g.area / AC, 3), geom=g, within="villas", pocket="plots"))
     for c in VZ + ("OS-1", "OS-G3"):
         ZD[c]["model_ac"] = round(ZD[c]["geom"].area / AC, 3)
-    print(f"green pockets: {moved:.2f} ac of park to villas (OS-1 to x {lo:.0f}); {len(gardens)} pocket gardens, {pocket_ac:.2f} ac; "
+    print(f"{'green pockets' if GREEN_POCKETS else 'green chain'}: {moved:.2f} ac of park to villas (OS-1 to x {lo:.0f}); {len(gardens)} pocket gardens, {pocket_ac:.2f} ac; "
           f"villa land {sum(ZD[c]['geom'].area for c in VZ) / AC:.2f} ac")
 
 

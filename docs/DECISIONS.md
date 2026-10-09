@@ -475,3 +475,17 @@ Each of these is a switch or an editable assumption, not a silent decision.
   puts each prebuilt plan's roads, plot efficiency, villa land and villas by phase (and no hospital) into the model
   in memory, recalculates, reads the One-Page Summary, and writes config/financials_draft_model.yaml. D1 PAT
   ₹364.9 Cr, IRR 20.9%; D2 362.5, 20.8%; D3 357.1, 20.4%; D4 350.6, 20.2% (model as given 380.6, 22.0%).
+
+## 9 Oct 2026 · options D5 and D6: one continuous green chain (owner)
+
+- The pocket gardens become one chain: each garden runs through its block from one street to the next and the next
+  block's garden starts across the street (leave one, cross, enter the next), lake to lake: from the west lake east
+  across the middle block, over the existing road and south through the south-east block to the south pond's bank
+  walk; and down the north-west lobe from its corner park to the west lake. About two plots wide (whole plots within
+  2 m of the line), widening to a pocket at five beads (within 11 m). The parks give the villas the same two pieces
+  as for D3/D4; the chain is open space on top (owner: villas may fall, not below 300).
+- The chain is snapped to the plots of a plan on the same villa outline without gardens (so it falls on whole plots):
+  `CHAIN_HALF=-1 BEAD_R=-1 draft_model.py --chain ...` for that plan, then `draft_model.py --chain <it> <out>`.
+- D5 (roads to the ground) 323 villas, open space 10.4 ac net of roads (chain 2.9 ac); D6 (north-south) 312 villas,
+  10.8 ac (chain 3.4 ac). The financial model takes each plan's open space (Inputs C37): D5 PAT ₹321.7 Cr, project
+  IRR 18.7%; D6 ₹312.1 Cr, 18.3%.

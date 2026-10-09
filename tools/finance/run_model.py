@@ -3,8 +3,10 @@
 For every option the presentation offers (app/prebuilt/plans/D*.json, `npm run plans`), the plan's land and villas go
 into a copy of the model in memory, Excel recalculates, and the One-Page Summary is read back; the workbook itself is
 never saved. The inputs are the ones the D1 update of 8 Oct changed (docs/DECISIONS.md):
-  Inputs C33  roads and infrastructure, share of 73 ac: what the plan leaves of the 73 ac after the 8.3 ac of open
-              space, the other components' 29.0 ac and the villa land   (C35, the + 2 ac, set to 0)
+  Inputs C37  additional open space: so the model's open space (10% of 73 ac + C37) is the plan's: the model's 8.3 ac,
+              plus the gardens a zoning adds and less the park land it gives the villas (D5/D6's green chain)
+  Inputs C33  roads and infrastructure, share of 73 ac: what the plan leaves of the 73 ac after the open space, the
+              other components' 29.0 ac and the villa land   (C35, the + 2 ac, set to 0)
   Inputs C41  villa plot efficiency: the plan's plots / villa land
   Inputs D123-D126  villa land by phase (shares): the villa zones of the plan's zoning
   Inputs H99, H106-H108  villas by phase: the plan's plots
@@ -26,16 +28,26 @@ REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 MODEL = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/Downloads/Draft model.xlsx")
 AC = 4046.8564224
 TOTAL_AC, OPEN_AC = 73.0, 8.3
-ZONING = {"model": "zones_draft_model.geojson", "green_pockets": "zones_draft_model_pockets.geojson"}
-ZONING_NS = {"model": "zones_draft_model.geojson", "green_pockets": "zones_draft_model_pockets_ns.geojson"}
+ZONING = {"model": "zones_draft_model.geojson", "green_pockets": "zones_draft_model_pockets.geojson", "green_chain": "zones_draft_model_chain.geojson"}
+ZONING_NS = {"model": "zones_draft_model.geojson", "green_pockets": "zones_draft_model_pockets_ns.geojson", "green_chain": "zones_draft_model_chain_ns.geojson"}
 # The option list, as app/src/engine/present/prebuilt.ts has it.
 OPTIONS = [
     ("D1", "terrain", "model", "Draft model · roads to the ground"),
     ("D2", "north_south", "model", "Draft model · north–south roads (Vastu)"),
     ("D3", "terrain", "green_pockets", "Green pockets · roads to the ground"),
     ("D4", "north_south", "green_pockets", "Green pockets · north–south roads (Vastu)"),
+    ("D5", "terrain", "green_chain", "Green chain · roads to the ground"),
+    ("D6", "north_south", "green_chain", "Green chain · north–south roads (Vastu)"),
 ]
 prog = yaml.safe_load(open(f"{REPO}/config/programme_draft_model.yaml", encoding="utf-8"))
+
+
+def park_ac(zfile):
+    return sum(f["properties"]["drawn_area_ac"] for f in json.load(open(f"{REPO}/data/processed/{zfile}", encoding="utf-8"))["features"]
+               if f["properties"]["use"] == "park")
+
+
+MODEL_PARK = park_ac(ZONING["model"])
 other_ac = sum(l.get("land_ac", 0) for l in prog["lines"] if l["use"] != "villas" and not l.get("deferred"))
 
 cases = [{"id": "model", "inputs": {}}]
@@ -53,15 +65,16 @@ for oid, roads, zoning, label in OPTIONS:
     villas = {k: 0 for k in (1, 2, 3, 4)}
     for q in plan["plots"]:
         villas[phase_of.get(q["zone"], 1)] += 1
-    roads_ac = TOTAL_AC - OPEN_AC - other_ac - land
+    open_ac = OPEN_AC + park_ac(zfile) - MODEL_PARK
+    roads_ac = TOTAL_AC - open_ac - other_ac - land
     inputs = {
-        "C33": roads_ac / TOTAL_AC, "C35": 0, "C41": plan["option"]["plottedShare"],
+        "C33": roads_ac / TOTAL_AC, "C35": 0, "C37": open_ac - TOTAL_AC * 0.10, "C41": plan["option"]["plottedShare"],
         "D123": vland[1] / land, "D124": vland[2] / land, "D125": vland[3] / land, "D126": 1 - (vland[1] + vland[2] + vland[3]) / land,
         "H99": villas[1], "H106": villas[2], "H107": villas[3], "H108": villas[4], "G103": 0, "H103": 0,
     }
     cases.append({"id": oid, "inputs": inputs})
     meta[oid] = {"label": label, "villas": len(plan["plots"]), "villas_by_phase": [villas[k] for k in (1, 2, 3, 4)],
-                 "villa_land_ac": round(land, 3), "roads_ac": round(roads_ac, 3), "plot_efficiency": round(plan["option"]["plottedShare"], 4)}
+                 "villa_land_ac": round(land, 3), "open_space_ac": round(open_ac, 3), "roads_ac": round(roads_ac, 3), "plot_efficiency": round(plan["option"]["plottedShare"], 4)}
 
 tmp = os.path.join(HERE, "_cases.json")
 out = os.path.join(HERE, "_results.json")
@@ -103,7 +116,7 @@ KEYS = [  # (key, label, cell, unit, better)
 doc = {
     "source": "Draft model.xlsx (owner, 7 Oct 2026), re-run for each plan by tools/finance/run_model.py; the workbook is not changed",
     "run": datetime.date.today().isoformat(),
-    "inputs_changed": "Inputs C33, C35 (roads), C41 (villa plot efficiency), D123-D126 (villa land by phase), H99, H106-H108 (villas by phase), G103, H103 (hospital: none on these 73 ac)",
+    "inputs_changed": "Inputs C33, C35 (roads), C37 (open space), C41 (villa plot efficiency), D123-D126 (villa land by phase), H99, H106-H108 (villas by phase), G103, H103 (hospital: none on these 73 ac)",
     "metrics": [{"key": k, "label": l, "cell": c, "unit": u, "better": b} for k, l, c, u, b in KEYS],
     "cases": {},
 }

@@ -83,7 +83,7 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     // through; the pocket gardens are whole plots between the streets (OS-P*), counted in full.
     const openNet = (zs: typeof s.draftZones): number =>
       zs.filter((z) => z.use === 'park').reduce((a, z) => a + multiPolyArea(z.geom) * (z.within && !z.component?.startsWith('OS-P') ? 0.7 : 1), 0) / 4046.8564224;
-    for (const zs of [s.draftZonesPockets, s.draftZonesPocketsNs]) {
+    for (const zs of [s.draftZoneSets.pockets!, s.draftZoneSets.pockets_ns!]) {
       expect(zs.length).toBeGreaterThan(s.draftZones.length);
       // The parks give a fixed piece (so the villa land's outline, and the street grid, stay put); the gardens
       // take back the whole plots nearest the sketch's points: within a tenth of an acre.
@@ -96,6 +96,22 @@ describe('the draft model basis (owner, 7 Oct)', () => {
       }
       // The villa land: what the parks gave, the gardens took back.
       expect(Math.abs(ac(zs, 'villas') - ac(s.draftZones, 'villas'))).toBeLessThan(0.1);
+    }
+  });
+
+  it('green chain (D5/D6, owner 9 Oct): the gardens run on block to block, open space on top of the model', async () => {
+    const s = await site();
+    const open = (zs: typeof s.draftZones): number => zs.filter((z) => z.use === 'park').reduce((a, z) => a + multiPolyArea(z.geom), 0) / 4046.8564224;
+    for (const name of ['chain', 'chain_ns']) {
+      const zs = s.draftZoneSets[name]!;
+      const chain = zs.filter((z) => z.component?.startsWith('OS-C'));
+      expect(chain.length, name).toBeGreaterThanOrEqual(10);
+      for (const g of chain) {
+        expect(g.within).toBe('villas');
+        expect(multiPolyArea(g.geom), g.name).toBeGreaterThanOrEqual(200); // KMBR Rule 31(vi)
+      }
+      // More open space than the model's, by the chain less what the parks gave the villas.
+      expect(open(zs), name).toBeGreaterThan(open(s.draftZones) + 1.5);
     }
   });
 

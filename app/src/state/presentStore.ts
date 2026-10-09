@@ -12,6 +12,7 @@ import type { OverrideSet } from '../engine/data/overrides';
 import { fetchSource } from '../engine/data/source';
 import { PRESENT_PLAN_OPTIONS, loadPrebuiltPlans, optionOverrides } from '../engine/present/prebuilt';
 import { pointInMulti } from '../engine/geom/planar';
+import { draftZonesFor } from '../engine/pipeline/basis';
 import type { PresentOptionId } from '../engine/present/prebuilt';
 
 /**
@@ -326,7 +327,7 @@ function optionOf(plan: PlanResult): OptionId {
 export function phaseOf(plan: PlanResult): { zone: (name: string | null) => number; road: (r: PlanResult['roads'][number]) => number } {
   const byName = new Map(plan.zones.map((z) => [z.name, Math.max(1, z.phase ?? 1)]));
   const site = useSite.getState().site;
-  const drawn = (plan.option.zoning === 'green_pockets' ? (plan.option.roads === 'north_south' ? site?.draftZonesPocketsNs : site?.draftZonesPockets) : site?.draftZones) ?? [];
+  const drawn = site ? draftZonesFor(site, plan.option.zoning ?? 'model', plan.option.roads) : [];
   const zones = drawn.filter((z) => z.phase !== undefined && byName.has(z.name));
   const zone = (name: string | null): number => (name ? (byName.get(name) ?? 1) : 1);
   const road = (r: PlanResult['roads'][number]): number => {

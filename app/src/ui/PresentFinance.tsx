@@ -183,7 +183,7 @@ export default function PresentFinance(): React.ReactElement | null {
         <div className="mt-1.5 grid grid-cols-2 gap-x-4">{MORE.map((k) => tile(k, false))}</div>
         {pat && irr && (
           <div className="mt-2">
-            <p className="mb-0.5 text-[10px] uppercase tracking-wider text-muted">The four plans · PAT, ₹ Cr · project IRR</p>
+            <p className="mb-0.5 text-[10px] uppercase tracking-wider text-muted">The plans · PAT, ₹ Cr · project IRR</p>
             {PRESENT_OPTIONS.map((o) => {
               const c = cases[o.id];
               if (!c) return null;

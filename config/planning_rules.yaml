@@ -28,7 +28,9 @@ options:
   road_orientation: terrain      # terrain = least cut and fill; north_south = Vastu, primary and secondary N-S
   # Draft model only. model = zones_draft_model.geojson; green_pockets (owner 9 Oct, options D3/D4) =
   # zones_draft_model_pockets.geojson: the dry ground west of the north pond and the west end of the south pond's
-  # bank walk are villas, and the same open space is nine pocket gardens among the villas (still 8.3 ac).
+  # bank walk are villas, and the same open space is nine pocket gardens among the villas (still 8.3 ac);
+  # green_chain (owner 9 Oct, options D5/D6) = zones_draft_model_chain(_ns).geojson: the gardens one continuous
+  # chain through the villa blocks, lake to lake, open space on top of the 8.3 ac (at least 300 villas).
   draft_zoning: model
 
 # Rules that replace the client-basis values on the draft-model basis (dotted path: value).

@@ -9,8 +9,8 @@ import type { PlanResult } from '../pipeline/plan';
  * fingerprint matches what it has loaded, so a prebuilt plan is never stale.
  */
 
-export type PresentOptionId = 'D1' | 'D2' | 'D3' | 'D4';
-export type PresentZoning = 'model' | 'green_pockets';
+export type PresentOptionId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6';
+export type PresentZoning = 'model' | 'green_pockets' | 'green_chain';
 
 /**
  * The master plans on the owner's draft financial model (owner 7 Oct 2026: planning_rules.yaml
@@ -24,6 +24,9 @@ export const PRESENT_PLAN_OPTIONS: { id: PresentOptionId; sizing: 'A' | 'B' | 'B
   // Owner 9 Oct: part of two parks is villas, the same open space is pocket gardens among the villas.
   { id: 'D3', sizing: 'MIX', roads: 'terrain', zoning: 'green_pockets', label: 'Green pockets · roads to the ground' },
   { id: 'D4', sizing: 'MIX', roads: 'north_south', zoning: 'green_pockets', label: 'Green pockets · north–south roads (Vastu)' },
+  // Owner 9 Oct: the gardens one continuous chain, lake to lake: leave one, cross the street, enter the next.
+  { id: 'D5', sizing: 'MIX', roads: 'terrain', zoning: 'green_chain', label: 'Green chain · roads to the ground' },
+  { id: 'D6', sizing: 'MIX', roads: 'north_south', zoning: 'green_chain', label: 'Green chain · north–south roads (Vastu)' },
 ];
 
 /** The planning overrides that select an option. */
@@ -45,6 +48,8 @@ export const FINGERPRINT_FILES = [
   'processed/zones_draft_model.geojson',
   'processed/zones_draft_model_pockets.geojson',
   'processed/zones_draft_model_pockets_ns.geojson',
+  'processed/zones_draft_model_chain.geojson',
+  'processed/zones_draft_model_chain_ns.geojson',
   'processed/site_features.geojson',
 ];
 

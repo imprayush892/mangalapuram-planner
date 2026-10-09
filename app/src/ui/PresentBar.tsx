@@ -168,7 +168,7 @@ export default function PresentBar(): React.ReactElement {
       </p>
 
       {forked && (
-        <div className="mt-3 grid grid-cols-4 gap-2">
+        <div className="mt-3 grid grid-cols-6 gap-1.5">
           {PRESENT_OPTIONS.map((o, i) => {
             const ready = Boolean(plans[o.id]);
             const on = o.id === option;

@@ -225,8 +225,8 @@ export interface PlanResult {
     apartmentUnits: number;
     villaSizing: VillaCategory;
     roads: 'terrain' | 'north_south';
-    /** The draft-model zoning (options.draft_zoning): the model's, or with green pockets among the villas (D3/D4). */
-    zoning: 'model' | 'green_pockets';
+    /** The draft-model zoning (options.draft_zoning): the model's, green pockets among the villas (D3/D4) or a green chain (D5/D6). */
+    zoning: 'model' | 'green_pockets' | 'green_chain';
     /** Villas the category asks for (B: the client's count; A: what the gross FSI allows); 0 when BUA sets it (C). */
     villaTarget: number;
     /** Villa BUA the gross FSI asks for on the villa land. */
@@ -3933,7 +3933,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         : buildings.filter((b) => b.typology === 'apartments').reduce((a, b) => a + b.units, 0),
       villaSizing,
       roads: roadMode,
-      zoning: pick<string>(planning, 'options.draft_zoning', 'model') === 'green_pockets' ? 'green_pockets' : 'model',
+      zoning: ((z) => (z === 'green_pockets' || z === 'green_chain' ? z : 'model'))(pick<string>(planning, 'options.draft_zoning', 'model')),
       villaTarget,
       targetBuiltUpM2: targetBuaM2,
       builtUpM2: villaBua,

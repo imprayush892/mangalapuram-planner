@@ -1,8 +1,8 @@
 # The owner's draft financial model run on each master plan (tools/finance/run_model.py). Generated: do not edit.
 source: Draft model.xlsx (owner, 7 Oct 2026), re-run for each plan by tools/finance/run_model.py; the workbook is not changed
 run: '2026-10-09'
-inputs_changed: 'Inputs C33, C35 (roads), C41 (villa plot efficiency), D123-D126 (villa land by phase), H99, H106-H108 (villas by phase), G103,
-  H103 (hospital: none on these 73 ac)'
+inputs_changed: 'Inputs C33, C35 (roads), C37 (open space), C41 (villa plot efficiency), D123-D126 (villa land by phase), H99, H106-H108 (villas
+  by phase), G103, H103 (hospital: none on these 73 ac)'
 metrics:
 - key: units
   label: Residential units
@@ -130,11 +130,13 @@ cases:
     - 79
     - 108
     villa_land_ac: 27.14
+    open_space_ac: 8.3
     roads_ac: 8.56
     plot_efficiency: 0.7626
     inputs:
       C33: 0.11726
       C35: 0
+      C37: 1.0
       C41: 0.762646
       D123: 0.110206
       D124: 0.367907
@@ -189,11 +191,13 @@ cases:
     - 79
     - 103
     villa_land_ac: 27.14
+    open_space_ac: 8.3
     roads_ac: 8.56
     plot_efficiency: 0.7528
     inputs:
       C33: 0.11726
       C35: 0
+      C37: 1.0
       C41: 0.752844
       D123: 0.110206
       D124: 0.367907
@@ -248,11 +252,13 @@ cases:
     - 76
     - 110
     villa_land_ac: 27.12
-    roads_ac: 8.58
+    open_space_ac: 8.319
+    roads_ac: 8.561
     plot_efficiency: 0.7447
     inputs:
-      C33: 0.117534
+      C33: 0.117274
       C35: 0
+      C37: 1.019
       C41: 0.744696
       D123: 0.131527
       D124: 0.351622
@@ -307,11 +313,13 @@ cases:
     - 73
     - 102
     villa_land_ac: 27.206
-    roads_ac: 8.494
+    open_space_ac: 8.234
+    roads_ac: 8.56
     plot_efficiency: 0.7284
     inputs:
-      C33: 0.116356
+      C33: 0.11726
       C35: 0
+      C37: 0.934
       C41: 0.728447
       D123: 0.131589
       D124: 0.350437
@@ -357,3 +365,125 @@ cases:
       villa_units: '357'
       villa_revenue_cr: '800.7'
       villa_margin: 27.3%
+  D5:
+    label: Green chain · roads to the ground
+    villas: 323
+    villas_by_phase:
+    - 39
+    - 117
+    - 69
+    - 98
+    villa_land_ac: 25.208
+    open_space_ac: 10.232
+    roads_ac: 8.56
+    plot_efficiency: 0.712
+    inputs:
+      C33: 0.11726
+      C35: 0
+      C37: 2.932
+      C41: 0.711968
+      D123: 0.119367
+      D124: 0.358616
+      D125: 0.20311
+      D126: 0.318907
+      H99: 39
+      H106: 117
+      H107: 69
+      H108: 98
+      G103: 0
+      H103: 0
+    values:
+      units: 1450.0
+      saleable_lakh_sft: 27.9745
+      revenue_cr: 2431.760281
+      cost_cr: 1966.932468
+      pbt_cr: 432.058107
+      pat_cr: 321.735957
+      pat_margin: 0.132306
+      project_irr: 0.186505
+      promoter_irr: 0.144751
+      peak_funding_cr: 465.953464
+      promoter_money_cr: 379.006255
+      peak_loan_cr: 112.424188
+      interest_cr: 32.769706
+      villa_units: 323.0
+      villa_revenue_cr: 727.063141
+      villa_margin: 0.257349
+    text:
+      units: 1,450
+      saleable_lakh_sft: '28.0'
+      revenue_cr: 2,431.8
+      cost_cr: 1,966.9
+      pbt_cr: '432.1'
+      pat_cr: '321.7'
+      pat_margin: 13.2%
+      project_irr: 18.7%
+      promoter_irr: 14.5%
+      peak_funding_cr: '466.0'
+      promoter_money_cr: '379.0'
+      peak_loan_cr: '112.4'
+      interest_cr: '32.8'
+      villa_units: '323'
+      villa_revenue_cr: '727.1'
+      villa_margin: 25.7%
+  D6:
+    label: Green chain · north–south roads (Vastu)
+    villas: 312
+    villas_by_phase:
+    - 38
+    - 125
+    - 59
+    - 90
+    villa_land_ac: 24.785
+    open_space_ac: 10.656
+    roads_ac: 8.559
+    plot_efficiency: 0.7025
+    inputs:
+      C33: 0.117247
+      C35: 0
+      C37: 3.356
+      C41: 0.702545
+      D123: 0.122534
+      D124: 0.365019
+      D125: 0.195521
+      D126: 0.316926
+      H99: 38
+      H106: 125
+      H107: 59
+      H108: 90
+      G103: 0
+      H103: 0
+    values:
+      units: 1439.0
+      saleable_lakh_sft: 27.711
+      revenue_cr: 2405.140705
+      cost_cr: 1953.779518
+      pbt_cr: 419.162112
+      pat_cr: 312.085883
+      pat_margin: 0.129758
+      project_irr: 0.182677
+      promoter_irr: 0.141036
+      peak_funding_cr: 466.475913
+      promoter_money_cr: 379.445214
+      peak_loan_cr: 112.488838
+      interest_cr: 32.199075
+      villa_units: 312.0
+      villa_revenue_cr: 700.443564
+      villa_margin: 0.249278
+    text:
+      units: 1,439
+      saleable_lakh_sft: '27.7'
+      revenue_cr: 2,405.1
+      cost_cr: 1,953.8
+      pbt_cr: '419.2'
+      pat_cr: '312.1'
+      pat_margin: 13.0%
+      project_irr: 18.3%
+      promoter_irr: 14.1%
+      peak_funding_cr: '466.5'
+      promoter_money_cr: '379.4'
+      peak_loan_cr: '112.5'
+      interest_cr: '32.2'
+      villa_units: '312'
+      villa_revenue_cr: '700.4'
+      villa_margin: 24.9%

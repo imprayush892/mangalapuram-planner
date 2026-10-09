@@ -5,11 +5,27 @@ import { withPath } from './plan';
 import type { PlanInput } from './plan';
 
 export type PlanBasis = 'client' | 'draft_model';
-export type DraftZoning = 'model' | 'green_pockets';
+export type DraftZoning = 'model' | 'green_pockets' | 'green_chain';
 
 /** Which of the draft-model zonings the plan is drawn on (planning_rules.yaml options.draft_zoning). */
 export function draftZoningOf(planning: YamlDoc): DraftZoning {
-  return pick<string>(planning, 'options.draft_zoning', 'model') === 'green_pockets' ? 'green_pockets' : 'model';
+  const z = pick<string>(planning, 'options.draft_zoning', 'model');
+  return z === 'green_pockets' || z === 'green_chain' ? z : 'model';
+}
+
+/**
+ * The zone set a draft zoning and road layout plan on (SiteModel.draftZoneSets): the gardens are snapped to whole
+ * plots of the base plan with the same roads (D1 for D3/D5, D2 for D4/D6). Null: the model's own zoning.
+ */
+export function draftZoneSetName(zoning: DraftZoning, roads: string): string | null {
+  if (zoning === 'model') return null;
+  return `${zoning === 'green_pockets' ? 'pockets' : 'chain'}${roads === 'north_south' ? '_ns' : ''}`;
+}
+
+/** The draft-model zones a plan of this zoning and road layout is drawn on. */
+export function draftZonesFor(site: SiteModel, zoning: DraftZoning, roads: string): SiteModel['draftZones'] {
+  const name = draftZoneSetName(zoning, roads);
+  return (name && site.draftZoneSets[name]?.length ? site.draftZoneSets[name] : null) ?? site.draftZones;
 }
 
 /** Which programme and zoning the plan is drawn on (planning_rules.yaml options.basis). */
@@ -36,13 +52,11 @@ export function planBasis(site: SiteModel, config: ConfigBundle): Pick<PlanInput
     planning = withPath(planning, path, value);
   }
   // Owner 9 Oct: options D3/D4 plan the zoning with green pockets (options.draft_zoning: green_pockets).
-  // The pocket gardens are snapped to whole plots of the base plan with the same roads (D1 for D3, D2 for D4).
-  const ns = pick<string>(planning, 'options.road_orientation', 'terrain') === 'north_south';
-  const pocketZones = ns ? site.draftZonesPocketsNs : site.draftZonesPockets;
-  const pockets = draftZoningOf(planning) === 'green_pockets' && pocketZones.length > 0;
+  // Owner 9 Oct: D3-D6 plan the zonings with green pockets or a green chain (options.draft_zoning).
+  const zones = draftZonesFor(site, draftZoningOf(planning), pick<string>(planning, 'options.road_orientation', 'terrain'));
   return {
     planning,
     programme: config.programmeDraft,
-    zones: (pockets ? pocketZones : site.draftZones).map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc, use: z.use, phase: z.phase, component: z.component, within: z.within })),
+    zones: zones.map((z) => ({ name: z.name, geom: z.geom, labelAc: z.labelAreaAc, use: z.use, phase: z.phase, component: z.component, within: z.within })),
   };
 }

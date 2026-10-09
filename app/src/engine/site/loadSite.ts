@@ -35,12 +35,12 @@ export interface SiteModel {
    */
   draftZones: Zone[];
   /**
-   * The draft-model zoning with green pockets (owner 9 Oct 2026, options D3/D4: part of two parks is villas and
-   * the same open space is pocket gardens among the villas); planned with options.draft_zoning: green_pockets.
+   * The other draft-model zonings (owner 9 Oct 2026), by name: `pockets` (D3: part of two parks is villas, the same
+   * open space is pocket gardens among the villas), `chain` (D5: the gardens one continuous chain, lake to lake), each
+   * with `_ns` for north-south roads (D4, D6: the gardens snapped to the north-south plan's plots). Planned with
+   * options.draft_zoning (pipeline/basis.ts). A set whose file is not shipped is left out.
    */
-  draftZonesPockets: Zone[];
-  /** The same for north-south roads (D4): its pocket gardens are snapped to D2's plots, not D1's. */
-  draftZonesPocketsNs: Zone[];
+  draftZoneSets: Record<string, Zone[]>;
   features: SiteFeature[];
   contours: ContourLine[];
   dem: Dem;
@@ -108,6 +108,9 @@ export interface LoadSiteOptions {
   fillMarginM?: number;
 }
 
+/** The draft-model zonings beside the model's own: data/processed/zones_draft_model_<name>.geojson. */
+export const DRAFT_ZONE_SETS = ['pockets', 'pockets_ns', 'chain', 'chain_ns'] as const;
+
 export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Promise<SiteModel> {
   const [origin, registration, parcelFc, zonesFc, featuresFc, contoursFc, demMeta] = await Promise.all([
     src.json<SiteOrigin>('processed/site_origin.json'),
@@ -121,9 +124,9 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
   const draftFc = await src
     .json<GeoJsonFeatureCollection<ZoneProps>>('processed/zones_draft_model.geojson')
     .catch(() => ({ type: 'FeatureCollection', features: [] }) as unknown as GeoJsonFeatureCollection<ZoneProps>);
-  const none = (): GeoJsonFeatureCollection<ZoneProps> => ({ type: 'FeatureCollection', features: [] }) as unknown as GeoJsonFeatureCollection<ZoneProps>;
-  const pocketsFc = await src.json<GeoJsonFeatureCollection<ZoneProps>>('processed/zones_draft_model_pockets.geojson').catch(none);
-  const pocketsNsFc = await src.json<GeoJsonFeatureCollection<ZoneProps>>('processed/zones_draft_model_pockets_ns.geojson').catch(none);
+  const setFcs = await Promise.all(
+    DRAFT_ZONE_SETS.map(async (name) => [name, await src.json<GeoJsonFeatureCollection<ZoneProps>>(`processed/zones_draft_model_${name}.geojson`).catch(() => null)] as const),
+  );
 
   const demBuffer = await src.binary('processed/dem_2m.f32');
   const dem = demFromBuffer(demMeta, demBuffer);
@@ -187,8 +190,8 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
   };
   const zones: Zone[] = zonesFc.features.map(toZone);
   const draftZones: Zone[] = draftFc.features.filter((f) => f.geometry).map(toZone);
-  const draftZonesPockets: Zone[] = pocketsFc.features.filter((f) => f.geometry).map(toZone);
-  const draftZonesPocketsNs: Zone[] = pocketsNsFc.features.filter((f) => f.geometry).map(toZone);
+  const draftZoneSets: Record<string, Zone[]> = {};
+  for (const [name, fc] of setFcs) if (fc) draftZoneSets[name] = fc.features.filter((f) => f.geometry).map(toZone);
 
   const features: SiteFeature[] = featuresFc.features.map((f) => ({
     layer: f.properties.layer,
@@ -226,8 +229,7 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
     parcelAreaAc: m2ToAcres(parcelAreaM2),
     zones,
     draftZones,
-    draftZonesPockets,
-    draftZonesPocketsNs,
+    draftZoneSets,
     features,
     contours,
     dem,
