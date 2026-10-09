@@ -18,6 +18,11 @@ export interface ConfigBundle {
   siting: YamlDoc;
   /** Owner overrides (config/planning_rules.yaml): win where they overlap client rules. */
   planning: YamlDoc;
+  /**
+   * The draft financial model run on each master plan (config/financials_draft_model.yaml, written by
+   * tools/finance/run_model.py): the presentation's financial figures. Absent where the file is not shipped.
+   */
+  financials?: YamlDoc;
 }
 
 export async function loadConfig(src: AssetSource): Promise<ConfigBundle> {
@@ -30,6 +35,7 @@ export async function loadConfig(src: AssetSource): Promise<ConfigBundle> {
     src.text('config/siting_rules.yaml'),
     src.text('config/planning_rules.yaml'),
   ]);
+  const financials = await src.text('config/financials_draft_model.yaml').catch(() => '');
   return {
     kmbr: parseYaml(kmbr) as YamlDoc,
     client: parseYaml(client) as YamlDoc,
@@ -38,6 +44,7 @@ export async function loadConfig(src: AssetSource): Promise<ConfigBundle> {
     assumptions: parseYaml(assumptions) as YamlDoc,
     siting: parseYaml(siting) as YamlDoc,
     planning: parseYaml(planning) as YamlDoc,
+    ...(financials ? { financials: parseYaml(financials) as YamlDoc } : {}),
   };
 }
 

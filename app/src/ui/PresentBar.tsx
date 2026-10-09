@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { FORK_STEP, PRESENT_OPTIONS, PRESENT_STEPS, usePresent } from '../state/presentStore';
+import { useWalk } from '../state/walkStore';
 import { useAnalysisForViews } from '../state/planningStore';
 import { useSite } from '../state/store';
 import { useRules } from '../state/useRules';
@@ -112,6 +113,8 @@ export default function PresentBar(): React.ReactElement {
     const onKey = (e: KeyboardEvent): void => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+      // Walking in the 3D view, the arrows, space and Esc move the walker (ThreeView); PageUp/PageDown still turn slides.
+      if (useWalk.getState().walking && (e.key.startsWith('Arrow') || e.key === ' ' || e.key === 'Escape')) return;
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault();
         usePresent.getState().next();

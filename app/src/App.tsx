@@ -32,6 +32,7 @@ import type { RailItem } from './ui/shell/IconRail';
 import { SolveBar } from './ui/shell/SolveBar';
 import PresentBar from './ui/PresentBar';
 import PresentFigures from './ui/PresentFigures';
+import PresentFinance from './ui/PresentFinance';
 import { usePresent } from './state/presentStore';
 
 const ExportPanel = lazy(() => import('./ui/ExportPanel'));
@@ -196,6 +197,7 @@ export default function App(): React.ReactElement {
       {presenting ? (
         <>
           <PresentFigures />
+          <PresentFinance />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center p-4">
             <PresentBar />
           </div>

@@ -8,6 +8,7 @@ import { pick } from '../data/config';
 import { m2ToAcres } from '../units';
 import { intersect } from '../geom/boolean';
 import { multiPolyArea } from '../geom/planar';
+import { PRESENT_PLAN_OPTIONS } from '../present/prebuilt';
 
 // Owner 7 Oct 2026: the plan on the owner's draft financial model ("Draft model.xlsx"): its programme
 // (config/programme_draft_model.yaml) on the zoning drawn for it (tools/zoning/draft_model.py).
@@ -95,6 +96,19 @@ describe('the draft model basis (owner, 7 Oct)', () => {
       }
       // The villa land: what the parks gave, the gardens took back.
       expect(Math.abs(ac(zs, 'villas') - ac(s.draftZones, 'villas'))).toBeLessThan(0.1);
+    }
+  });
+
+  it('carries the draft financial model run on every option (owner 9 Oct, config/financials_draft_model.yaml)', async () => {
+    const c = await config();
+    const cases = pick<Record<string, { values: Record<string, number | null>; villas?: number }>>(c.financials, 'cases', {});
+    expect(cases.model, 'the model as given').toBeDefined();
+    for (const o of PRESENT_PLAN_OPTIONS) {
+      const v = cases[o.id]?.values;
+      expect(v, o.id).toBeDefined();
+      for (const k of ['units', 'revenue_cr', 'cost_cr', 'pat_cr', 'project_irr', 'promoter_irr']) expect(v![k], `${o.id} ${k}`).toBeTypeOf('number');
+      // The model's residential units: the plan's villas, the model's 935 flats and 192 senior homes.
+      expect(v!.units).toBe((cases[o.id]!.villas ?? 0) + 935 + 192);
     }
   });
 

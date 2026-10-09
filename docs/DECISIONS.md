@@ -463,3 +463,15 @@ Each of these is a switch or an editable assumption, not a silent decision.
   `python tools/zoning/draft_model.py --pockets <plan.json> <out.geojson>`, chosen with planning_rules
   options.draft_zoning: green_pockets. D3 lays the roads to the ground (as D1), D4 north-south (as D2).
 - D3 364 villas (D1 373), cut 53,900 / fill 60,400 m3; D4 357 villas (D2 370), cut 57,900 / fill 75,500 m3.
+
+## 9 Oct 2026 · walk mode; the financial model in the presentation (owner)
+
+- 3D view: a Walk button puts the camera at eye height (1.7 m) on the drawn terrain, starting on the road nearest
+  the view; W A S D or the arrows move (4 m/s, Shift 12 m/s), a drag looks round, Q / E turn, double-click the
+  ground to jump there, Esc stops. The buildings and villas are solid; the walker stays on the surveyed ground.
+- Presentation: from the fork on, a panel shows the owner's draft financial model run on the option on screen
+  (profit, IRRs, revenue, cost, funding, units), each figure with its change against D1 (D1's against the model as
+  given), and the four options side by side; M hides it. The figures are Excel's own: tools/finance/run_model.py
+  puts each prebuilt plan's roads, plot efficiency, villa land and villas by phase (and no hospital) into the model
+  in memory, recalculates, reads the One-Page Summary, and writes config/financials_draft_model.yaml. D1 PAT
+  ₹364.9 Cr, IRR 20.9%; D2 362.5, 20.8%; D3 357.1, 20.4%; D4 350.6, 20.2% (model as given 380.6, 22.0%).

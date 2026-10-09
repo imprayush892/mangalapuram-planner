@@ -16,6 +16,12 @@ import { useRules } from '../state/useRules';
 import { pick } from '../engine/data/config';
 import { usePresent } from '../state/presentStore';
 import { zoneColour } from './draw';
+import { useWalk } from '../state/walkStore';
+
+/** Walk mode (owner 9 Oct): eye height on the ground, walking and running speeds. */
+const EYE_M = 1.7;
+const WALK_MS = 4;
+const RUN_MS = 12;
 
 /**
  * 3D terrain and massing. The same scene the GLB export writes, so what is on
@@ -24,6 +30,11 @@ import { zoneColour } from './draw';
 export default function ThreeView(): React.ReactElement {
   const wrapRef = useRef<HTMLDivElement>(null);
   const cameraStateRef = useRef<{ pos: THREE.Vector3; target: THREE.Vector3 } | null>(null);
+  // The walker: where it stands and looks, kept across scene rebuilds (a new plan, a new step).
+  const walkerRef = useRef<{ x: number; z: number; yaw: number; pitch: number } | null>(null);
+  const walking = useWalk((s) => s.walking);
+  const setWalking = useWalk((s) => s.setWalking);
+  const hudRef = useRef<HTMLSpanElement>(null);
   const site = useEditedSite();
   const byZone = useLayout((s) => s.byZone);
   const activeIndex = useLayout((s) => s.activeOptionIndex);
@@ -134,6 +145,168 @@ export default function ThreeView(): React.ReactElement {
     controls.maxPolarAngle = Math.PI / 2.05;
     controls.update();
 
+    // ---- walk mode: eye height over the drawn terrain, the keys to move, a drag to look, double-click to jump
+    const terrainMesh = scene.getObjectByName('Terrain');
+    const solids = scene.getObjectByName('Masterplan');
+    const down = new THREE.Raycaster();
+    const ahead = new THREE.Raycaster();
+    const groundAt = (x: number, z: number): number => {
+      if (terrainMesh) {
+        down.set(new THREE.Vector3(x, 2000, z), new THREE.Vector3(0, -1, 0));
+        const hit = down.intersectObject(terrainMesh, false)[0];
+        if (hit) return hit.point.y;
+      }
+      const v = site.dem.sampleBilinear([x, -z]);
+      return Number.isFinite(v) ? v : Number.NaN;
+    };
+    const keys = new Set<string>();
+    let orbitSaved: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
+    const enterWalk = (): void => {
+      orbitSaved = { pos: camera.position.clone(), target: controls.target.clone() };
+      if (!walkerRef.current) {
+        // Start on the road nearest where the orbit was looking, facing along it (not inside a building); with no
+        // roads drawn, where the orbit was looking, facing the way the camera faced.
+        const dir = controls.target.clone().sub(camera.position);
+        walkerRef.current = { x: controls.target.x, z: controls.target.z, yaw: Math.atan2(-dir.x, -dir.z), pitch: -0.05 };
+        let best = Infinity;
+        for (const r of pipelinePlan?.roads ?? []) {
+          const c = r.centreline;
+          for (let k = 0; k + 1 < c.length; k += 1) {
+            const [ax, ay] = c[k]!;
+            const [bx, by] = c[k + 1]!;
+            const d = Math.hypot(ax - controls.target.x, -ay - controls.target.z);
+            if (d < best && Math.hypot(bx - ax, by - ay) > 1) {
+              best = d;
+              // facing along the road: scene z is minus the plan's y
+              walkerRef.current = { x: ax, z: -ay, yaw: Math.atan2(-(bx - ax), by - ay), pitch: -0.05 };
+            }
+          }
+        }
+      }
+      controls.enabled = false;
+      camera.near = 0.1;
+      camera.updateProjectionMatrix();
+      // Daylight at eye level: a sky and a haze instead of the plan view's dark backdrop.
+      scene.background = new THREE.Color(0xc9dbe6);
+      scene.fog = new THREE.Fog(0xc9dbe6, 250, 1400);
+      document.body.style.userSelect = 'none';
+    };
+    const leaveWalk = (): void => {
+      controls.enabled = true;
+      camera.near = 1;
+      camera.updateProjectionMatrix();
+      scene.background = new THREE.Color(0x0f1518);
+      scene.fog = new THREE.Fog(0x0f1518, 900, 2400);
+      document.body.style.userSelect = '';
+      if (orbitSaved) {
+        camera.position.copy(orbitSaved.pos);
+        controls.target.copy(orbitSaved.target);
+      }
+      keys.clear();
+    };
+    if (useWalk.getState().walking) enterWalk();
+    const unsub = useWalk.subscribe((st, prev) => {
+      if (st.walking && !prev.walking) enterWalk();
+      else if (!st.walking && prev.walking) leaveWalk();
+    });
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (!useWalk.getState().walking) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+      if (e.key === 'Escape') {
+        useWalk.getState().setWalking(false);
+        return;
+      }
+      if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+      keys.add(e.code);
+    };
+    const onKeyUp = (e: KeyboardEvent): void => {
+      keys.delete(e.code);
+    };
+    let drag: { x: number; y: number } | null = null;
+    const onDown = (e: PointerEvent): void => {
+      if (!useWalk.getState().walking) return;
+      e.preventDefault(); // a drag looks round; it must not select the page's text
+      drag = { x: e.clientX, y: e.clientY };
+    };
+    const onMove = (e: PointerEvent): void => {
+      const w = walkerRef.current;
+      if (!drag || !w || !useWalk.getState().walking) return;
+      w.yaw -= (e.clientX - drag.x) * 0.004;
+      w.pitch = Math.max(-1.3, Math.min(1.3, w.pitch - (e.clientY - drag.y) * 0.004));
+      drag = { x: e.clientX, y: e.clientY };
+    };
+    const onUp = (): void => {
+      drag = null;
+    };
+    const onDbl = (e: MouseEvent): void => {
+      const w = walkerRef.current;
+      if (!w || !useWalk.getState().walking || !terrainMesh) return;
+      const r = renderer.domElement.getBoundingClientRect();
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+      const hit = ray.intersectObject(terrainMesh, false)[0];
+      if (hit) {
+        w.x = hit.point.x;
+        w.z = hit.point.z;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    renderer.domElement.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    renderer.domElement.addEventListener('dblclick', onDbl);
+    const clock = new THREE.Clock();
+    const blocked = (x: number, z: number, dx: number, dz: number, y: number): boolean => {
+      if (!solids) return false;
+      const len = Math.hypot(dx, dz);
+      if (len < 1e-6) return false;
+      // A wall within half a metre of the next step, at knee and at chest height.
+      for (const h of [0.6, 1.4]) {
+        ahead.set(new THREE.Vector3(x, y + h, z), new THREE.Vector3(dx / len, 0, dz / len));
+        ahead.far = len + 0.5;
+        if (ahead.intersectObject(solids, true).length > 0) return true;
+      }
+      return false;
+    };
+    const walkStep = (): void => {
+      const w = walkerRef.current;
+      const dt = Math.min(0.1, clock.getDelta());
+      if (!w || !useWalk.getState().walking) return;
+      if (keys.has('KeyQ')) w.yaw += 1.6 * dt;
+      if (keys.has('KeyE')) w.yaw -= 1.6 * dt;
+      const fwd = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
+      const side = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
+      const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN_MS : WALK_MS) * dt;
+      const g0 = groundAt(w.x, w.z);
+      if (fwd !== 0 || side !== 0) {
+        const n = Math.hypot(fwd, side);
+        const fx = -Math.sin(w.yaw);
+        const fz = -Math.cos(w.yaw);
+        const dx = ((fx * fwd - fz * side) / n) * speed;
+        const dz = ((fz * fwd + fx * side) / n) * speed;
+        // Slide along a wall: try the whole step, then each axis on its own. Never off the surveyed ground.
+        for (const [mx, mz] of [[dx, dz], [dx, 0], [0, dz]] as const) {
+          if (Number.isFinite(groundAt(w.x + mx, w.z + mz)) && !blocked(w.x, w.z, mx, mz, Number.isFinite(g0) ? g0 : 0)) {
+            w.x += mx;
+            w.z += mz;
+            break;
+          }
+        }
+      }
+      const g = groundAt(w.x, w.z);
+      const eye = (Number.isFinite(g) ? g : camera.position.y - EYE_M) + EYE_M;
+      camera.position.set(w.x, eye, w.z);
+      const look = new THREE.Vector3(-Math.sin(w.yaw) * Math.cos(w.pitch), Math.sin(w.pitch), -Math.cos(w.yaw) * Math.cos(w.pitch));
+      camera.lookAt(camera.position.clone().add(look));
+      if (hudRef.current) {
+        const deg = ((((-w.yaw * 180) / Math.PI) % 360) + 360) % 360;
+        const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        hudRef.current.textContent = `ground RL ${Number.isFinite(g) ? g.toFixed(1) : '—'} · facing ${dirs[Math.round(deg / 45) % 8]}`;
+      }
+    };
+
     // Water particles: drops that follow the same receivers, on the same
     // flooded surface, as the flow lines. They start on the channels this
     // storm runs and leave where the water leaves the site.
@@ -216,7 +389,11 @@ export default function ThreeView(): React.ReactElement {
         sim.points.geometry.attributes.position!.needsUpdate = true;
       }
 
-      controls.update();
+      if (useWalk.getState().walking) walkStep();
+      else {
+        clock.getDelta();
+        controls.update();
+      }
       renderer.render(scene, camera);
     };
     tick();
@@ -231,10 +408,16 @@ export default function ThreeView(): React.ReactElement {
     ro.observe(wrap);
 
     return () => {
-      cameraStateRef.current = {
-        pos: camera.position.clone(),
-        target: controls.target.clone(),
-      };
+      cameraStateRef.current = useWalk.getState().walking && orbitSaved
+        ? orbitSaved
+        : { pos: camera.position.clone(), target: controls.target.clone() };
+      unsub();
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      renderer.domElement.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      renderer.domElement.removeEventListener('dblclick', onDbl);
       cancelAnimationFrame(frame);
       ro.disconnect();
       controls.dispose();
@@ -269,11 +452,30 @@ export default function ThreeView(): React.ReactElement {
   ]);
 
   return (
-    <div ref={wrapRef} className="relative h-full w-full bg-ink">
-      <div className="pointer-events-none absolute bottom-3 left-3 rounded border border-line bg-panel/90 px-2 py-1 text-[11px] text-muted">
-        Drag to orbit, scroll to zoom. Terrain is the 2 m DEM; unsurveyed ground is left open rather than filled.
-        Levels are RL on the assumed TBM datum.
-      </div>
+    <div ref={wrapRef} className={`relative h-full w-full bg-ink ${walking ? 'select-none' : ''}`}>
+      <button
+        type="button"
+        onClick={() => setWalking(!walking)}
+        title={walking ? 'Back to the orbit view (Esc)' : 'Walk the site at eye height: W A S D or the arrows to move, drag to look, Shift to run, double-click to jump there'}
+        className={`absolute bottom-3 right-3 z-40 rounded-md border px-2.5 py-1 text-[11px] font-semibold ${
+          walking ? 'border-accent bg-accent/20 text-accent' : 'border-line bg-panel/90 text-muted hover:text-fg'
+        }`}
+      >
+        {walking ? '✕ Stop walking' : '🚶 Walk'}
+      </button>
+      {walking ? (
+        <div className="pointer-events-none absolute bottom-12 right-3 z-40 w-[190px] rounded-md border border-line bg-panel/90 px-2.5 py-1.5 text-right text-[10.5px] leading-snug text-muted">
+          <span className="text-fg">Walking</span>
+          <br />W A S D or arrows · drag to look · Q / E turn · Shift runs · double-click the ground to jump · Esc stops
+          <br />
+          <span ref={hudRef} className="tabular-nums" />
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute bottom-3 left-3 rounded border border-line bg-panel/90 px-2 py-1 text-[11px] text-muted">
+          Drag to orbit, scroll to zoom. Terrain is the 2 m DEM; unsurveyed ground is left open rather than filled.
+          Levels are RL on the assumed TBM datum.
+        </div>
+      )}
     </div>
   );
 }
