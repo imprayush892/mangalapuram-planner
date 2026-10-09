@@ -34,6 +34,7 @@ import PresentBar from './ui/PresentBar';
 import PresentFigures from './ui/PresentFigures';
 import PresentFinance from './ui/PresentFinance';
 import { usePresent } from './state/presentStore';
+import { useWalk } from './state/walkStore';
 
 const ExportPanel = lazy(() => import('./ui/ExportPanel'));
 const ThreeView = lazy(() => import('./ui/ThreeView'));
@@ -65,6 +66,8 @@ export default function App(): React.ReactElement {
   const setViewMode = useSite((s) => s.setViewMode);
   const { section, leftOpen, rightOpen, setSection, toggleLeft, toggleRight } = useUi();
   const presenting = usePresent((s) => s.active);
+  // Walking (owner 9 Oct): nothing but the view; every panel stays mounted, only hidden, and comes back on Esc.
+  const walking = useWalk((s) => s.walking);
   const startPresenting = usePresent((s) => s.start);
 
   const rules = useRules();
@@ -155,6 +158,7 @@ export default function App(): React.ReactElement {
           </Suspense>
         )}
       </div>
+      <div className={walking ? 'hidden' : 'contents'}>
 
       {/* title and view mode */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3">
@@ -278,6 +282,7 @@ export default function App(): React.ReactElement {
         </div>
         </>
       )}
+      </div>
     </div>
   );
 }

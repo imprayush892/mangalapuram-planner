@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useLayout } from '../state/layoutStore';
@@ -35,6 +35,13 @@ export default function ThreeView(): React.ReactElement {
   const walking = useWalk((s) => s.walking);
   const setWalking = useWalk((s) => s.setWalking);
   const hudRef = useRef<HTMLSpanElement>(null);
+  const [hintOn, setHintOn] = useState(false);
+  useEffect(() => {
+    if (!walking) return;
+    setHintOn(true);
+    const t = setTimeout(() => setHintOn(false), 4000);
+    return () => clearTimeout(t);
+  }, [walking]);
   const site = useEditedSite();
   const byZone = useLayout((s) => s.byZone);
   const activeIndex = useLayout((s) => s.activeOptionIndex);
@@ -115,7 +122,8 @@ export default function ThreeView(): React.ReactElement {
     const camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 1, 6000);
     // Presenting, the presenter's bar covers the foot of the screen: the picture sits higher.
     const lift = (): void => {
-      if (presenting) camera.setViewOffset(wrap.clientWidth, wrap.clientHeight, 0, wrap.clientHeight * 0.14, wrap.clientWidth, wrap.clientHeight);
+      // Presenting, the picture sits higher above the presenter's bar; walking, the bar is hidden: the horizon is centred.
+      if (presenting && !useWalk.getState().walking) camera.setViewOffset(wrap.clientWidth, wrap.clientHeight, 0, wrap.clientHeight * 0.14, wrap.clientWidth, wrap.clientHeight);
       else camera.clearViewOffset();
     };
     lift();
@@ -185,6 +193,7 @@ export default function ThreeView(): React.ReactElement {
       }
       controls.enabled = false;
       camera.near = 0.1;
+      lift();
       camera.updateProjectionMatrix();
       // Daylight at eye level: a sky and a haze instead of the plan view's dark backdrop.
       scene.background = new THREE.Color(0xc9dbe6);
@@ -194,6 +203,7 @@ export default function ThreeView(): React.ReactElement {
     const leaveWalk = (): void => {
       controls.enabled = true;
       camera.near = 1;
+      lift();
       camera.updateProjectionMatrix();
       scene.background = new THREE.Color(0x0f1518);
       scene.fog = new THREE.Fog(0x0f1518, 900, 2400);
@@ -453,22 +463,24 @@ export default function ThreeView(): React.ReactElement {
 
   return (
     <div ref={wrapRef} className={`relative h-full w-full bg-ink ${walking ? 'select-none' : ''}`}>
-      <button
-        type="button"
-        onClick={() => setWalking(!walking)}
-        title={walking ? 'Back to the orbit view (Esc)' : 'Walk the site at eye height: W A S D or the arrows to move, drag to look, Shift to run, double-click to jump there'}
-        className={`absolute bottom-3 right-3 z-40 rounded-md border px-2.5 py-1 text-[11px] font-semibold ${
-          walking ? 'border-accent bg-accent/20 text-accent' : 'border-line bg-panel/90 text-muted hover:text-fg'
-        }`}
-      >
-        {walking ? '✕ Stop walking' : '🚶 Walk'}
-      </button>
+      {!walking && (
+        <button
+          type="button"
+          onClick={() => setWalking(true)}
+          title="Walk the site at eye height: W A S D or the arrows to move, drag to look, Shift to run, double-click to jump there, Esc to stop"
+          className="absolute bottom-3 right-3 z-40 rounded-md border border-line bg-panel/90 px-2.5 py-1 text-[11px] font-semibold text-muted hover:text-fg"
+        >
+          🚶 Walk
+        </button>
+      )}
       {walking ? (
-        <div className="pointer-events-none absolute bottom-12 right-3 z-40 w-[190px] rounded-md border border-line bg-panel/90 px-2.5 py-1.5 text-right text-[10.5px] leading-snug text-muted">
-          <span className="text-fg">Walking</span>
-          <br />W A S D or arrows · drag to look · Q / E turn · Shift runs · double-click the ground to jump · Esc stops
-          <br />
-          <span ref={hudRef} className="tabular-nums" />
+        // Nothing but the view (owner 9 Oct): the keys show for a few seconds on entering, then fade out.
+        <div
+          className={`pointer-events-none absolute bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-md bg-black/45 px-3 py-1.5 text-center text-[11px] text-white/85 transition-opacity duration-1000 ${
+            hintOn ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          W A S D or arrows to move · drag to look · Shift to run · double-click to jump · Esc to leave
         </div>
       ) : (
         <div className="pointer-events-none absolute bottom-3 left-3 rounded border border-line bg-panel/90 px-2 py-1 text-[11px] text-muted">
