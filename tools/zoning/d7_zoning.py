@@ -1,20 +1,18 @@
-"""D7, least earthwork (owner 12 Oct 2026): the optimised zoning with the villas on the gentle land and the steep hill
-green, at a few caps on how steep a villa cell may be; each measured for what its villa land costs to grade and drawn
-over the slope.
+"""D7, least earthwork (owner 12 Oct 2026): the optimised zoning with the villas on the gentlest land the other uses leave
+and the steepest green, measured for what its villa land costs to grade and drawn over the slope.
 
-  python tools/zoning/d7_zoning.py [outdir]     (default D:/New folder/_work/d7/zoning; D7_CAPS="120,140,150,165")
+  python tools/zoning/d7_zoning.py [outdir]     (default D:/New folder/_work/d7/zoning)
 
-For each cap: optimise.py with D7=1 D7_MAX_RS=<cap> VILLA_AC=26 (an upper bound) OUT=<outdir>/zones_d7_<villa ac>.geojson;
-the recommended cap (D7_FINAL, 150) is copied to zones_d7_final.geojson. Measured, on the 2 m grid:
+Writes <outdir>/zones_d7_base.geojson (optimise.py with D7=1 VILLA_AC=30: the base the master plans, then greens.py
+pockets on it) and two with less of the hill (D7_MAX_RS 180, 165) for comparison, each with a map, and summary.md with:
   - the villa land by natural slope band (<1:8, 1:8-1:5, 1:5-1:4, 1:4-1:3, 1:3-1:2, >1:2) and its expected earthwork
     and walls by the D7 master's measured curve (Rs lakh an acre: 11, 35, 38, 91, 159, 221);
-  - villas at the model's 12.5 an acre; the open space (parks, the lakes and the channel apart);
-  - a map: every use coloured, the villa land outlined over the slope bands.
+  - villas at the model's 12.5 an acre; the open space (parks, the lakes and the channel apart); the villa blocks and
+    how many are under 1.5 ac; the towers, senior, school and retail/office checked against the optimised zoning.
 The D1 base and D3 are measured alike. data/processed is only read.
 """
 import json
 import os
-import shutil
 import subprocess
 import sys
 
@@ -30,13 +28,15 @@ warnings.simplefilter("ignore")
 from site_grid import REPO, AC, NX, NY, X0, Y0, CELL, TERRAIN, LAKES, GRAD, PARCEL, FIXED_ROADS, mask_of  # noqa: E402
 
 OUTDIR = sys.argv[1] if len(sys.argv) > 1 else "D:/New folder/_work/d7/zoning"
-CAPS = [float(t) for t in os.environ.get("D7_CAPS", "120,140,150,165").split(",")]
-FINAL_CAP = float(os.environ.get("D7_FINAL", 150))
 VILLAS_PER_AC = 12.5                                   # the model's mix (D7 master)
 BAND_EDGES = [1 / 8, 1 / 5, 1 / 4, 1 / 3, 1 / 2]
 BAND_RS = [11, 35, 38, 91, 159, 221]                   # D7 master 12 Oct: earthwork + walls, Rs lakh an acre of villa land
 BAND_NAMES = ["<1:8", "1:8-1:5", "1:5-1:4", "1:4-1:3", "1:3-1:2", ">1:2"]
 BAND_COL = ["#F6F3EA", "#E6DCC0", "#D2B98A", "#C08552", "#94512F", "#5A2A1A"]
+# (name, env): the base, and two with less villa land on the hill (no villa on a cell dearer than the cap, Rs lakh/ac)
+VARIANTS = [("base", {}), ("base_cap180", {"D7_MAX_RS": "180"}), ("base_cap165", {"D7_MAX_RS": "165"})]
+PINNED = ("apartments", "senior", "school", "retail", "office")
+FRAGMENT_AC = 1.5
 
 
 def measure(path):
@@ -50,11 +50,23 @@ def measure(path):
     g = GRAD[villa & np.isfinite(GRAD)]
     edges = [-1] + BAND_EDGES + [99]
     bands = [float(((g > edges[k]) & (g <= edges[k + 1])).sum() * CELL * CELL / AC) for k in range(len(BAND_RS))]
+    pcs = [q.area / AC for q in getattr(polys["villas"], "geoms", [polys["villas"]])]
     m = dict(villa_ac=polys["villas"].area / AC, bands=bands, over_4_ac=sum(bands[3:]),
              rs_cr=sum(b * r for b, r in zip(bands, BAND_RS)) / 100, open_ac=polys["park"].area / AC,
-             apt_ac=polys["apartments"].area / AC)
+             apt_ac=polys["apartments"].area / AC, pieces=sorted((round(x, 2) for x in pcs), reverse=True),
+             fragments=sum(1 for x in pcs if x < FRAGMENT_AC))
     m["villas"] = m["villa_ac"] * VILLAS_PER_AC
     return m, polys
+
+
+def pinned_diff(path):
+    """The towers, the apartment and senior clubhouses, senior, school and retail/office against the optimised zoning:
+    the largest area (m2) any of them differs by."""
+    def get(p):
+        return {f["properties"]["component"]: shape(f["geometry"]) for f in json.load(open(p, encoding="utf-8"))["features"]
+                if f["properties"]["use"] in PINNED or f["properties"]["component"] in ("C14", "C15")}
+    a, b = get(f"{REPO}/data/processed/zones_draft_model.geojson"), get(path)
+    return max(a[k].symmetric_difference(b.get(k, shapely.Polygon())).area for k in a)
 
 
 def draw(polys, title, png):
@@ -102,53 +114,50 @@ def draw(polys, title, png):
 
 
 def row(name, m):
+    blocks = ", ".join(f"{x:.1f}" for x in m["pieces"][:6]) + (" ..." if len(m["pieces"]) > 6 else "")
     return (f"| {name} | {m['villa_ac']:.2f} | {m['villas']:.0f} | " + " | ".join(f"{b:.1f}" for b in m["bands"]) +
-            f" | **{m['over_4_ac']:.1f}** | **{m['rs_cr']:.1f}** | {m['open_ac']:.2f} |")
+            f" | **{m['over_4_ac']:.1f}** | **{m['rs_cr']:.1f}** | {m['open_ac']:.2f} | {blocks} | {m['fragments']} |")
 
 
 def main():
     os.makedirs(OUTDIR, exist_ok=True)
     runs = []
-    for cap in CAPS:
-        tmp = os.path.join(OUTDIR, f"_d7_cap{cap:g}.geojson")
-        env = dict(os.environ, D7="1", D7_MAX_RS=str(cap), VILLA_AC=os.environ.get("VILLA_AC", "26"), OUT=tmp)
+    for name, extra in VARIANTS:
+        out = os.path.join(OUTDIR, f"zones_d7_{name}.geojson")
+        env = dict(os.environ, D7="1", VILLA_AC=os.environ.get("VILLA_AC", "30"), OUT=out, **extra)
         r = subprocess.run([sys.executable, os.path.join(HERE, "optimise.py")], env=env, capture_output=True, text=True)
         if r.returncode:
             raise SystemExit(r.stderr[-2000:])
-        m, _ = measure(tmp)
-        out = os.path.join(OUTDIR, f"zones_d7_{m['villa_ac']:.1f}.geojson")
-        os.replace(tmp, out)
-        runs.append((f"D7 cap {cap:g} (zones_d7_{m['villa_ac']:.1f})", out, cap))
-        if cap == FINAL_CAP:
-            shutil.copyfile(out, os.path.join(OUTDIR, "zones_d7_final.geojson"))
+        runs.append((f"D7 {name} (zones_d7_{name})", out, name))
     refs = [("D1 base (zones_draft_model)", f"{REPO}/data/processed/zones_draft_model.geojson", None),
             ("D3 pockets (zones_draft_model_pockets)", f"{REPO}/data/processed/zones_draft_model_pockets.geojson", None)]
     res = {}
-    for name, p, cap in refs + runs:
+    for name, p, tag in refs + runs:
         m, polys = measure(p)
+        m["pinned_diff_m2"] = pinned_diff(p)
         res[name] = m
-        if cap is not None:
-            draw(polys, f"{name}: villa land {m['villa_ac']:.1f} ac (~{m['villas']:.0f} villas), {m['over_4_ac']:.1f} ac over 1:4, "
+        if tag is not None:
+            draw(polys, f"{name}: villa land {m['villa_ac']:.1f} ac in {len(m['pieces'])} blocks, {m['over_4_ac']:.1f} ac over 1:4, "
                  f"villa earthwork ~Rs {m['rs_cr']:.1f} Cr; open space {m['open_ac']:.1f} ac", p.replace(".geojson", ".png"))
-            if cap == FINAL_CAP:
-                shutil.copyfile(p.replace(".geojson", ".png"), os.path.join(OUTDIR, "zones_d7_final.png"))
     hdr = ("| zoning | villa land, ac | villas at 12.5/ac | " + " | ".join(f"{n}, ac" for n in BAND_NAMES) +
-           " | over 1:4, ac | villa earthwork + walls, Rs Cr (curve) | open space, ac |\n|" + "---|" * 12)
+           " | over 1:4, ac | villa earthwork + walls, Rs Cr (curve) | open space, ac | villa blocks, ac | blocks under 1.5 ac |\n|" + "---|" * 14)
     lines = [hdr] + [row(n, res[n]) for n, _, _ in refs + runs]
     print("\n".join(lines))
     json.dump(res, open(os.path.join(OUTDIR, "metrics.json"), "w"), indent=1)
-    fin = next(res[n] for n, _, c in runs if c == FINAL_CAP)
-    d3 = res[refs[1][0]]
-    md = ["# D7 zoning, least earthwork (owner 12 Oct)", "",
-          f"Recommended: **zones_d7_final.geojson** (cap {FINAL_CAP:g}): {fin['villa_ac']:.1f} ac of villa land, ~{fin['villas']:.0f} villas at "
-          f"{VILLAS_PER_AC} an acre, {fin['over_4_ac']:.1f} ac over 1:4, villa earthwork + walls ~Rs {fin['rs_cr']:.1f} Cr on the D7 master's "
-          f"curve (D3 Rs {d3['rs_cr']:.1f} Cr on the same curve, {100 * (1 - fin['rs_cr'] / d3['rs_cr']):.0f}% less); open space {fin['open_ac']:.1f} ac.", "",
-          "D7=1 in optimise.py: villa cost = the premium + Rs lakh/ac / 15 (the curve on each 20 m cell's 2 m slopes); no villa on a cell "
-          "over D7_MAX_RS (VILLA_AC then an upper bound: the villas take the gentle land the other uses leave); the towers C11/C20 (+C14) "
-          "pay D7_WT on gentle land, so go up the hill (areas, 20 floors under the airport line, phases kept); the villa clubhouses on "
-          "the villas' steepest land; villa blocks from 0.5 ac. Pins (C19, C02, school), senior, retail/office, KEEP_GREEN, lakes and "
-          "channel as the base. No flag: byte-identical to data/processed/zones_draft_model.geojson.", ""] + lines + ["",
-          "Maps: zones_d7_<ac>.png (uses coloured, the villa land outlined over the six slope bands)."]
+    b_, d3 = res[runs[0][0]], res[refs[1][0]]
+    md = ["# D7 base zoning, least earthwork (owner 12 Oct)", "",
+          f"**zones_d7_base.geojson**: {b_['villa_ac']:.1f} ac of villa land in {len(b_['pieces'])} blocks "
+          f"({', '.join(f'{x:.1f}' for x in b_['pieces'])} ac; {b_['fragments']} under {FRAGMENT_AC} ac), ~{b_['villas']:.0f} villas at "
+          f"{VILLAS_PER_AC} an acre, {b_['over_4_ac']:.1f} ac over 1:4, villa earthwork + walls ~Rs {b_['rs_cr']:.1f} Cr on the D7 master's "
+          f"curve (D3 Rs {d3['rs_cr']:.1f} Cr); open space {b_['open_ac']:.1f} ac; no pockets yet.", "",
+          f"Towers (C02, C11, C19, C20), the apartment and senior clubhouses, senior, school and retail/office as in "
+          f"data/processed/zones_draft_model.geojson (largest difference {b_['pinned_diff_m2']:.0f} m2). D7=1 in optimise.py: villa cost = the "
+          "premium + Rs lakh/ac / 15 (the curve on each 20 m cell's 2 m slopes), villa blocks grown 5 ac at a time, compact; a villa strip "
+          "one cell (20 m) across and a block under 1.5 ac are green; the villa clubhouses on the villas' steepest land. "
+          "No flag: byte-identical to data/processed/zones_draft_model.geojson.", "",
+          "With the towers on the low ground (the airport line), the land left to the villas is the hill: the zoning's saving is the "
+          "steepest edges and the fragments left green, not the hill avoided. zones_d7_final (towers moved) is superseded.", ""] + lines + [
+          "", "Maps: zones_d7_<name>.png (uses coloured, the villa land outlined over the six slope bands)."]
     open(os.path.join(OUTDIR, "summary.md"), "w", encoding="utf-8").write("\n".join(md) + "\n")
     return res, lines
 

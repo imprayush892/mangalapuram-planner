@@ -127,10 +127,15 @@ D7_RS_LAKH_AC = [11, 35, 38, 91, 159, 221]
 # the villas' cost is the premium as before plus D7_W x the cell's Rs; cells over D7_MAX_RS never villas (VILLA_AC then
 # only an upper bound: the villa land is the gentle land the other uses leave); the towers' cost adds D7_WT on gentle land
 D7_W = float(os.environ.get("D7_W", 1 / 15))                # villa cost per Rs lakh an acre (1:4-1:3 = 6, the premium <= 3.5)
-D7_TOWERS = D7 and os.environ.get("D7_TOWERS", "1") == "1"   # the towers off the gentle land too (below)
+# D7 master 12 Oct: D7_TOWERS moved C20 onto ground that holds one 20-floor tower (791 of 935 flats): off by default, the
+# towers, senior, school and retail/office where the optimised zoning puts them
+D7_TOWERS = D7 and os.environ.get("D7_TOWERS", "0") == "1"
 D7_WT = float(os.environ.get("D7_WT", 8.0))
-D7_MAX_RS = float(os.environ.get("D7_MAX_RS", 150))      # no villa on a cell dearer than this, Rs lakh an acre (150: ~24 ac, 300 villas)
-D7_BLOCK_AC = float(os.environ.get("D7_BLOCK_AC", 0.5))  # the smallest villa block grown (1.0 before: the gentle patches are small)
+D7_MAX_RS = float(os.environ.get("D7_MAX_RS", 1e9))      # no villa on a cell dearer than this, Rs lakh an acre (none: with the towers kept the hill is all there is)
+D7_BLOCK_AC = float(os.environ.get("D7_BLOCK_AC", 1.5))  # the smallest villa block (D7 master: fragments plot at 10/ac, blocks at 13)
+D7_COMPACT = float(os.environ.get("D7_COMPACT", 1.0))   # the villa pieces' compactness (0.5 before): blocks, not strips
+D7_CHUNK_AC = float(os.environ.get("D7_CHUNK_AC", 5.0))  # the largest villa block grown at once (14 before: one piece climbs the hill)
+D7_OPEN = os.environ.get("D7_OPEN", "1") == "1"       # no villa strip one cell (20 m) across
 
 
 def d7_rs_lakh_ac():
@@ -453,12 +458,12 @@ if D7:
     villa_cost = np.where(D7_RS > D7_MAX_RS, np.inf, villa_cost)       # near-prohibitive: never a cell this steep
 for _e in (KEEP_GREEN, KEEP_GREEN_2):
     villa_cost = np.where(in_ellipse(_e), np.inf, villa_cost)
-acc, k, chunk = LAKE_VILLA_AC, 0, 14.0
+acc, k, chunk = LAKE_VILLA_AC, 0, (D7_CHUNK_AC if D7 else 14.0)
 _blk = D7_BLOCK_AC if D7 else 1.0
 while acc < VILLA_TARGET_AC + CLUB_AC - 0.3 and chunk >= _blk:
     k += 1
     try:
-        got, area = grow(f"VG{k}", min(VILLA_TARGET_AC + CLUB_AC - acc, chunk), villa_cost, compact=0.5)
+        got, area = grow(f"VG{k}", min(VILLA_TARGET_AC + CLUB_AC - acc, chunk), villa_cost, compact=(D7_COMPACT if D7 else 0.5))
     except SystemExit:                               # no free piece that big: a smaller one
         chunk = 0.7 * min(chunk, VILLA_TARGET_AC + CLUB_AC - acc)
         continue
@@ -497,9 +502,22 @@ for _c, q in _pieces:
     if acc >= VILLA_TARGET_AC + CLUB_AC - 0.1:
         break
     _a = float(CELL_AC[_lab == q].sum())
-    if _a >= min(0.8, _blk):
+    if _a >= (_blk if D7 else 0.8):
         OWNER[_lab == q] = "VILLA"
         acc += _a
+if D7:
+    # D7 master 12 Oct: villa land in blocks that plot well: a strip one cell across, and a piece under D7_BLOCK_AC
+    # (between the fixed roads), is green
+    _v = OWNER == "VILLA"
+    if D7_OPEN:
+        _v = _v & ndimage.binary_opening(_v, structure=np.ones((2, 2), bool))
+    for _r in range(1, REGION.max() + 1):
+        _l, _n = ndimage.label(_v & (REGION == _r))
+        for q in range(1, _n + 1):
+            if CELL_AC[_l == q].sum() < D7_BLOCK_AC:
+                _v[_l == q] = False
+    OWNER[(OWNER == "VILLA") & ~_v] = ""
+    print(f"  D7: villa land {float(CELL_AC[OWNER == 'VILLA'].sum()):.2f} ac in blocks") if os.environ.get("DEBUG_VILLAS") else None
 # 6 the villa clubhouses at the middle of the villas: club 1 (Phase 1) among the nearest villas to the gate, club 2
 # (Phase 3) at the middle of all of them, both on villa land with the least outlook there
 villa = OWNER == "VILLA"
@@ -591,6 +609,14 @@ for key in [c[0] for c in COMPONENTS] + list(VILLA_NAMES):
         target, why = None, "the free land with the widest outlook, outward from the gate by the draft model's phase shares"
     Z.append(dict(component=comp, name=name, use=use, phase=ph, geom=g, target=target, why=why))
 # the public open space: the lakes and every piece of land no zone took (the lakes counted as open space, owner 12 Oct)
+if D7:
+    # and drawn: a villa piece under D7_BLOCK_AC (a road cutting a block's corner off) is green
+    _vu = unary_union([z["geom"] for z in Z if z["use"] == "villas"])
+    _small = unary_union([q for q in getattr(_vu, "geoms", [_vu]) if q.area < D7_BLOCK_AC * AC] or [Polygon()])
+    for z in Z:
+        if z["use"] == "villas":
+            z["geom"] = z["geom"].difference(_small).buffer(0)
+    taken = taken.difference(_small).buffer(0)
 rest = SITE.difference(taken).buffer(0)
 lakes = rest.intersection(lake_mask_poly).buffer(0)
 parks = rest.difference(lake_mask_poly).buffer(-2).buffer(2).buffer(0)
