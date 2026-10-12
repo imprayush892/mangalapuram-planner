@@ -686,3 +686,10 @@ Each of these is a switch or an editable assumption, not a silent decision.
   the marks (~₹1.2–1.4 Cr an acre). The owner keeps all marks (12 Oct).
 - Assumed rates: planted batter ₹1,500 per m run per m height; road bank 0.9H² m³/m at ₹350 + turf ₹250/m².
 - Deck: D2, D6, D7 (no D3); the web app keeps D1-D6.
+
+## 12 Oct 2026 (owner, final for the deck): office all in Phase 4; earthwork by phase; one financial overview
+- The office (both blocks, where they are) is all Phase 4: the model's own row 115 (2,25,000 sq ft saleable, its own
+  timing); the hospital's row 103 empty. Retail stays 40% Phase 1 / 60% Phase 3. D2 PAT ₹347.5 Cr, IRR 19.2%; D6 ₹284.0 Cr,
+  16.4%; D7 ₹286.3 Cr, 16.7%.
+- Deck phase slides show earthwork per phase (cut, fill, walls, ₹), no phase-wise finance; each option ends with the
+  model's One-Page Summary consolidated (section C by product, the bridge to PAT). run_model reads section C too.
