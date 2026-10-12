@@ -77,8 +77,9 @@ def load(plan_p, ew_p, rm_p, terr_p, zones_p):
             m |= outer
         zinfo.append(f["properties"])
         zone_id[m & (zone_id < 0)] = len(zinfo) - 1
+    house = raster([p["groundFloor"] for p in plan["plots"]])
     return dict(nx=nx, ny=ny, cell=cell, x0=x0, y0=y0, dem=dem, delta=delta, road=road, terr=terr, plan=plan, own=own,
-                zone_id=zone_id, zinfo=zinfo, plot=plot, bld=bld)
+                zone_id=zone_id, zinfo=zinfo, plot=plot, bld=bld, house=house)
 
 
 def walls(S):
@@ -100,11 +101,32 @@ def walls(S):
             hh = float(h[j, i])
             out.append((j, i, j2, i2, hh, float(nat[j, i]), axis))
     rs_m3 = yaml_num(None, "rcc_wall_rs_per_m3", 21500)
+    # D7 (earthwork_mode min, the plan reports batters): low garden steps as batters, road edges on the park as banks
+    ew = S["plan"]["earthworkCost"]
+    soft = "batters" in ew
+    if soft:
+        from scipy import ndimage
+        bmax = ew["batters"]["maxStepM"]
+        built = S["plot"] | S["bld"]
+        dist = ndimage.distance_transform_edt(~built) * cell
+        uses = [z.get("use") for z in S["zinfo"]]
+        park = np.vectorize(lambda z: z < 0 or uses[z] in ("park", "open"))(S["zone_id"])
+        green = ~built & ~S["road"]
+        yard = ~S["road"] & ~S["house"] & (S["plot"] | green)
+        land = yaml_num(None, "bank_width_m_per_m_height", 1.75)
     rows = []
     for (j, i, j2, i2, hh, nat, axis) in out:
         bank = hh > max_wall
-        vol = 0.0 if bank else cell * (a * hh + b * hh * hh)
-        rows.append(dict(j=j, i=i, j2=j2, i2=i2, h=hh, nat=nat, bank=bank, vol=vol, rs=vol * rs_m3, axis=axis))
+        kind = "bank" if bank else "wall"
+        if soft and not bank:
+            if hh <= bmax and yard[j, i] and yard[j2, i2] and (S["plot"][j, i] or S["plot"][j2, i2]):
+                kind = "batter"
+            else:
+                for (ra, rb, ga, gb) in ((j, i, j2, i2), (j2, i2, j, i)):
+                    if S["road"][ra, rb] and green[ga, gb] and park[ga, gb] and dist[ga, gb] >= land * hh:
+                        kind = "road bank"
+        vol = cell * (a * hh + b * hh * hh) if kind == "wall" else 0.0
+        rows.append(dict(j=j, i=i, j2=j2, i2=i2, h=hh, nat=nat, bank=kind != "wall", kind=kind, vol=vol, rs=vol * rs_m3, axis=axis))
     return rows
 
 
@@ -119,8 +141,13 @@ def report(S, rows, label):
     tot_w = sum(r["rs"] for r in W)
     total = cut * exc + min(cut, fill) * bf + tot_w
     print(f"== {label}: cut {cut:,.0f} m3, fill {fill:,.0f} m3, walls {len(W) * cell:,.0f} m / {sum(r['vol'] for r in W):,.0f} m3, "
-          f"banks {sum(1 for r in rows if r['bank']) * cell:,.0f} m; Rs {total / 1e7:.2f} Cr (excavation {cut * exc / 1e7:.2f}, "
+          f"banks over the wall height {sum(1 for r in rows if r['kind'] == 'bank') * cell:,.0f} m; Rs {total / 1e7:.2f} Cr (excavation {cut * exc / 1e7:.2f}, "
           f"backfill {min(cut, fill) * bf / 1e7:.2f}, walls {tot_w / 1e7:.2f})")
+    ew = S["plan"]["earthworkCost"]
+    if "batters" in ew:
+        print(f"  D7 (engine): batters {ew['batters']['lengthM']:,.0f} m Rs {ew['rs']['batters'] / 1e7:.2f} Cr, road banks {ew['banks']['lengthM']:,.0f} m "
+              f"Rs {ew['rs']['banks'] / 1e7:.2f} Cr; engine total Rs {ew['rs']['total'] / 1e7:.2f} Cr (this replay: batters "
+              f"{sum(1 for r in rows if r['kind'] == 'batter') * cell:,.0f} m, road banks {sum(1 for r in rows if r['kind'] == 'road bank') * cell:,.0f} m)")
     # cut and fill by owner
     print("  cut / fill by owner (m3):", ", ".join(
         f"{k} {float(-delta[(own == k) & (delta < 0)].sum() * ca):,.0f}/{float(delta[(own == k) & (delta > 0)].sum() * ca):,.0f}"
@@ -192,7 +219,7 @@ def draw(S, rows, out_png, title):
     segs, cols = [], []
     cmap = plt.get_cmap("YlOrRd")
     for r in rows:
-        if r["bank"]:
+        if r["kind"] == "bank":
             continue
         j, i, axis = r["j"], r["i"], r["axis"]
         if axis == 1:   # wall on the vertical edge between (i, j) and (i+1, j)
@@ -201,7 +228,7 @@ def draw(S, rows, out_png, title):
         else:
             y = y0 + cell * (j + 1)
             segs.append([(x0 + cell * i, y), (x0 + cell * (i + 1), y)])
-        cols.append(cmap(min(1.0, 0.25 + r["h"] / 6)))
+        cols.append(cmap(min(1.0, 0.25 + r["h"] / 6)) if r["kind"] == "wall" else "#1a9850")   # D7: batters and road banks green
     ax.add_collection(LineCollection(segs, colors=cols, linewidths=1.6))
     ax.set_xlim(ext[0], ext[1])
     ax.set_ylim(ext[2], ext[3])
