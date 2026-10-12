@@ -60,6 +60,10 @@ PHRASE = {"C08": "villa clubhouse 1", "C10": "villa clubhouse 2 (mini-golf)", "C
           "C15": "senior clubhouse", "C05": "school stage A", "C13": "school stage B", "C12-1": "retail / F&B high street (40%)",
           "C12": "retail / F&B high street (60%)", "C16-1": "offices (40%)", "C16": "offices (60%)", "C14": "apartment clubhouse"}
 
+# the model's own infrastructure rate (Inputs C45, Rs Cr a gross acre): the earthwork goes on top of it
+import openpyxl  # noqa: E402
+INFRA_BASE = float(openpyxl.load_workbook(MODEL, read_only=True)["Inputs"]["C45"].value or 0.75)
+
 cases = [{"id": "model", "inputs": {}}]
 meta = {}
 for oid, label in OPTIONS:
@@ -97,6 +101,11 @@ for oid, label in OPTIONS:
     for c, a in APT_ROWS.items():
         inputs[a] = comp.get(c, 0.0)
     inputs["C151"] = sum(comp.get(c, 0.0) for c in APT_ROWS)
+    # KMBR Table 6 (A1) fee on the apartments' floor area over FSI 3 (Rs 5,000/m2) and over 4 (Rs 7,500/m2), on each
+    # apartment row's construction rate (as app/src/engine/finance/optionRun.ts)
+    for r in (98, 111, 112, 113):
+        inputs[f"N{r}"] = (f"=INDEX('Construction Cost'!$C$19:$K$19,MATCH(K{r},'Construction Cost'!$C$4:$K$4,0))"
+                           f"+IFERROR((MAX(0,M{r}-3*G{r}*43560)*5000+MAX(0,M{r}-4*G{r}*43560)*2500)/10.7639/M{r},0)")
     for ph in (1, 2, 3, 4):
         in_ph = [q for q in plan["plots"] if phase_of.get(q["zone"], 1) == ph]
         for i, t in enumerate(TYPES):
@@ -115,6 +124,12 @@ for oid, label in OPTIONS:
         elif z.get("component") in PHRASE:
             by_phase[ph].append(PHRASE[z["component"]])
     by_phase[1].append("sales office")
+    # owner 12 Oct: the earthwork at the owner's rates (plan.earthworkCost), into the infrastructure as G45
+    ew = plan.get("earthworkCost")
+    if ew:
+        inputs["F45"] = "Earthwork & retaining walls, this plan (Rs Cr)"
+        inputs["G45"] = ew["rs"]["total"] / 1e7
+        inputs["C45"] = f"={INFRA_BASE}+G45/C16"
     for ph in (1, 2, 3, 4):
         items = list(dict.fromkeys(by_phase[ph]))
         inputs[f"C{89 + ph}"] = ("Launch: " if ph == 1 else "") + ", ".join(items)
@@ -126,6 +141,7 @@ for oid, label in OPTIONS:
                  "villa_land_ac": round(villa_ac, 3), "villas_per_acre": round(nv / villa_ac, 2),
                  "open_space_ac": round(open_ac, 3), "roads_ac": round(roads_ac, 3), "parcel_ac": round(parcel, 3),
                  "plot_efficiency": round(plan["option"]["plottedShare"], 4),
+                 "earthwork": plan.get("earthworkCost"),
                  "green_ac": {k: round(v / AC, 3) for k, v in g.items()}}
 
 tmp = os.path.join(HERE, "_cases.json")

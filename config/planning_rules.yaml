@@ -216,7 +216,8 @@ villas:
   # Owner 12 Oct (optimised zoning): villas as the land holds, never more than max_per_acre on a villa zone's land;
   # the count each zoning aims for (D1/D2 350-370; the green options may go lower, but not below 300, owner 9 Oct).
   max_per_acre: 15
-  count_by_zoning: {model: [350, 370], green_pockets: [300, 370], green_chain: [300, 370]}
+  # (owner 12 Oct, later: villas on the land the towers give up; the count up to 420, 15 an acre still the limit)
+  count_by_zoning: {model: [350, 420], green_pockets: [300, 420], green_chain: [300, 420]}
   # Villa land is 80% plots and 20% roads, with 5% leeway either way; the open space comes from the
   # water and the slope, not from the villa land. Reported against each plan, not forced.
   land_split: {plots: 0.80, roads: 0.20, tolerance: 0.05}

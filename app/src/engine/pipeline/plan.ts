@@ -252,6 +252,16 @@ export interface PlanResult {
   existingRoads: { lengthM: number; overLimitM: number; maxGrade: number; limit: number };
   /** Owner 12 Oct: the land account (on the 2 m grid, so it adds up to the parcel exactly) and its green. */
   land: LandAccount;
+  /** Owner 12 Oct: what the earthwork costs at the owner's rates: excavation, backfill with the excavated earth, RCC
+   * retaining walls (estimated from the steps in the finished ground). Rupees; volumes m3, lengths m. */
+  earthworkCost: {
+    cutM3: number;
+    fillM3: number;
+    surplusCutM3: number;
+    importFillM3: number;
+    wall: { lengthM: number; volumeM3: number; maxHeightM: number; minStepM: number; maxWallM: number; bankLengthM: number };
+    rs: { excavation: number; backfill: number; walls: number; total: number };
+  };
   /** Road corridors of every tier, as a mask. */
   roadMask: Mask;
   notes: string[];
@@ -4038,6 +4048,52 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     else cut -= d * cellArea;
   }
 
+  /* ------------------------------------- earthwork cost (owner 12 Oct) */
+  // Retaining walls where the finished ground steps by more than wall_min_step_m between neighbouring cells and the
+  // earthwork touched one of them (a platform's edge against the ground, a plot against the next, a road against a
+  // plot); a smaller step is graded. Concrete a*H + b*H^2 a metre of wall (config/assumptions.yaml earthwork_costs).
+  const ewc = (k: string, d: number): number => pick<number>(input.assumptions, `earthwork_costs.${k}`, d);
+  const [wa, wb] = pick<[number, number]>(input.assumptions, 'earthwork_costs.wall_concrete_m3_per_m', [0.38, 0.04]);
+  const minStep = ewc('wall_min_step_m', 0.5);
+  const maxWall = ewc('wall_max_height_m', 6);
+  let bankLen = 0;
+  let wallLen = 0;
+  let wallVol = 0;
+  let wallMax = 0;
+  for (let j = 0; j < ny; j += 1) {
+    for (let i = 0; i < nx; i += 1) {
+      const k = j * nx + i;
+      if (!terrain[k]) continue;
+      for (const k2 of [i + 1 < nx ? k + 1 : -1, j + 1 < ny ? k + nx : -1]) {
+        if (k2 < 0 || !terrain[k2] || (delta[k] === 0 && delta[k2] === 0)) continue;
+        const za = dem.values[k]! + delta[k]!;
+        const zb = dem.values[k2]! + delta[k2]!;
+        if (!Number.isFinite(za) || !Number.isFinite(zb)) continue;
+        const h = Math.abs(za - zb);
+        if (h <= minStep) continue;
+        if (h > maxWall) {
+          bankLen += dem.cell; // too tall for a wall: a sloped bank, its earth already in the cut and fill
+          continue;
+        }
+        wallLen += dem.cell;
+        wallVol += dem.cell * (wa * h + wb * h * h);
+        wallMax = Math.max(wallMax, h);
+      }
+    }
+  }
+  const rsExc = cut * ewc('excavation_rs_per_m3', 350);
+  // backfill with the excavated earth: as much as there is (fill over the cut would be brought in, not priced here)
+  const rsFill = Math.min(fill, cut) * ewc('backfill_rs_per_m3', 300);
+  const rsWall = wallVol * ewc('rcc_wall_rs_per_m3', 21500);
+  const earthworkCost = {
+    cutM3: cut,
+    fillM3: fill,
+    surplusCutM3: Math.max(0, cut - fill),
+    importFillM3: Math.max(0, fill - cut),
+    wall: { lengthM: wallLen, volumeM3: wallVol, maxHeightM: wallMax, minStepM: minStep, maxWallM: maxWall, bankLengthM: bankLen },
+    rs: { excavation: rsExc, backfill: rsFill, walls: rsWall, total: rsExc + rsFill + rsWall },
+  };
+
   const ms = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
   return {
     roads: keptRoads.map((r) => ({
@@ -4091,6 +4147,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     fillM3: fill,
     programme,
     land,
+    earthworkCost,
     existingRoads: { lengthM: exLen, overLimitM: exOver, maxGrade: exMax, limit: exLimit },
     roadMask: network,
     notes,

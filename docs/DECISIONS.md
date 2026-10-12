@@ -627,3 +627,24 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - Retail stays one Phase 3 line (the workbook's Retail Lease and Costs sheets run off its one row). Bound: all of it in
   Phase 1 would add ₹5.0 Cr PAT and ₹46 Cr peak funding to D1 (project IRR -0.1 pt); the 40% the plan builds in Phase 1
   is about ₹2 Cr PAT and ₹18 Cr peak funding.
+
+## 12 Oct 2026 · villas on the land the towers gave up; the school at the lobe's tip; earthwork priced (owner)
+
+- The school goes up to the east lobe's tip, the land below it green. The towers stand closer, on less land: each
+  tower zone is its flats x 2,130 sq ft (the plans' towers' own floor area a flat) at FSI 3.8, under the 4.0 the owner
+  accepted (KMBR Table 6, A1: Rs 5,000/m2 on the floor area over FSI 3, Rs 7,500 over 4; in the model on each
+  apartment row's construction rate, Inputs N98, N111-N113). The Phase 3 towers keep 70 m off the 18 m road, at the
+  west edge. The land given up (by the 18 m road, the lake's west bank, the gate-side and Phase 4 tower land) is
+  plotted villas; a free piece of 0.8 ac and more goes to villas while they are short of their land. The villa count
+  may run to 420 (15 an acre still the limit).
+- Earthwork at the owner's rates: excavation Rs 350/m3, backfill with the excavated earth Rs 300/m3, RCC retaining wall
+  Rs 21,500/m3. Walls where the finished ground steps by more than 0.5 m between neighbouring 2 m cells (platform
+  edges, plot to plot, road edges), up to 6 m high, concrete 0.38 H + 0.04 H^2 m3 a metre (ASSUMPTIONS, config/
+  assumptions.yaml earthwork_costs); a taller step (deep road cut or fill) is a sloped bank, its earth in the cut and
+  fill, its length reported. Into the model as Inputs G45 (Rs Cr), the infrastructure rate C45 = the model's 0.75 +
+  G45 / gross acres, so it is spent and escalated as the infrastructure is.
+- Result (villas; earthwork Rs Cr; PAT, project IRR): D1 372, 36.1, 305.4, 18.5%; D2 376, 36.6, 309.3, 18.7%;
+  D3 335, 34.1, 273.6, 17.0%; D4 349, 36.4, 283.2, 17.5%; D5 315, 34.0, 256.7, 16.2%; D6 340, 36.3, 276.0, 17.2%.
+  For D1: the earthwork Rs 39.5 Cr of PAT, the FSI fee Rs 6.7 Cr; the tighter towers and their villas +Rs 6 Cr net of
+  the fee. About 18 km of walls an option (~14,000 m3), half of them at road edges: the road profiles are worth a
+  civil engineer's look.

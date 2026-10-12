@@ -140,6 +140,24 @@ export default function MetricsHud(): React.ReactElement {
             ).toLocaleString('en-IN')} sft`}
           />
           <PipelineRow label="Cut / fill" value={`${Math.round(pipeline.cutM3).toLocaleString()} / ${Math.round(pipeline.fillM3).toLocaleString()} m³`} />
+          {pipeline.earthworkCost && (
+            <>
+              <PipelineRow
+                label="Retaining walls"
+                value={`${Math.round(pipeline.earthworkCost.wall.lengthM).toLocaleString()} m · ${Math.round(pipeline.earthworkCost.wall.volumeM3).toLocaleString()} m³`}
+              />
+              <PipelineRow
+                label="Earthwork cost"
+                value={`₹${(pipeline.earthworkCost.rs.total / 1e7).toFixed(1)} Cr`}
+              />
+              <div className="pb-1 text-[10px] leading-snug text-muted">
+                excavation ₹{(pipeline.earthworkCost.rs.excavation / 1e7).toFixed(1)} Cr (₹350/m³) · backfill ₹{(pipeline.earthworkCost.rs.backfill / 1e7).toFixed(1)} Cr (₹300/m³) ·
+                RCC walls ₹{(pipeline.earthworkCost.rs.walls / 1e7).toFixed(1)} Cr (₹21,500/m³, steps of {pipeline.earthworkCost.wall.minStepM}-{pipeline.earthworkCost.wall.maxWallM} m; tallest{' '}
+                {pipeline.earthworkCost.wall.maxHeightM.toFixed(1)} m); {Math.round(pipeline.earthworkCost.wall.bankLengthM ?? 0).toLocaleString()} m of steps over {pipeline.earthworkCost.wall.maxWallM} m left as sloped banks;{' '}
+                {Math.round(pipeline.earthworkCost.surplusCutM3).toLocaleString()} m³ of cut left over
+              </div>
+            </>
+          )}
         </div>
       )}
       {draft && landByUse.length > 0 && (

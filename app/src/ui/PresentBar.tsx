@@ -87,7 +87,12 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
       return `${plan.plots.length} villa plots, typically ${n0(avg * 10.7639)} sq ft. Pick a master plan below.`;
     }
     case 'earthwork':
-      return plan ? `Every plot's platform held to 1:5: ${n0(plan.cutM3)} m³ of cut and ${n0(plan.fillM3)} m³ of fill, roads included.` : '';
+      if (!plan) return '';
+      if (!plan.earthworkCost) return `Every plot's platform held to 1:5: ${n0(plan.cutM3)} m³ of cut and ${n0(plan.fillM3)} m³ of fill, roads included.`;
+      {
+        const e = plan.earthworkCost;
+        return `Every platform held to 1:5: ${n0(e.cutM3)} m³ cut, ${n0(e.fillM3)} m³ fill, ${n0(e.wall.lengthM)} m of retaining wall (${n0(e.wall.volumeM3)} m³ RCC). ₹${(e.rs.total / 1e7).toFixed(1)} Cr at the owner's rates.`;
+      }
     case 'typologies':
       return plan ? `Every block takes its use from the zoning. Golf lies on ${ac(plan.golf.areaM2)} ac of gentle open ground by the clubhouse.` : '';
     case 'towers': {

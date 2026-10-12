@@ -2,7 +2,7 @@ import type { HyperFormula, RawCellContent } from 'hyperformula';
 import * as XLSX from 'xlsx';
 import { buildEngine, cellAddress, formatValue, inputAddress, readWorkbook } from './workbook';
 import type { ModelSheet } from './workbook';
-import { runCase } from './optionRun';
+import { expandInputs, runCase } from './optionRun';
 import { patchXlsx } from './xlsxPatch';
 import type { CaseResult } from './optionRun';
 
@@ -66,7 +66,7 @@ export class ModelCore {
     const hf = this.hf!;
     const s = this.sheets.find((q) => q.name === name)!;
     const sid = hf.getSheetId(name)!;
-    const all = inputs ? Object.entries(inputs).map(([a, v]) => [inputAddress(hf, a), v] as const) : [];
+    const all = inputs ? Object.entries(expandInputs(hf, inputs)).map(([a, v]) => [inputAddress(hf, a), v] as const) : [];
     const before = all.map(([at]) => [at, hf.getCellSerialized(at) as RawCellContent] as const);
     if (all.length) hf.batch(() => all.forEach(([at, v]) => hf.setCellContents(at, [[v]])));
     const values = hf.getSheetValues(sid);
@@ -95,7 +95,7 @@ export class ModelCore {
    */
   exportXlsx(buf: ArrayBuffer, inputs?: Record<string, RawCellContent>): Uint8Array {
     const cells: Record<string, RawCellContent> = {};
-    for (const [a, v] of Object.entries(inputs ?? {})) cells[a.includes('!') ? a : `Inputs!${a}`] = v;
+    for (const [a, v] of Object.entries(inputs ? expandInputs(this.hf!, inputs) : {})) cells[a.includes('!') ? a : `Inputs!${a}`] = v;
     for (const [key, v] of Object.entries(this.applied)) cells[key] = v;
     return patchXlsx(buf, cells);
   }

@@ -151,9 +151,11 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     const [p, c] = await Promise.all([plan(), config()]);
     const types = pick<{ name: string; share: number; plot_sft: number }[]>(c.programmeDraft, 'villa_types', []);
     expect(p.option.villaSizing).toBe('MIX');
-    // Owner 12 Oct: D1 holds 350-370 villas, never more than 15 an acre of a villa zone.
-    expect(p.plots.length).toBeGreaterThanOrEqual(350);
-    expect(p.plots.length).toBeLessThanOrEqual(370);
+    // Owner 12 Oct: D1 holds the villas its zoning asks for (planning_rules villas.count_by_zoning), never more than
+    // 15 an acre of a villa zone.
+    const [lo, hi] = pick<[number, number]>(c.planning, 'villas.count_by_zoning.model', [350, 420]);
+    expect(p.plots.length).toBeGreaterThanOrEqual(lo);
+    expect(p.plots.length).toBeLessThanOrEqual(hi);
     for (const z of p.zones.filter((q) => q.use === 'villas')) {
       const ps = p.plots.filter((q) => q.zone === z.name);
       expect(ps.length).toBeGreaterThan(0);

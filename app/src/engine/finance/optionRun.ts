@@ -29,6 +29,23 @@ const PHRASE: Record<string, string> = {
   C12: 'retail / F&B high street (60%)', 'C16-1': 'offices (40%)', C16: 'offices (60%)', C14: 'apartment clubhouse',
 };
 
+/** The plan's earthwork cost (Rs Cr): goes in as Inputs G45 (labelled in F45), and C45 (infrastructure, Rs Cr a gross
+ * acre) becomes the model's own rate (or the owner's edit of it) plus G45 over the gross acres, so it is spent as the
+ * infrastructure is (Costs row 118). */
+export const EARTHWORK = 'EARTHWORK_CR';
+
+export function expandInputs(hf: HyperFormula, inputs: Record<string, RawCellContent>): Record<string, RawCellContent> {
+  if (!(EARTHWORK in inputs)) return inputs;
+  const { [EARTHWORK]: cr, ...rest } = inputs;
+  const base = hf.getCellValue(inputAddress(hf, 'C45'));
+  return {
+    ...rest,
+    F45: 'Earthwork & retaining walls, this plan (Rs Cr)',
+    G45: cr ?? 0,
+    C45: `=${typeof base === 'number' ? base : 0.75}+G45/C16`,
+  };
+}
+
 export const KEYS: [string, string, string, string, 'up' | 'down'][] = [
   ['units', 'Residential units', 'D5', 'count', 'up'],
   ['saleable_lakh_sft', 'Saleable area', 'E5', 'lakh sft', 'up'],
@@ -79,6 +96,13 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
   // G111-G113 read it): the units stay the model's (its envelope), as the plan places them.
   for (const [c, a] of Object.entries(APT_ROWS)) inputs[a] = comp[c] ?? 0;
   inputs.C151 = Object.keys(APT_ROWS).reduce((t, c) => t + (comp[c] ?? 0), 0);
+  // KMBR Table 6 (A1): the apartments' floor area over FSI 3 pays Rs 5,000/m2, over 4 Rs 7,500/m2 (owner 12 Oct: the
+  // towers on less land, at FSI 3.8): on each apartment row's construction rate, per sq ft of its construction area
+  for (const r of [98, 111, 112, 113]) {
+    inputs[`N${r}`] =
+      `=INDEX('Construction Cost'!$C$19:$K$19,MATCH(K${r},'Construction Cost'!$C$4:$K$4,0))` +
+      `+IFERROR((MAX(0,M${r}-3*G${r}*43560)*5000+MAX(0,M${r}-4*G${r}*43560)*2500)/10.7639/M${r},0)`;
+  }
   // The villa mix and plots phase by phase as the plan cuts them (rows 130-145, four types a phase: the model copies
   // Phase 1's mix to every phase, and its plots are the types' nominal sizes)
   for (const ph of [1, 2, 3, 4]) {
@@ -104,9 +128,12 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
     inputs[`C${89 + ph}`] = `${ph === 1 ? 'Launch: ' : ''}${items.join(', ')}`;
   }
   inputs['One-Page Summary!C15'] = 'Hospital (not in this plan)';
+  // Owner 12 Oct: the earthwork at the owner's rates, into the model's infrastructure (see expandInputs)
+  if (plan.earthworkCost) inputs[EARTHWORK] = plan.earthworkCost.rs.total / 1e7;
   Object.assign(inputs, OFFICE_P1, OFFICE_P3);
   const g = L.green;
   const meta = {
+    earthwork: plan.earthworkCost,
     villas: nv, villas_by_phase: [villas[1], villas[2], villas[3], villas[4]], villa_land_ac: villaAc, villas_per_acre: nv / villaAc,
     open_space_ac: openAc, roads_ac: roadsAc, parcel_ac: parcel, plot_efficiency: plan.option.plottedShare,
     green_ac: Object.fromEntries(Object.entries(g).map(([k, v]) => [k, v / AC])),
@@ -115,13 +142,16 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
 }
 
 export interface CaseResult {
+  /** The inputs as set (the earthwork expanded into its cells). */
+  inputs: Record<string, RawCellContent>;
   values: Record<string, number | null>;
   text: Record<string, string>;
   summary: Record<string, unknown>;
 }
 
 /** Sets the inputs, reads the summary, puts the inputs back. */
-export function runCase(hf: HyperFormula, sheets: ModelSheet[], inputs: Record<string, RawCellContent>): CaseResult {
+export function runCase(hf: HyperFormula, sheets: ModelSheet[], given: Record<string, RawCellContent>): CaseResult {
+  const inputs = expandInputs(hf, given);
   const set = Object.entries(inputs).map(([a, v]) => [inputAddress(hf, a), v] as const);
   const before = set.map(([at]) => [at, hf.getCellSerialized(at) as RawCellContent] as const);
   hf.batch(() => {
@@ -170,5 +200,5 @@ export function runCase(hf: HyperFormula, sheets: ModelSheet[], inputs: Record<s
   hf.batch(() => {
     for (const [at, v] of before) hf.setCellContents(at, [[v]]);
   });
-  return { values, text, summary };
+  return { values, text, summary, inputs };
 }

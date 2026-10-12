@@ -63,7 +63,7 @@ const saveEdits = (e: Edits): void => {
 
 export interface LiveCase extends CaseResult {
   label: string;
-  inputs?: Record<string, RawCellContent>;
+  inputs: Record<string, RawCellContent>;
   [k: string]: unknown;
 }
 
@@ -100,8 +100,8 @@ async function runAll(): Promise<void> {
     const plan = plans[o.id];
     if (!plan) continue;
     const { inputs, meta } = optionInputs(plan);
-    const r = await call<CaseResult>('run', inputs);
-    cases[o.id] = { label: o.label, ...meta, ...r, inputs };
+    const r = await call<CaseResult>('run', inputs); // r.inputs: as set, the earthwork expanded
+    cases[o.id] = { label: o.label, ...meta, ...r };
     if (my !== runToken) return;
   }
   if (my === runToken) useModel.setState({ cases, running: false });

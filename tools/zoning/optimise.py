@@ -67,6 +67,13 @@ FSI = {"residential": KMBR["A1_residential"]["fsi"][0], "office": KMBR["E_office
 # (component, use, phase, name, land in acres, how the land is sized)
 # Apartment land over the bare FSI 3 land (tried 1.1, 12 Oct: no more flats, fewer villas)
 APT_MARGIN = 1.0
+# Owner 12 Oct: the towers closer together, on less land, the rest plotted villas: the apartments at FSI 3.8, under the
+# 4.0 the owner accepted (planning_rules apartments.fsi_max; KMBR A1 with the Rs 5,000/m2 fee on the area over FSI 3),
+# a margin for the airport line and the towers' spacing
+APT_FSI = 0.95 * RULES["apartments"]["fsi_max"]
+# the towers' own floor area a flat (the plans' towers: their plate over its flats, ~2,060-2,130 sq ft, more than the
+# model's 1,842 = 1,602 saleable x 1.15), so the FSI is the plan's
+APT_SFT_PER_FLAT = 2130
 
 
 def fsi_ac(bua, fsi):
@@ -80,10 +87,10 @@ COMPONENTS = [
     ("C16-1", "office", 1, "COMMERCIAL OFFICE · PHASE 1", fsi_ac(0.4 * 258750, FSI["office"]), "40% of 2,58,750 sq ft at KMBR's free FSI 3"),
     ("C12", "retail", 3, "RETAIL & F&B · PHASE 3", fsi_ac(0.6 * 90000, RETAIL_FSI), "60% of 90,000 sq ft at FSI 2.0"),
     ("C16", "office", 3, "COMMERCIAL OFFICE · PHASE 3", fsi_ac(0.6 * 258750, FSI["office"]), "60% of 2,58,750 sq ft at KMBR's free FSI 3"),
-    ("C02", "apartments", 1, "APARTMENTS · PHASE 1", APT_MARGIN * fsi_ac(171350, FSI["residential"]), "1,71,350 sq ft at KMBR's free FSI 3"),
-    ("C11", "apartments", 2, "APARTMENTS · PHASE 2", APT_MARGIN * fsi_ac(430790, FSI["residential"]), "4,30,790 sq ft at FSI 3"),
-    ("C19", "apartments", 3, "APARTMENTS · PHASE 3", APT_MARGIN * fsi_ac(559590, FSI["residential"]), "5,59,590 sq ft at FSI 3"),
-    ("C20", "apartments", 4, "APARTMENTS · PHASE 4", APT_MARGIN * fsi_ac(559590, FSI["residential"]), "5,59,590 sq ft at FSI 3"),
+    ("C02", "apartments", 1, "APARTMENTS · PHASE 1", APT_MARGIN * fsi_ac(93 * APT_SFT_PER_FLAT, APT_FSI), "93 flats x 2,130 sq ft at FSI 3.8 (KMBR A1 with the fee)"),
+    ("C11", "apartments", 2, "APARTMENTS · PHASE 2", APT_MARGIN * fsi_ac(234 * APT_SFT_PER_FLAT, APT_FSI), "234 flats x 2,130 sq ft at FSI 3.8 (KMBR A1 with the fee)"),
+    ("C19", "apartments", 3, "APARTMENTS · PHASE 3", APT_MARGIN * fsi_ac(304 * APT_SFT_PER_FLAT, APT_FSI), "304 flats x 2,130 sq ft at FSI 3.8 (KMBR A1 with the fee)"),
+    ("C20", "apartments", 4, "APARTMENTS · PHASE 4", APT_MARGIN * fsi_ac(304 * APT_SFT_PER_FLAT, APT_FSI), "304 flats x 2,130 sq ft at FSI 3.8 (KMBR A1 with the fee)"),
     ("C04", "senior", 1, "SENIOR LIVING · PHASE 1", fsi_ac(38400, SENIOR_FSI), "38,400 sq ft at FSI 1.35 (low-rise)"),
     ("C07", "senior", 2, "SENIOR ENCLAVE · PHASE 2", fsi_ac(192000, SENIOR_FSI), "1,92,000 sq ft at FSI 1.35 (low-rise)"),
     # ASSUMPTION: the school's buildings at KMBR's FSI 2.5 need 1.0 ac; a CBSE-affiliated senior school asks 2 ac of
@@ -96,7 +103,7 @@ COMPONENTS = [
     ("C10", "clubhouse", 3, "VILLA CLUBHOUSE 2 + MINI-GOLF", 1.2, "the draft model's 1.2 ac"),
     ("C14", "clubhouse", 4, "APARTMENT CLUBHOUSE", 1.0, "the draft model's 1.0 ac"),
 ]
-VILLA_TARGET_AC = float(os.environ.get("VILLA_AC", 31.5))   # gross villa land: ~360 villas at the plans' yield
+VILLA_TARGET_AC = float(os.environ.get("VILLA_AC", 34.5))   # gross villa land: ~360 villas at the plans' yield
 VILLA_PHASE_SHARE = [0.15, 0.25, 0.30, 0.30]                 # the draft model's villa land by phase (Inputs D123-D126)
 OPEN_MIN_AC = 0.10 * 73.0                                     # KMBR Rule 31(v): 10% of the layout as public open space
 
@@ -274,7 +281,8 @@ def grow(comp, target_ac, cost, seed_ok=None, grow_ok=None, compact=0.35):
 report = []
 # Owner 12 Oct, marked on the plan: the school in the east lobe (blue circle), the Phase 3 towers on the ground west of
 # the 18 m road (red circle, where the school was). Local metres; a zone starts within 60 m of its mark.
-PIN = {"SCH": (812.0, 453.0), "C19": (240.0, 425.0)}
+PIN = {"SCH": (812.0, 450.0), "C19": (240.0, 425.0)}   # (owner, later: the school up to the lobe's tip)
+SCHOOL_NORTH_OF = 380.0                                  # the school in the lobe's upper part, the green below it
 
 
 def near(pt, r=60.0):
@@ -327,7 +335,7 @@ for comp in ("C04", "C15"):
 # front or a hilltop), low buildings
 school_cost = inf + 1.6 * SLOPEn + 4.0 * PREMn + 2.0 * LEVELn + 0.5 * LOWn + 1.5 * np.abs(np.nan_to_num(RANK, nan=1.0) - 0.3)
 # one campus, then the two stages: stage A the part nearer the gate
-got, area = grow("SCH", sizes["C05"][4] + sizes["C13"][4], school_cost, seed_ok=near(PIN["SCH"], 40), grow_ok=near(PIN["SCH"], 110), compact=1.2)
+got, area = grow("SCH", sizes["C05"][4] + sizes["C13"][4], school_cost, seed_ok=near(PIN["SCH"], 40), grow_ok=near(PIN["SCH"], 110) & (GY[:, None] >= SCHOOL_NORTH_OF), compact=1.2)
 _sch = sorted(got, key=lambda c: DIST[c])
 _acc = 0.0
 for c in _sch:
@@ -347,6 +355,9 @@ for comp in ("C19", "C02", "C20", "C11"):                  # the owner's mark fi
     # gate, a compact block (a road may cross it and the clubhouse must still fit)
     want = ac_ + (sizes["C14"][4] if comp == "C20" else 0.0)
     try:
+        if comp == "C19":
+            # owner 12 Oct: the Phase 3 towers drawn together at the west edge, the land by the 18 m road plotted villas
+            cost = cost + np.where(np.array([[MAIN.distance(shapely.geometry.Point(GX[i], GY[j])) for i in range(GNX)] for j in range(GNY)]) < 70, 4.0, 0.0)
         got, area = grow(comp, want, cost, seed_ok=near(PIN[comp]) if comp in PIN else thick, compact=1.6)   # compact: towers fit either way the roads run
     except SystemExit:
         got, area = grow(comp, want, cost, compact=0.8)
@@ -367,8 +378,10 @@ villa_cost = inf - 1.5 * VPn - 1.0 * LAKEFRONT - 1.0 * LEVELn + 0.6 * SLOPEn
 # Owner 12 Oct, circled on the plan: the green path south of the west lake (by the drain, the senior clubhouse) stays
 # green: no villas in it (local metres, read off the drawing)
 KEEP_GREEN = ((250.0, 146.0), 66.0, 78.0)                     # centre, half-width, half-height
-_kc, _kx, _ky = KEEP_GREEN
-villa_cost = np.where(((GX[None, :] - _kc[0]) / _kx) ** 2 + ((GY[:, None] - _kc[1]) / _ky) ** 2 <= 1.0, np.inf, villa_cost)
+# and (owner) where the school stood in the east lobe, below it now: green
+KEEP_GREEN_2 = ((812.0, 355.0), 70.0, 28.0)
+for (_kc, _kx, _ky) in (KEEP_GREEN, KEEP_GREEN_2):
+    villa_cost = np.where(((GX[None, :] - _kc[0]) / _kx) ** 2 + ((GY[:, None] - _kc[1]) / _ky) ** 2 <= 1.0, np.inf, villa_cost)
 acc, k, chunk = LAKE_VILLA_AC, 0, 14.0
 while acc < VILLA_TARGET_AC + CLUB_AC - 0.3 and chunk >= 1.0:
     k += 1
@@ -403,6 +416,18 @@ while acc < VILLA_TARGET_AC + CLUB_AC - 0.1 and _heap:
         c_, d_ = a_ + dj, b_ + di
         if free(c_, d_) and (a_, b_, c_, d_) not in CROSS and np.isfinite(villa_cost[c_, d_]):
             heapq.heappush(_heap, (villa_cost[c_, d_], c_, d_, a_, b_))
+# and any free piece of a villa block's size (0.8 ac and more, between the roads) left over, the best first, while the
+# villas are short of their land (owner 12 Oct: the land the towers gave up is villas)
+_freem = np.vectorize(lambda j, i: free(j, i))(*np.indices((GNY, GNX))) & np.isfinite(villa_cost)
+_lab, _n = ndimage.label(_freem & ~ROADLINE)
+_pieces = sorted(((float(villa_cost[_lab == q].mean()), q) for q in range(1, _n + 1)), key=lambda t: t[0])
+for _c, q in _pieces:
+    if acc >= VILLA_TARGET_AC + CLUB_AC - 0.1:
+        break
+    _a = float(CELL_AC[_lab == q].sum())
+    if _a >= 0.8:
+        OWNER[_lab == q] = "VILLA"
+        acc += _a
 # 6 the villa clubhouses at the middle of the villas: club 1 (Phase 1) among the nearest villas to the gate, club 2
 # (Phase 3) at the middle of all of them, both on villa land with the least outlook there
 villa = OWNER == "VILLA"

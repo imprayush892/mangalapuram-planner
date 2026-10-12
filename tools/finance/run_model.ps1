@@ -30,7 +30,7 @@ try {
     $wb = $xl.Workbooks.Open($spec.model, 0, $true)
     $inp = $wb.Worksheets.Item('Inputs')
     foreach ($p in $case.inputs.PSObject.Properties) {
-      if ($p.Value -is [string]) { $inp.Range($p.Name).Value2 = $p.Value }
+      if ($p.Value -is [string]) { if ($p.Value.StartsWith('=')) { $inp.Range($p.Name).Formula = $p.Value } else { $inp.Range($p.Name).Value2 = $p.Value } }
       else { $inp.Range($p.Name).Formula = ([double]$p.Value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) }
     }
     $xl.CalculateFull()
