@@ -48,7 +48,7 @@ LEVELn = np.clip((np.nan_to_num(LEVEL, nan=np.nanmax(_lv)) - _lv.min()) / max(1e
 # or senior living (they go to the low ground with no selling point of its own)
 _lake_m = ndimage.distance_transform_edt(~LAKE_CELL) * G
 LAKEFRONT = np.clip((120.0 - _lake_m) / 80.0, 0, 1)                                   # 1 within 40 m of a lake, 0 from 120 m
-PREMn = np.maximum(VPn, LAKEFRONT)
+PREMn = np.maximum(np.maximum(VPn, LAKEFRONT), LEVELn)      # owner 12 Oct: the high ground is premium too
 # how far into the site (from the parcel's edge): 0 at the edge, 1 from 120 m in
 INTERIORn = np.clip(ndimage.distance_transform_edt(IN_SITE) * G / 120.0, 0, 1)
 # The airport limit (planning_rules airport): the floors a tower can have on each cell, its top under the AAI line.
@@ -259,7 +259,7 @@ for comp in ("C04", "C15"):
     report.append((comp, area))
 # 2b the school: one campus on the flattest ground on a fixed road, off the premium land (owner 12 Oct: not on a lake
 # front or a hilltop), low buildings
-school_cost = inf + 1.6 * SLOPEn + 4.0 * PREMn + 0.5 * LOWn + 1.5 * np.abs(np.nan_to_num(RANK, nan=1.0) - 0.3)
+school_cost = inf + 1.6 * SLOPEn + 4.0 * PREMn + 2.0 * LEVELn + 0.5 * LOWn + 1.5 * np.abs(np.nan_to_num(RANK, nan=1.0) - 0.3)
 # one campus, then the two stages: stage A the part nearer the gate
 got, area = grow("SCH", sizes["C05"][4] + sizes["C13"][4], school_cost, seed_ok=FRONT_FIXED, compact=0.8)
 _sch = sorted(got, key=lambda c: DIST[c])
@@ -297,7 +297,7 @@ for comp in ("C02", "C20", "C19", "C11"):                  # Phase 1 first, by t
 # 5 the villas: grown as a few large pieces from the ground with the widest outlook (not cell by cell, which leaves
 # holes); the clubhouses come out of them next, so the villas are grown that much larger
 CLUB_AC = sizes["C08"][4] + sizes["C10"][4]
-villa_cost = inf - 1.5 * VPn - 1.0 * LAKEFRONT + 0.6 * SLOPEn
+villa_cost = inf - 1.5 * VPn - 1.0 * LAKEFRONT - 1.0 * LEVELn + 0.6 * SLOPEn
 acc, k, chunk = LAKE_VILLA_AC, 0, 14.0
 while acc < VILLA_TARGET_AC + CLUB_AC - 0.3 and chunk >= 1.5:
     k += 1

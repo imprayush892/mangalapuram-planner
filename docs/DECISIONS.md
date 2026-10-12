@@ -576,3 +576,8 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - Result (villas; furthest walk to green; PAT, project IRR): D1 358, 335 m, ₹339.5 Cr, 20.4%; D2 363, 307 m, ₹343.0 Cr,
   20.7%; D3 356, 47 m, ₹337.3 Cr, 20.3%; D4 354, 47 m, ₹336.8 Cr, 20.3%; D5 307, 123 m, ₹293.2 Cr, 18.3%; D6 315, 94 m,
   ₹300.8 Cr, 18.7%. All 935 flats and 192 senior homes placed in every option.
+
+- (Same day, owner: "the school can't be on the peak") The high ground counts as premium as well (with the outlook
+  and the lake fronts): the school goes to low ground (RL 79, the lowest fifth of the site) west of the 18 m road,
+  the hilltop is villas. Result: D1 362 villas, ₹343.3 Cr, 20.5%; D2 364, ₹345.7 Cr, 20.7%; D3 351, ₹332.8 Cr, 20.1%;
+  D4 366, ₹346.3 Cr, 20.7%; D5 319, ₹303.8 Cr, 18.7%; D6 332, ₹315.7 Cr, 19.3%. D3/D4 every villa within 48 m of green.
