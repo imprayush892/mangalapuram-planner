@@ -45,7 +45,13 @@ OPTIONS = [
     ("D4", "Green pockets · north–south roads (Vastu)"),
     ("D5", "Green link · roads to the ground"),
     ("D6", "Green link · north–south roads (Vastu)"),
+    ("D7", "Least earthwork · roads to the ground"),
 ]
+# Owner 12 Oct (D7): ONLY=D3,D7 runs those options alone; PLAN_DIR reads <id>.json plans (the scratch tests' plain plan
+# JSON) instead of app/prebuilt/plans; OUT_YAML writes there instead of config/financials_draft_model.yaml.
+ONLY = [x for x in os.environ.get("ONLY", "").split(",") if x]
+OPTIONS = [o for o in OPTIONS if (o[0] in ONLY if ONLY else o[0] != "D7")]
+PLAN_DIR = os.environ.get("PLAN_DIR")
 # Inputs row of each component's land (column G); villas (rows 99, 106-108) are the model's plug, C40.
 ROW = {"C01": 97, "C02": 98, "C08": 100, "C04": 101, "C05": 102, "C16-1": 103, "C15": 104, "C07": 105, "C10": 109,
        "C13": 110, "C11": 111, "C19": 112, "C20": 113, "C12": 114, "C14": 116, "C16": 115}
@@ -103,7 +109,8 @@ INFRA_BASE = float(openpyxl.load_workbook(MODEL, read_only=True)["Inputs"]["C45"
 cases = [{"id": "model", "inputs": {}}]
 meta = {}
 for oid, label in OPTIONS:
-    plan = json.load(open(f"{REPO}/app/prebuilt/plans/{oid}.json", encoding="utf-8"))["plan"]
+    plan = json.load(open(f"{PLAN_DIR or REPO + '/app/prebuilt/plans'}/{oid}.json", encoding="utf-8"))
+    plan = plan.get("plan", plan)
     L = plan["land"]
     parcel = L["parcelM2"] / AC
     comp = {}
@@ -317,10 +324,10 @@ for c in ["model"] + [o[0] for o in OPTIONS]:
     e["summary"] = summary(c)
     doc["cases"][c] = e
     print(c, {k: e["text"][k] for k in ("units", "revenue_cr", "pat_cr", "project_irr", "promoter_irr")}, "land", e["summary"]["land_total_ac"])
-dst = f"{REPO}/config/financials_draft_model.yaml"
+dst = os.environ.get("OUT_YAML") or f"{REPO}/config/financials_draft_model.yaml"
 with open(dst, "w", encoding="utf-8") as f:
     f.write("# The owner's draft financial model run on each master plan (tools/finance/run_model.py). Generated: do not edit.\n")
     yaml.safe_dump(doc, f, allow_unicode=True, sort_keys=False, width=140)
 os.remove(tmp)
 os.remove(out)
-print("wrote", os.path.relpath(dst, REPO))
+print("wrote", dst)
