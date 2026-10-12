@@ -107,7 +107,66 @@ NB = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 NB8 = NB + [(-1, -1), (-1, 1), (1, -1), (1, 1)]
 # A step from a cell to its neighbour that crosses a fixed road (between their centres): a zone never grows across
 # one (the land joins up round a road's end, so the pieces between the roads alone do not keep it on one side)
-_road_lines = unary_union([f["line"] for f in FIXED])
+# ------------------------------------------------------------------ the water channel (owner 12 Oct)
+# An open channel joins the north pond (RL 80) and the west lake (RL 72), down the low ground between them: the
+# cheapest path on a 4 m grid where the cost of a step rises with the ground's level (so it keeps to the valley),
+# smoothed. CHANNEL_W of water between planted banks (CHANNEL_BANK each side); the roads bridge it.
+CHANNEL_W, CHANNEL_BANK = 6.0, 4.0
+CHANNEL_FROM, CHANNEL_TO = (491.0, 477.0), (252.0, 255.0)
+
+
+def _channel_line():
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import dijkstra as _dij
+    k = 2
+    z = DEM[::k, ::k]
+    okm = TERRAIN[::k, ::k] & np.isfinite(z)
+    ny_, nx_ = z.shape
+    xs = X0 + CELL * k * (np.arange(nx_) + 0.5)
+    ys = Y0 + CELL * k * (np.arange(ny_) + 0.5)
+    zl = np.where(okm, z, np.nan)
+    zn = (zl - np.nanmin(zl)) / max(1e-9, np.nanmax(zl) - np.nanmin(zl))
+    idx = -np.ones(z.shape, int)
+    idx[okm] = np.arange(int(okm.sum()))
+    rr, cc, ww = [], [], []
+    for dj, di, d in ((0, 1, 1.0), (1, 0, 1.0), (1, 1, 2 ** 0.5), (1, -1, 2 ** 0.5)):
+        sa = (slice(max(0, -dj), ny_ - max(0, dj)), slice(max(0, -di), nx_ - max(0, di)))
+        sb = (slice(max(0, dj), ny_ + min(0, dj)), slice(max(0, di), nx_ + min(0, di)))
+        a, b = idx[sa], idx[sb]
+        ok = (a >= 0) & (b >= 0)
+        w = d * (1.0 + 12.0 * (zn[sa] + zn[sb])[ok] / 2)
+        rr += list(a[ok]); cc += list(b[ok]); ww += list(w)
+    n_ = int(okm.sum())
+    gph = coo_matrix((ww + ww, (rr + cc, cc + rr)), shape=(n_, n_)).tocsr()
+    gx_, gy_ = np.meshgrid(xs, ys)
+    lakes_k = LAKES[::k, ::k] & okm
+
+    def near(pt):
+        d = np.hypot(gx_ - pt[0], gy_ - pt[1])
+        return idx[lakes_k & (d <= 40)]
+    src, dst = near(CHANNEL_FROM), near(CHANNEL_TO)
+    dist, pred, _ = _dij(gph, indices=src, min_only=True, return_predecessors=True)
+    end = dst[int(np.argmin(dist[dst]))]
+    path = [end]
+    while pred[path[-1]] >= 0:
+        path.append(pred[path[-1]])
+    jj, ii = np.nonzero(okm)
+    pts = [(xs[ii[q]], ys[jj[q]]) for q in path]
+    line = LineString(pts).simplify(4.0)
+    for _ in range(3):                                         # Chaikin: a gentle curve, not the grid's steps
+        c = list(line.coords)
+        out = [c[0]]
+        for a_, b_ in zip(c[:-1], c[1:]):
+            out += [(0.75 * a_[0] + 0.25 * b_[0], 0.75 * a_[1] + 0.25 * b_[1]), (0.25 * a_[0] + 0.75 * b_[0], 0.25 * a_[1] + 0.75 * b_[1])]
+        out.append(c[-1])
+        line = LineString(out)
+    return line
+
+
+CHANNEL = _channel_line()
+CHANNEL_WATER = CHANNEL.buffer(CHANNEL_W / 2).difference(unary_union([shapely.geometry.shape(mapping(FIXED_ROADS))]))
+CHANNEL_CORRIDOR = CHANNEL.buffer(CHANNEL_W / 2 + CHANNEL_BANK)
+_road_lines = unary_union([f["line"] for f in FIXED] + [CHANNEL])
 CROSS = {}
 ROADLINE = np.zeros((GNY, GNX), bool)                      # cells a fixed road's centre line runs through
 for _j in range(GNY):
@@ -145,7 +204,7 @@ r[order] = np.linspace(0, 1, len(order))
 RANK[fin] = r                                                 # 0 at the gate, 1 at the far end
 
 # The pieces of the site the fixed roads and the public road between the parcels cut it into: a zone stays in one.
-_site_parts = PARCEL.difference(FIXED_ROADS.buffer(1)).buffer(0)
+_site_parts = PARCEL.difference(FIXED_ROADS.buffer(1)).difference(CHANNEL_CORRIDOR).buffer(0)
 REGION = np.zeros((GNY, GNX), int)
 for _k, _g in enumerate(sorted(getattr(_site_parts, "geoms", [_site_parts]), key=lambda q: -q.area), 1):
     for (j, i) in cells:
@@ -213,6 +272,13 @@ def grow(comp, target_ac, cost, seed_ok=None, grow_ok=None, compact=0.35):
 
 
 report = []
+# Owner 12 Oct, marked on the plan: the school in the east lobe (blue circle), the Phase 3 towers on the ground west of
+# the 18 m road (red circle, where the school was). Local metres; a zone starts within 60 m of its mark.
+PIN = {"SCH": (812.0, 453.0), "C19": (240.0, 425.0)}
+
+
+def near(pt, r=60.0):
+    return np.hypot(GX[None, :] - pt[0], GY[:, None] - pt[1]) <= r
 ARM_FRONT = coarse(mask_of(FIXED[2]["line"].buffer(14)).astype(float)) > 0
 FRONT = FRONT_MAIN | ARM_FRONT
 NEAR_MAIN = ndimage.binary_dilation(FRONT, iterations=2)
@@ -261,7 +327,7 @@ for comp in ("C04", "C15"):
 # front or a hilltop), low buildings
 school_cost = inf + 1.6 * SLOPEn + 4.0 * PREMn + 2.0 * LEVELn + 0.5 * LOWn + 1.5 * np.abs(np.nan_to_num(RANK, nan=1.0) - 0.3)
 # one campus, then the two stages: stage A the part nearer the gate
-got, area = grow("SCH", sizes["C05"][4] + sizes["C13"][4], school_cost, seed_ok=FRONT_FIXED, compact=0.8)
+got, area = grow("SCH", sizes["C05"][4] + sizes["C13"][4], school_cost, seed_ok=near(PIN["SCH"], 40), grow_ok=near(PIN["SCH"], 110), compact=1.2)
 _sch = sorted(got, key=lambda c: DIST[c])
 _acc = 0.0
 for c in _sch:
@@ -270,7 +336,7 @@ for c in _sch:
 report.append(("C05", float(CELL_AC[OWNER == "C05"].sum())))
 report.append(("C13", float(CELL_AC[OWNER == "C13"].sum())))
 # 3 apartment towers: where a 20-floor tower hides least of anyone's outlook, on ground with little of its own
-for comp in ("C02", "C20", "C19", "C11"):                  # Phase 1 first, by the gate
+for comp in ("C19", "C02", "C20", "C11"):                  # the owner's mark first, then Phase 1 by the gate
     _, use, ph, name, ac_, why = sizes[comp]
     # at the edge of the site, never among the villas (owner 12 Oct: the towers must not block the villas' views)
     cost = inf + 2.5 * TALLn + 0.8 * VPn + 2.5 * INTERIORn + 0.6 * SLOPEn + (3.0 if ph == 1 else 0.7) * phase_cost(ph) + APT_FIT
@@ -281,7 +347,7 @@ for comp in ("C02", "C20", "C19", "C11"):                  # Phase 1 first, by t
     # gate, a compact block (a road may cross it and the clubhouse must still fit)
     want = ac_ + (sizes["C14"][4] if comp == "C20" else 0.0)
     try:
-        got, area = grow(comp, want, cost, seed_ok=thick, compact=0.8)
+        got, area = grow(comp, want, cost, seed_ok=near(PIN[comp]) if comp in PIN else thick, compact=1.6)   # compact: towers fit either way the roads run
     except SystemExit:
         got, area = grow(comp, want, cost, compact=0.8)
     if comp == "C20":
@@ -298,20 +364,26 @@ for comp in ("C02", "C20", "C19", "C11"):                  # Phase 1 first, by t
 # holes); the clubhouses come out of them next, so the villas are grown that much larger
 CLUB_AC = sizes["C08"][4] + sizes["C10"][4]
 villa_cost = inf - 1.5 * VPn - 1.0 * LAKEFRONT - 1.0 * LEVELn + 0.6 * SLOPEn
+# Owner 12 Oct, circled on the plan: the green path south of the west lake (by the drain, the senior clubhouse) stays
+# green: no villas in it (local metres, read off the drawing)
+KEEP_GREEN = ((250.0, 146.0), 66.0, 78.0)                     # centre, half-width, half-height
+_kc, _kx, _ky = KEEP_GREEN
+villa_cost = np.where(((GX[None, :] - _kc[0]) / _kx) ** 2 + ((GY[:, None] - _kc[1]) / _ky) ** 2 <= 1.0, np.inf, villa_cost)
 acc, k, chunk = LAKE_VILLA_AC, 0, 14.0
-while acc < VILLA_TARGET_AC + CLUB_AC - 0.3 and chunk >= 1.5:
+while acc < VILLA_TARGET_AC + CLUB_AC - 0.3 and chunk >= 1.0:
     k += 1
     try:
         got, area = grow(f"VG{k}", min(VILLA_TARGET_AC + CLUB_AC - acc, chunk), villa_cost, compact=0.5)
     except SystemExit:                               # no free piece that big: a smaller one
-        chunk *= 0.7
+        chunk = 0.7 * min(chunk, VILLA_TARGET_AC + CLUB_AC - acc)
         continue
-    if area < 1.5:                                   # too small to be a villa block: open space
+    if area < 1.0:                                   # too small to be a villa block (12 villas or so): open space
         for (j, i) in got:
             OWNER[j, i] = ""
-        chunk *= 0.7
+        chunk = 0.7 * min(chunk, VILLA_TARGET_AC + CLUB_AC - acc)
         continue
     acc += area
+    print(f"  villa piece VG{k}: {area:.2f} ac (chunk {chunk:.1f}), {acc:.2f} of {VILLA_TARGET_AC + CLUB_AC:.2f}") if os.environ.get("DEBUG_VILLAS") else None
 OWNER[np.vectorize(lambda o: isinstance(o, str) and o.startswith("VG"))(OWNER)] = "VILLA"
 # and the villa land extends into the free land beside it (cheapest first, never across a fixed road) until it holds
 # the target: the strips too small for a villa block of their own join the block beside them
@@ -386,7 +458,7 @@ def cells_poly(sel):
     return unary_union([box(X0 + G * i, Y0 + G * j, X0 + G * (i + 1), Y0 + G * j + G) for j, i in zip(js, is_)]).buffer(0)
 
 
-SITE = PARCEL.difference(FIXED_ROADS).buffer(0)
+SITE = PARCEL.difference(FIXED_ROADS).difference(CHANNEL_CORRIDOR).buffer(0)
 LAKE_POLY = shapely.geometry.shape({"type": "MultiPolygon", "coordinates": []}) if False else None
 lake_mask_poly = unary_union([box(X0 + CELL * i, Y0 + CELL * j, X0 + CELL * (i + 1), Y0 + CELL * (j + 1)) for j, i in zip(*np.nonzero(LAKES))]).buffer(0)
 NAMES = {c[0]: c for c in COMPONENTS}
@@ -438,6 +510,13 @@ for k, g in enumerate(sorted(getattr(lakes, "geoms", [lakes]), key=lambda q: -q.
         continue
     c = g.centroid
     Z.append(dict(component=f"OS-W{k}", name=f"LAKE {k}", use="park", phase=1, geom=g, target=None, why="a lake kept (owner 12 Oct), counted as open space", water=True, green="lake"))
+# the channel: its water (the roads bridge it, so not under them) and its planted banks
+_cw = CHANNEL_WATER.intersection(PARCEL).difference(FIXED_ROADS).difference(lake_mask_poly).buffer(0)
+_cb = CHANNEL_CORRIDOR.intersection(PARCEL).difference(FIXED_ROADS).difference(lake_mask_poly).difference(_cw).buffer(0)
+Z.append(dict(component="OS-CH", name="WATER CHANNEL", use="park", phase=1, geom=_cw, target=None, water=True, green="lake",
+              why=f"an open channel joining the north pond and the west lake (owner 12 Oct), {CHANNEL_W:.0f} m of water; the roads bridge it"))
+Z.append(dict(component="OS-CB", name="CHANNEL BANKS", use="park", phase=1, geom=_cb, target=None, green="landscape",
+              why=f"the channel's planted banks, {CHANNEL_BANK:.0f} m each side"))
 
 
 def main():

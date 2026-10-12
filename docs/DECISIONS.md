@@ -581,3 +581,22 @@ Each of these is a switch or an editable assumption, not a silent decision.
   and the lake fronts): the school goes to low ground (RL 79, the lowest fifth of the site) west of the 18 m road,
   the hilltop is villas. Result: D1 362 villas, ₹343.3 Cr, 20.5%; D2 364, ₹345.7 Cr, 20.7%; D3 351, ₹332.8 Cr, 20.1%;
   D4 366, ₹346.3 Cr, 20.7%; D5 319, ₹303.8 Cr, 18.7%; D6 332, ₹315.7 Cr, 19.3%. D3/D4 every villa within 48 m of green.
+
+## 12 Oct 2026 · the owner's marks: school to the east lobe, Phase 3 towers west, a water channel, the link as drawn
+
+- Marked on the plan (optimise.py PIN, local metres read off the drawing): the school in the east lobe (the rest of
+  the lobe villas), the Phase 3 towers (C19) on the ground west of the 18 m road where the school was. The green
+  path south of the west lake by the senior clubhouse stays green (KEEP_GREEN: no villas in it).
+- An open water channel joins the north pond (RL 80) and the west lake (RL 72) down the low ground: 6 m of water
+  between 4 m planted banks; the roads bridge it; the south pond stays as it is. Water counts as open space, the banks
+  as landscape. (The hydrology analysis does not yet route the storm through it.)
+- D5/D6: the link follows the owner's drawn line, from the park by the 18 m road east through the middle of the
+  villas, over the existing road and south to the south pond, a 10 m green path with a round garden (15 m radius)
+  at each loop the owner drew; a pocket where a villa would be over 150 m from green.
+- D3/D4: 1.5 x the pockets the 50 m rule needs (more, closer pockets): every villa within 45 m of green.
+- Every villa zone holds at most 15 villas an acre (the steepest over it are left green).
+- DXF of each plan: `node app/scripts/plan-dxf.mjs exports/dxf` (layers: zones by use, RC / in-the-villas / landscape
+  green, water, roads by tier, plots, houses, buildings by use, labels; local metres).
+- Result (villas; furthest walk to green; PAT, project IRR): D1 358, 236 m, ₹338.8 Cr, 20.5%; D2 364, 199 m, ₹343.3 Cr,
+  20.9%; D3 311, 41 m, ₹298.2 Cr, 18.5%; D4 331, 45 m, ₹314.1 Cr, 19.4%; D5 304, 138 m, ₹290.2 Cr, 18.1%; D6 316, 135 m,
+  ₹300.1 Cr, 18.8%. All 935 flats and 192 senior homes placed in every option.

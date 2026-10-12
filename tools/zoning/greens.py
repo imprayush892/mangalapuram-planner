@@ -30,9 +30,18 @@ AC = 4046.8564224
 REACH = 150.0           # m walk to green (owner 12 Oct, D3/D4)
 # The owner also asks for the green to be spread evenly across the villas: the pockets are placed to a closer reach,
 # SPREAD, so each neighbourhood of villas gets its own (the 150 m rule is then met with room to spare).
-SPREAD = float(os.environ.get("SPREAD", 50.0))   # owner 12 Oct: many small pockets, every villa with green in sight
+SPREAD = float(os.environ.get("SPREAD", 50.0))
+POCKET_FACTOR = float(os.environ.get("POCKET_FACTOR", 1.5))   # owner 12 Oct: 1.5 x the pockets the 50 m rule needs   # owner 12 Oct: many small pockets, every villa with green in sight
 LINK_W = float(os.environ.get("LINK_W", 10.0))      # the link's width, m
 LINK_GAP = float(os.environ.get("LINK_GAP", 110.0))  # waypoints until no villa land is further than this from green
+# Owner 12 Oct, drawn on the plan: the link runs from the park by the 18 m road east through the middle of the villas,
+# over the existing road, and south to the south pond, with a round garden where the owner drew a loop (local metres,
+# read off the drawing). LINK_SKETCH=0 goes back to the tree joining the greens.
+LINK_SKETCH = os.environ.get("LINK_SKETCH", "1") == "1"
+SKETCH = [(333.5, 320.0), (380.9, 324.8), (406.5, 329.5), (433.0, 291.0), (494.7, 288.6), (551.5, 298.0), (580.0, 294.3),
+          (639.7, 239.0), (608.4, 210.5), (570.5, 181.9), (537.3, 161.0), (511.7, 124.8), (494.7, 81.9)]
+SKETCH_LOOPS = [(406.5, 329.5), (537.3, 161.0)]
+LOOP_R = 15.0                                          # the round gardens, about 0.17 ac
 BEAD_STEP = float(os.environ.get("BEAD_STEP", 80.0))   # owner 12 Oct: the link a chain of green spaces, a pocket park
 BEAD_SIDE = float(os.environ.get("BEAD_SIDE", 26.0))   # every BEAD_STEP along it, BEAD_SIDE square (about 0.17 ac)
 LINK_PARK_AC = float(os.environ.get("LINK_PARK_AC", 1.0))   # the link joins the lakes, the villa clubs and parks this big
@@ -160,7 +169,21 @@ if mode == "check":
               open(base_path.replace(".json", "_walk.json"), "w"))
     sys.exit(0)
 if mode == "pockets":
-    gardens = cover(base_d.copy(), SPREAD, set(), "pocket")
+    used = set()
+    gardens = cover(base_d.copy(), SPREAD, used, "pocket")
+    # Owner 12 Oct: half as many again: more pockets, closer, where they bring the most villas nearer green
+    want = int(np.ceil(POCKET_FACTOR * len(gardens)))
+    t = SPREAD
+    while len(gardens) < want and t > 10:
+        t -= 5
+        cur = base_d.copy()
+        for pick in gardens:
+            for q in pick:
+                cur = np.minimum(cur, PP[q] + 10)
+            cur[pick] = 0
+        gardens += cover(cur, t, used, "pocket")
+    gardens = gardens[:want]
+    print(f"  {len(gardens)} pockets ({POCKET_FACTOR:g} x the {int(round(want / POCKET_FACTOR))} that bring every villa within {SPREAD:.0f} m)")
 else:
     # The link as a corridor, LINK_W wide, drawn through the villa land (the plan lays its plots round it, the streets
     # running on through, owner 7 Oct): a tree joining the greens that touch the villa land (the lakes, the villa clubs,
@@ -241,11 +264,23 @@ else:
         if len(path) > 1:
             PATHS.append(LineString(RXY[path]).simplify(R * 1.5))
         print(f"  + {terminals[best][0]}: {bd:.0f} m")
-    # the beads: a pocket park every BEAD_STEP along the link
+    # the beads: a pocket park every BEAD_STEP along the link; or the owner's line and its round gardens
     beads = []
-    for ln in PATHS:
-        for t in np.arange(BEAD_STEP / 2, ln.length, BEAD_STEP):
-            beads.append(ln.interpolate(t).buffer(BEAD_SIDE / 2, cap_style=3))
+    if LINK_SKETCH:
+        line = LineString(SKETCH)
+        for _ in range(3):                                     # Chaikin: a gentle curve through the drawn points
+            c = list(line.coords)
+            out = [c[0]]
+            for a_, b_ in zip(c[:-1], c[1:]):
+                out += [(0.75 * a_[0] + 0.25 * b_[0], 0.75 * a_[1] + 0.25 * b_[1]), (0.25 * a_[0] + 0.75 * b_[0], 0.25 * a_[1] + 0.75 * b_[1])]
+            out.append(c[-1])
+            line = LineString(out)
+        PATHS = [line]
+        beads = [Point(q).buffer(LOOP_R, 24) for q in SKETCH_LOOPS]
+    else:
+        for ln in PATHS:
+            for t in np.arange(BEAD_STEP / 2, ln.length, BEAD_STEP):
+                beads.append(ln.interpolate(t).buffer(BEAD_SIDE / 2, cap_style=3))
     print(f"  {len(beads)} pocket parks on the link")
     corridor = unary_union([ln.buffer(LINK_W / 2, cap_style=1, join_style=2) for ln in PATHS] + beads).intersection(villa_poly)
     corridor = corridor.buffer(-1).buffer(1).buffer(0)

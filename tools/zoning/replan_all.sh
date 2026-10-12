@@ -12,7 +12,7 @@ R="D:/New folder/mangalapuram-planner"
 W="D:/New folder/_work/draft"
 P="$R/data/processed"
 POCKET_VILLA_AC="${POCKET_VILLA_AC:-33}"     # D3/D4: the villa land the pockets come out of
-LINK_VILLA_AC="${LINK_VILLA_AC:-34.5}"       # D5/D6: the link takes more, so more villa land to start from
+LINK_VILLA_AC="${LINK_VILLA_AC:-36}"       # D5/D6: the link takes more, so more villa land to start from
 plan() { (cd "$R/app" && node scripts/sync-data.mjs >/dev/null && ROADS=terrain,north_south SET="$1" npx vitest run src/engine/__tests__/_draft.test.ts >/dev/null); }
 cd "$R"
 python tools/zoning/optimise.py | tail -1

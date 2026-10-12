@@ -287,7 +287,7 @@ export interface PlanInput {
    * The zoning, clipped to the parcel: the client's plan, or the draft model's zones, which carry
    * their use, phase and programme component (programme line id).
    */
-  zones: { name: string; geom: MultiPoly; labelAc?: number; use?: string; phase?: number; component?: string; within?: string; water?: boolean }[];
+  zones: { name: string; geom: MultiPoly; labelAc?: number; use?: string; phase?: number; component?: string; within?: string; water?: boolean; green?: string }[];
   kmbr: YamlDoc;
   client: YamlDoc;
   assumptions: YamlDoc;
@@ -3140,6 +3140,16 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         for (const p of steepFirst.slice(0, over)) gone.add(p);
         carried.push(`${over} plots over the ${hi} villas the zoning asks for are left green, the steepest first (owner 12 Oct)`);
       }
+      // and no villa zone over villas.max_per_acre (owner 12 Oct: 15 an acre at most)
+      const perAc = num(planning, 'villas.max_per_acre');
+      let capped = 0;
+      for (const z of zones.filter((q) => q.use === 'villas')) {
+        const inZone = steepFirst.filter((p) => p.zone === z.name && !gone.has(p));
+        const extra = inZone.length - Math.floor((z.areaM2 / 4046.8564224) * perAc);
+        for (const p of inZone.slice(0, Math.max(0, extra))) gone.add(p);
+        capped += Math.max(0, extra);
+      }
+      if (capped > 0) carried.push(`${capped} plots over ${perAc} an acre in their villa zone are left green, the steepest first (owner 12 Oct)`);
     } else if (isMix) {
       // Each zone stops at its component's units. Owner 7 Oct (85% of the villa land in plots): a plot over the
       // count is not left empty; its row neighbours share it, each still a rectangle, within the growth limit.
@@ -3818,7 +3828,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       parkRoads += z.areaM2 - net;
       if (iz.water) green.lakesM2 += net;
       else if (iz.within) green.zoneM2 += net;
-      else if (net >= rcMin) green.rcM2 += net;
+      else if (iz.green !== 'landscape' && net >= rcMin) green.rcM2 += net;
       else green.landscapeM2 += net;
     } else if (z.use === 'clubhouse') green.clubM2 += z.areaM2;
     else if (buildsOn.has(z.use)) {
