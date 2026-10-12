@@ -648,3 +648,13 @@ Each of these is a switch or an editable assumption, not a silent decision.
   For D1: the earthwork Rs 39.5 Cr of PAT, the FSI fee Rs 6.7 Cr; the tighter towers and their villas +Rs 6 Cr net of
   the fee. About 18 km of walls an option (~14,000 m3), half of them at road edges: the road profiles are worth a
   civil engineer's look.
+
+## 12 Oct 2026 (owner, marked on the plan): towers together, senior living together
+- The two Phase 3 towers (C19, 304 flats) stand side by side in one block at the south end of the west strip, just
+  north of the senior living and clear of the green path by the west lake; each tower has twice its footprint and
+  setbacks about it (about 1 ac a tower). The strip north of them, and the land between the old split plots, is
+  plotted villas. Township FSI is counted globally (no per-zone FSI), as in the earlier deck.
+- All senior living is one place: the Phase 1 block (C04) and the senior clubhouse (C15) start against the enclave
+  (C07), never on the green path.
+- Tools: `tools/zoning/optimise.py` (C19_PIN / C19_OK / C19_PIECE_AC; the senior blocks seeded beside the enclave;
+  MULTI_PIECE for zones allowed in pieces). Test: a villa phase under 5 ac may stray 0.2 from the plot mix (0.15 above).

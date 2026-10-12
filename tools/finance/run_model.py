@@ -101,11 +101,7 @@ for oid, label in OPTIONS:
     for c, a in APT_ROWS.items():
         inputs[a] = comp.get(c, 0.0)
     inputs["C151"] = sum(comp.get(c, 0.0) for c in APT_ROWS)
-    # KMBR Table 6 (A1) fee on the apartments' floor area over FSI 3 (Rs 5,000/m2) and over 4 (Rs 7,500/m2), on each
-    # apartment row's construction rate (as app/src/engine/finance/optionRun.ts)
-    for r in (98, 111, 112, 113):
-        inputs[f"N{r}"] = (f"=INDEX('Construction Cost'!$C$19:$K$19,MATCH(K{r},'Construction Cost'!$C$4:$K$4,0))"
-                           f"+IFERROR((MAX(0,M{r}-3*G{r}*43560)*5000+MAX(0,M{r}-4*G{r}*43560)*2500)/10.7639/M{r},0)")
+    # (owner 12 Oct: the FSI is the township's, over the whole site: no additional-FSI fee on the tower land)
     for ph in (1, 2, 3, 4):
         in_ph = [q for q in plan["plots"] if phase_of.get(q["zone"], 1) == ph]
         for i, t in enumerate(TYPES):

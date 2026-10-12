@@ -139,6 +139,7 @@ export default function MetricsHud(): React.ReactElement {
               m2ToSft(pipeline.plots.reduce((s, p) => s + p.builtUpM2, 0) + pipeline.buildings.reduce((s, b) => s + b.builtUpM2, 0)),
             ).toLocaleString('en-IN')} sft`}
           />
+          {pipeline.land && <PipelineRow label="Township FSI" value={`${pipeline.land.globalFsi.toFixed(2)} (built-up ÷ 73.54 ac)`} />}
           <PipelineRow label="Cut / fill" value={`${Math.round(pipeline.cutM3).toLocaleString()} / ${Math.round(pipeline.fillM3).toLocaleString()} m³`} />
           {pipeline.earthworkCost && (
             <>

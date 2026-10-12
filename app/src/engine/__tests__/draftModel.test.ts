@@ -163,7 +163,7 @@ describe('the draft model basis (owner, 7 Oct)', () => {
       for (const t of types) {
         const share = ps.filter((q) => q.kind === t.name).length / ps.length;
         // a small phase with many edge plots strays further from the mix (the model is given the plan's own mix)
-        expect(Math.abs(share - t.share), `${z.name} ${t.name}`).toBeLessThan(0.15);
+        expect(Math.abs(share - t.share), `${z.name} ${t.name}`).toBeLessThan(m2ToAcres(z.areaM2) < 5 ? 0.2 : 0.15);
       }
     }
     for (const t of types) expect(Math.abs(p.plots.filter((q) => q.kind === t.name).length / p.plots.length - t.share), t.name).toBeLessThan(0.1);

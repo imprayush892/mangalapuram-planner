@@ -96,13 +96,7 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
   // G111-G113 read it): the units stay the model's (its envelope), as the plan places them.
   for (const [c, a] of Object.entries(APT_ROWS)) inputs[a] = comp[c] ?? 0;
   inputs.C151 = Object.keys(APT_ROWS).reduce((t, c) => t + (comp[c] ?? 0), 0);
-  // KMBR Table 6 (A1): the apartments' floor area over FSI 3 pays Rs 5,000/m2, over 4 Rs 7,500/m2 (owner 12 Oct: the
-  // towers on less land, at FSI 3.8): on each apartment row's construction rate, per sq ft of its construction area
-  for (const r of [98, 111, 112, 113]) {
-    inputs[`N${r}`] =
-      `=INDEX('Construction Cost'!$C$19:$K$19,MATCH(K${r},'Construction Cost'!$C$4:$K$4,0))` +
-      `+IFERROR((MAX(0,M${r}-3*G${r}*43560)*5000+MAX(0,M${r}-4*G${r}*43560)*2500)/10.7639/M${r},0)`;
-  }
+  // (Owner 12 Oct: the FSI is the township's, over the whole site, so no KMBR additional-FSI fee on the tower land.)
   // The villa mix and plots phase by phase as the plan cuts them (rows 130-145, four types a phase: the model copies
   // Phase 1's mix to every phase, and its plots are the types' nominal sizes)
   for (const ph of [1, 2, 3, 4]) {

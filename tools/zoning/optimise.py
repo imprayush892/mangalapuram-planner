@@ -74,6 +74,20 @@ APT_FSI = 0.95 * RULES["apartments"]["fsi_max"]
 # the towers' own floor area a flat (the plans' towers: their plate over its flats, ~2,060-2,130 sq ft, more than the
 # model's 1,842 = 1,602 saleable x 1.15), so the FSI is the plan's
 APT_SFT_PER_FLAT = 2130
+# Owner 12 Oct (later): the FSI is the township's, over the whole site, as in the earlier deck: a tower zone is its towers
+# and the room they need, no more. A tower: the 16,500 sq ft footprint (aspect 2, about 55 x 28 m) with its 3 m setbacks,
+# x TOWER_ROOM for the clear distance between towers, the stagger, the drive and the zone's irregular edge; 20 floors of 8 flats, so 160 flats a tower.
+_plate = 16500 / 10.7639
+_L, _D = (_plate * RULES["apartments"]["plate_aspect"]) ** 0.5, (_plate / RULES["apartments"]["plate_aspect"]) ** 0.5
+CLUB_C14_AC = 1.25   # the apartment clubhouse (the model's 1.0 ac): room for it whichever way the roads run
+TOWER_ROOM = float(os.environ.get("TOWER_ROOM", 3.0))   # x the footprint with its setbacks: the clear distance, the stagger, the drive, an irregular edge
+TOWER_LOT_AC = (_L + 2 * RULES["apartments"]["setback_m"]) * (_D + 2 * RULES["apartments"]["setback_m"]) * TOWER_ROOM / AC
+FLATS_PER_TOWER = 160
+
+
+def tower_land(flats):
+    import math
+    return math.ceil(flats / FLATS_PER_TOWER) * TOWER_LOT_AC
 
 
 def fsi_ac(bua, fsi):
@@ -87,10 +101,10 @@ COMPONENTS = [
     ("C16-1", "office", 1, "COMMERCIAL OFFICE · PHASE 1", fsi_ac(0.4 * 258750, FSI["office"]), "40% of 2,58,750 sq ft at KMBR's free FSI 3"),
     ("C12", "retail", 3, "RETAIL & F&B · PHASE 3", fsi_ac(0.6 * 90000, RETAIL_FSI), "60% of 90,000 sq ft at FSI 2.0"),
     ("C16", "office", 3, "COMMERCIAL OFFICE · PHASE 3", fsi_ac(0.6 * 258750, FSI["office"]), "60% of 2,58,750 sq ft at KMBR's free FSI 3"),
-    ("C02", "apartments", 1, "APARTMENTS · PHASE 1", APT_MARGIN * fsi_ac(93 * APT_SFT_PER_FLAT, APT_FSI), "93 flats x 2,130 sq ft at FSI 3.8 (KMBR A1 with the fee)"),
-    ("C11", "apartments", 2, "APARTMENTS · PHASE 2", APT_MARGIN * fsi_ac(234 * APT_SFT_PER_FLAT, APT_FSI), "234 flats x 2,130 sq ft at FSI 3.8 (KMBR A1 with the fee)"),
-    ("C19", "apartments", 3, "APARTMENTS · PHASE 3", APT_MARGIN * fsi_ac(304 * APT_SFT_PER_FLAT, APT_FSI), "304 flats x 2,130 sq ft at FSI 3.8 (KMBR A1 with the fee)"),
-    ("C20", "apartments", 4, "APARTMENTS · PHASE 4", APT_MARGIN * fsi_ac(304 * APT_SFT_PER_FLAT, APT_FSI), "304 flats x 2,130 sq ft at FSI 3.8 (KMBR A1 with the fee)"),
+    ("C02", "apartments", 1, "APARTMENTS · PHASE 1", tower_land(93), "93 flats in 1 tower: the towers and their room (township FSI)"),
+    ("C11", "apartments", 2, "APARTMENTS · PHASE 2", tower_land(234), "234 flats in 2 towers: the towers and their room (township FSI)"),
+    ("C19", "apartments", 3, "APARTMENTS · PHASE 3", tower_land(304), "304 flats in 2 towers: the towers and their room (township FSI)"),
+    ("C20", "apartments", 4, "APARTMENTS · PHASE 4", tower_land(304), "304 flats in 2 towers: the towers and their room (township FSI)"),
     ("C04", "senior", 1, "SENIOR LIVING · PHASE 1", fsi_ac(38400, SENIOR_FSI), "38,400 sq ft at FSI 1.35 (low-rise)"),
     ("C07", "senior", 2, "SENIOR ENCLAVE · PHASE 2", fsi_ac(192000, SENIOR_FSI), "1,92,000 sq ft at FSI 1.35 (low-rise)"),
     # ASSUMPTION: the school's buildings at KMBR's FSI 2.5 need 1.0 ac; a CBSE-affiliated senior school asks 2 ac of
@@ -281,8 +295,22 @@ def grow(comp, target_ac, cost, seed_ok=None, grow_ok=None, compact=0.35):
 report = []
 # Owner 12 Oct, marked on the plan: the school in the east lobe (blue circle), the Phase 3 towers on the ground west of
 # the 18 m road (red circle, where the school was). Local metres; a zone starts within 60 m of its mark.
-PIN = {"SCH": (812.0, 450.0), "C19": (240.0, 425.0)}   # (owner, later: the school up to the lobe's tip)
-SCHOOL_NORTH_OF = 380.0                                  # the school in the lobe's upper part, the green below it
+PIN = {"SCH": (812.0, 450.0), "C19": (240.0, 425.0), "C02": (385.0, 545.0)}   # C02: by the gate, east of the 18 m road (the west band villas)   # (owner, later: the school up to the lobe's tip)
+# Owner 12 Oct, circled on the plan: the green path south of the west lake (by the drain, the senior clubhouse) stays
+# green: no villas in it (local metres, read off the drawing)
+KEEP_GREEN = ((250.0, 146.0), 66.0, 78.0)                     # centre, half-width, half-height
+# and (owner) where the school stood in the east lobe, below it now: green
+KEEP_GREEN_2 = ((812.0, 355.0), 70.0, 28.0)
+def in_ellipse(e):
+    (_kc, _kx, _ky) = e
+    return ((GX[None, :] - _kc[0]) / _kx) ** 2 + ((GY[:, None] - _kc[1]) / _ky) ** 2 <= 1.0
+# owner 12 Oct: the two Phase 3 towers side by side at the south end of the west strip (above the senior enclave, off
+# the green path, north of the senior living), the strip north of them plotted villas; each tower with twice its footprint and setbacks about it
+C19_PIN = (205.0, 330.0)
+C19_OK = (GY[:, None] <= 420.0) & ~in_ellipse(KEEP_GREEN)
+C19_PIECE_AC = TOWER_LOT_AC * 2.0 / TOWER_ROOM
+MULTI_PIECE = set()                                       # zones allowed in more than one piece
+SCHOOL_NORTH_OF = 380.0                                 # the school in the lobe's upper part, the green below it
 
 
 def near(pt, r=60.0):
@@ -328,8 +356,11 @@ _, use, ph, name, ac_, why = sizes["C07"]
 senior_cost = inf + 2.5 * LEVELn + 4.0 * PREMn + 1.0 * LOWn + 0.6 * SLOPEn
 got, area = grow("C07", ac_, senior_cost, compact=0.8)
 report.append(("C07", area))
+# owner 12 Oct: all the senior living together: the Phase 1 block and the clubhouse start against the enclave (south
+# of the west strip, which the towers take; never on the green path by the west lake)
 for comp in ("C04", "C15"):
-    got, area = grow(comp, sizes[comp][4], senior_cost + 3.0 * (ndimage.binary_dilation(np.isin(OWNER, ["C07", "C04"]), iterations=1) == 0), compact=0.8)
+    _beside = ndimage.binary_dilation(np.isin(OWNER, ["C07", "C04"]), iterations=1) & (OWNER == "")
+    got, area = grow(comp, sizes[comp][4], senior_cost + 3.0 * ~_beside, seed_ok=_beside, grow_ok=(GY[:, None] <= 300.0) & ~in_ellipse(KEEP_GREEN), compact=0.8)
     report.append((comp, area))
 # 2b the school: one campus on the flattest ground on a fixed road, off the premium land (owner 12 Oct: not on a lake
 # front or a hilltop), low buildings
@@ -353,21 +384,33 @@ for comp in ("C19", "C02", "C20", "C11"):                  # the owner's mark fi
     thick = ndimage.distance_transform_edt(_freem) * G >= 30
     # the Phase 4 towers and the apartment clubhouse grow as one piece; the clubhouse is the part of it nearest the
     # gate, a compact block (a road may cross it and the clubhouse must still fit)
-    want = ac_ + (sizes["C14"][4] if comp == "C20" else 0.0)
+    want = ac_ + (CLUB_C14_AC if comp == "C20" else 0.0)
     try:
         if comp == "C19":
             # owner 12 Oct: the Phase 3 towers drawn together at the west edge, the land by the 18 m road plotted villas
             cost = cost + np.where(np.array([[MAIN.distance(shapely.geometry.Point(GX[i], GY[j])) for i in range(GNX)] for j in range(GNY)]) < 70, 4.0, 0.0)
+            got, area = grow(comp, 2 * C19_PIECE_AC, cost, seed_ok=near(C19_PIN, 40), grow_ok=np.broadcast_to(C19_OK, (GNY, GNX)), compact=1.6)
+            report.append((comp, area))
+            continue
         got, area = grow(comp, want, cost, seed_ok=near(PIN[comp]) if comp in PIN else thick, compact=1.6)   # compact: towers fit either way the roads run
     except SystemExit:
         got, area = grow(comp, want, cost, compact=0.8)
     if comp == "C20":
+        # the clubhouse: one compact block out of the towers' piece, grown from its cell nearest the gate
         _acc = 0.0
-        for c in sorted(got, key=lambda c: DIST[c]):
-            if _acc >= sizes["C14"][4] - 0.02:
-                break
+        _mine = set(got)
+        _start = min(got, key=lambda c: DIST[c])
+        _heap = [(0.0, _start)]
+        _seen = {_start}
+        while _heap and _acc < CLUB_C14_AC - 0.02:
+            _, c = heapq.heappop(_heap)
             OWNER[c] = "C14"
             _acc += CELL_AC[c]
+            for dj, di in NB:
+                q = (c[0] + dj, c[1] + di)
+                if q in _mine and q not in _seen:
+                    _seen.add(q)
+                    heapq.heappush(_heap, (float(np.hypot(q[0] - _start[0], q[1] - _start[1])), q))
         report.append(("C14", _acc))
         area -= _acc
     report.append((comp, area))
@@ -375,13 +418,8 @@ for comp in ("C19", "C02", "C20", "C11"):                  # the owner's mark fi
 # holes); the clubhouses come out of them next, so the villas are grown that much larger
 CLUB_AC = sizes["C08"][4] + sizes["C10"][4]
 villa_cost = inf - 1.5 * VPn - 1.0 * LAKEFRONT - 1.0 * LEVELn + 0.6 * SLOPEn
-# Owner 12 Oct, circled on the plan: the green path south of the west lake (by the drain, the senior clubhouse) stays
-# green: no villas in it (local metres, read off the drawing)
-KEEP_GREEN = ((250.0, 146.0), 66.0, 78.0)                     # centre, half-width, half-height
-# and (owner) where the school stood in the east lobe, below it now: green
-KEEP_GREEN_2 = ((812.0, 355.0), 70.0, 28.0)
-for (_kc, _kx, _ky) in (KEEP_GREEN, KEEP_GREEN_2):
-    villa_cost = np.where(((GX[None, :] - _kc[0]) / _kx) ** 2 + ((GY[:, None] - _kc[1]) / _ky) ** 2 <= 1.0, np.inf, villa_cost)
+for _e in (KEEP_GREEN, KEEP_GREEN_2):
+    villa_cost = np.where(in_ellipse(_e), np.inf, villa_cost)
 acc, k, chunk = LAKE_VILLA_AC, 0, 14.0
 while acc < VILLA_TARGET_AC + CLUB_AC - 0.3 and chunk >= 1.0:
     k += 1
@@ -501,11 +539,14 @@ for key in [c[0] for c in COMPONENTS] + list(VILLA_NAMES):
     if not key.startswith("V"):
         # One piece of land between the fixed roads (a cell's square can reach across a road its centre is clear of)
         _parts = sorted(getattr(_site_parts, "geoms", [_site_parts]), key=lambda q: -q.area)
-        _reg = int(np.bincount(REGION[sel]).argmax())
-        g = g.intersection(_parts[_reg - 1]).buffer(0)
+        if key in MULTI_PIECE:                       # in pieces by design (each piece in its own land between the roads)
+            g = g.intersection(unary_union([_parts[r - 1] for r in set(REGION[sel].tolist()) if r > 0])).buffer(0)
+        else:
+            _reg = int(np.bincount(REGION[sel]).argmax())
+            g = g.intersection(_parts[_reg - 1]).buffer(0)
         # and one piece: a road crossing the zone (the loop's end) leaves the smaller side to the open space
         _pcs = [q for q in getattr(g, "geoms", [g]) if q.area >= 400]
-        if len(_pcs) > 1:
+        if len(_pcs) > 1 and key not in MULTI_PIECE:
             g = max(_pcs, key=lambda q: q.area)
     g = unary_union([q for q in getattr(g, "geoms", [g]) if q.area >= 400]).buffer(0)   # no sliver under 0.1 ac
     taken = unary_union([taken, g])

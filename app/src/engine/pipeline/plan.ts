@@ -286,6 +286,9 @@ export interface LandAccount {
   zones: { name: string; component?: string; use: Typology; phase?: number; areaM2: number }[];
   roadsM2: number;
   green: { rcM2: number; lakesM2: number; zoneM2: number; landscapeM2: number; groundsM2: number; clubM2: number };
+  /** Owner 12 Oct: the township's FSI: all the built-up area (villas and buildings) over the parcel. */
+  globalFsi: number;
+  builtUpM2: number;
   /** RC + lakes + zone green + small parks, strips and the edge: the open space no component's land holds (the model's Inputs C38). */
   openSpaceM2: number;
 }
@@ -2883,7 +2886,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         }
         const minHi = towers.reduce((m, t) => Math.min(m, t.pHi), Infinity);
         const spreadCap = 2 * (dims.L + 2 * P) + towerClear;
-        let budget = perTower > 0 || towerFloorsSet ? Number.POSITIVE_INFINITY : apt.fsi * z.areaM2;
+        // Owner 12 Oct (draft model): the FSI is the township's, over the whole site (as in the earlier deck), not each
+        // tower zone's: a zone holds its towers and no more land, and its own FSI does not cap their floors.
+        let budget = perTower > 0 || towerFloorsSet || zp ? Number.POSITIVE_INFINITY : apt.fsi * z.areaM2;
         const chosen: T[] = [];
         let relaxed = 0;
         for (;;) {
@@ -3859,7 +3864,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     roadsM2: outRoad * cellArea + parkRoads,
     green,
     openSpaceM2: green.rcM2 + green.lakesM2 + green.zoneM2 + green.landscapeM2,
+    builtUpM2: plots.reduce((t, p) => t + p.builtUpM2, 0) + buildings.reduce((t, b) => t + b.builtUpM2, 0),
+    globalFsi: 0,
   };
+  land.globalFsi = land.builtUpM2 / Math.max(1, land.parcelM2);
 
   /* ------------------------------------------------------ programme */
   const maxPerAcre = num(planning, 'villas.max_per_acre');
