@@ -15,7 +15,7 @@ lines:
   - {id: C08, use: club, phase: 1, bua_sft: 5000, land_ac: 0.5, name: "Villa clubhouse 1"}                    # row 100
   - {id: C04, use: senior, phase: 1, units: 32, plinth_sft: 1000, saleable_sft: 32000, bua_sft: 38400, land_ac: 1.0}   # row 101
   - {id: C05, use: school, phase: 2, bua_sft: 70000, land_ac: 2.5, name: "School stage A: primary & middle"}  # row 102
-  - {id: C06, use: hospital, phase: 2, bua_sft: 300000, land_ac: 0, name: "Hospital: core, shell & MEP", deferred: "out of this plan (owner 12 Oct): no land on these 73 ac and no figure in the model run (its row 103 carries the office's Phase 1)"}    # row 103
+  - {id: C06, use: hospital, phase: 2, bua_sft: 300000, land_ac: 0, name: "Hospital: core, shell & MEP", deferred: "out of this plan (owner 12 Oct): no land on these 73 ac and no figure in the model run (its row 103 is left empty)"}    # row 103
   - {id: C15, use: club, phase: 2, bua_sft: 5000, land_ac: 0.3, name: "Senior-living clubhouse"}               # row 104
   - {id: C07, use: senior, phase: 2, units: 160, plinth_sft: 1000, saleable_sft: 160000, bua_sft: 192000, land_ac: 5.0}  # row 105
   - {id: C09, use: villas, phase: 2, name: "Villas - phase 2"}   # row 106: villas as the land holds, up to villas.max_per_acre (owner 12 Oct)
@@ -26,11 +26,11 @@ lines:
   - {id: C11, use: apartments, phase: 2, units: 234, saleable_sft: 374600, bua_sft: 430790, land_ac: 3.0}   # row 111
   - {id: C19, use: apartments, phase: 3, units: 304, saleable_sft: 486600, bua_sft: 559590, land_ac: 3.9}   # row 112
   - {id: C20, use: apartments, phase: 4, units: 304, saleable_sft: 486600, bua_sft: 559590, land_ac: 3.9}   # row 113
-  # Owner 12 Oct: retail and office are split, 40% in Phase 1 and 60% in Phase 3, both on the client's 18 m road.
+  # Owner 12 Oct: retail split 40% Phase 1, 60% Phase 3; the office (later the same day) all in Phase 4. Both on the client's 18 m road.
   - {id: C12-1, use: retail, phase: 1, saleable_sft: 30000, bua_sft: 36000, land_ac: 0.41, name: "Retail high street, mainly F&B (leased) - Phase 1, 40%"}
   - {id: C12, use: retail, phase: 3, saleable_sft: 45000, bua_sft: 54000, land_ac: 0.62, name: "Retail high street, mainly F&B (leased) - Phase 3, 60%"}   # row 114
-  - {id: C16-1, use: office, phase: 1, saleable_sft: 90000, bua_sft: 103500, land_ac: 0.79, name: "Commercial office (strata) - Phase 1, 40%"}   # row 103 (the hospital's, re-used)
-  - {id: C16, use: office, phase: 3, saleable_sft: 135000, bua_sft: 155250, land_ac: 1.19, name: "Commercial office (strata) - Phase 3, 60%"}               # row 115
+  - {id: C16-1, use: office, phase: 4, saleable_sft: 90000, bua_sft: 103500, land_ac: 0.79, name: "Commercial office (strata) - Phase 4, block A, 40%"}   # row 115 with block B (owner 12 Oct, later: all office in Phase 4)
+  - {id: C16, use: office, phase: 4, saleable_sft: 135000, bua_sft: 155250, land_ac: 1.19, name: "Commercial office (strata) - Phase 4, block B, 60%"}               # row 115
   - {id: C14, use: club, phase: 4, bua_sft: 18000, land_ac: 1.0, name: "Apartment clubhouse"}                  # row 116
 # Villa plot types: mix of units, villa size (saleable = built up, area factor 1), plot (rows 130-133).
 villa_types:

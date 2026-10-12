@@ -53,18 +53,11 @@ ONLY = [x for x in os.environ.get("ONLY", "").split(",") if x]
 OPTIONS = [o for o in OPTIONS if (o[0] in ONLY if ONLY else o[0] != "D7")]
 PLAN_DIR = os.environ.get("PLAN_DIR")
 # Inputs row of each component's land (column G); villas (rows 99, 106-108) are the model's plug, C40.
-ROW = {"C01": 97, "C02": 98, "C08": 100, "C04": 101, "C05": 102, "C16-1": 103, "C15": 104, "C07": 105, "C10": 109,
+ROW = {"C01": 97, "C02": 98, "C08": 100, "C04": 101, "C05": 102, "C15": 104, "C07": 105, "C10": 109,
        "C13": 110, "C11": 111, "C19": 112, "C20": 113, "C12": 114, "C14": 116, "C16": 115}
 RETAIL_P1 = "C12-1"          # into row 114 with the rest of the retail (see above)
-RETAIL_P1_START = 3          # retail Phase 1 built from quarter 3, as the office's. ASSUMPTION (owner to confirm).
+RETAIL_P1_START = 3          # retail Phase 1 built from quarter 3, with the Phase 1 launch. ASSUMPTION (owner to confirm).
 VILLA_PHASE_ROW = {1: 99, 2: 106, 3: 107, 4: 108}
-# Row 103 as the office's Phase 1 (40% of row 115's 2,25,000 sft saleable), priced and paid like row 115; built from
-# quarter 3 with the Phase 1 launch, sold over 6 quarters (40% of the office's 14). ASSUMPTION: the timing (owner to confirm).
-OFFICE_P1 = {"C103": "Commercial office (strata) - Phase 1, 40%", "D103": 1, "E103": "Commercial", "F103": "Y", "H103": 1,
-             "I103": 90000, "K103": "Office", "L103": 1.15, "P103": 3, "Q103": 10, "U103": 7500, "V103": 3, "X103": 6,
-             "Z103": "COMM", "AB103": 0.04}
-# Row 115 as the office's Phase 3, 60%: built from quarter 10 with the Phase 3 villas, sold over 8 quarters (60% of 14).
-OFFICE_P3 = {"C115": "Commercial office (strata) - Phase 3, 60%", "D115": 3, "I115": 135000, "P115": 10, "V115": 10, "X115": 8}
 
 
 def retail_split():
@@ -100,7 +93,7 @@ TYPES = ["1,800 sq ft plot", "2,250 sq ft plot", "2,500 sq ft plot", "2,800 sq f
 APT_ROWS = {"C02": "E154", "C11": "E155", "C19": "E156", "C20": "E157"}
 PHRASE = {"C08": "villa clubhouse 1", "C10": "villa clubhouse 2 (mini-golf)", "C04": "32 senior-living units", "C07": "senior enclave (160 units)",
           "C15": "senior clubhouse", "C05": "school stage A", "C13": "school stage B", "C12-1": "retail / F&B high street (40%)",
-          "C12": "retail / F&B high street (60%)", "C16-1": "offices (40%)", "C16": "offices (60%)", "C14": "apartment clubhouse"}
+          "C12": "retail / F&B high street (60%)", "C16-1": "offices", "C16": "offices", "C14": "apartment clubhouse"}
 
 # the model's own infrastructure rate (Inputs C45, Rs Cr a gross acre): the earthwork goes on top of it
 import openpyxl  # noqa: E402
@@ -122,6 +115,7 @@ for oid, label in OPTIONS:
         elif c:
             comp[c] = comp.get(c, 0.0) + a
     comp["C12"] = comp.get("C12", 0.0) + comp.pop(RETAIL_P1, 0.0)
+    comp["C16"] = comp.get("C16", 0.0) + comp.pop("C16-1", 0.0)       # the office, both blocks, on row 115 (Phase 4)
     villa_ac = sum(vland.values())
     open_ac = L["openSpaceM2"] / AC
     roads_ac = L["roadsM2"] / AC
@@ -140,6 +134,10 @@ for oid, label in OPTIONS:
               "H99": villas[1], "H106": villas[2], "H107": villas[3], "H108": villas[4]}
     for c, r in ROW.items():
         inputs[f"G{r}"] = comp.get(c, 0.0)
+    # owner 12 Oct (later): the office all in Phase 4, the model's own row 115 (its area and timing); both office blocks'
+    # land on it (above); the hospital's row 103 empty (the hospital is on the deferred land)
+    inputs["G103"] = 0.0
+    inputs["H103"] = 0
     # (as app/src/engine/finance/optionRun.ts) the apartments' land by phase, the plots as cut, the phases in words
     for c, a in APT_ROWS.items():
         inputs[a] = comp.get(c, 0.0)
@@ -173,8 +171,6 @@ for oid, label in OPTIONS:
         items = list(dict.fromkeys(by_phase[ph]))
         inputs[f"C{89 + ph}"] = ("Launch: " if ph == 1 else "") + ", ".join(items)
     inputs["One-Page Summary!C15"] = "Hospital (not in this plan)"
-    inputs.update(OFFICE_P1)
-    inputs.update(OFFICE_P3)
     inputs.update(retail_split())
     cases.append({"id": oid, "inputs": inputs})
     g = L["green"]
@@ -264,7 +260,20 @@ def summary(c):
         v = [num(c, f"Summary!{k}{row}") or 0 for k in "CDEFGH"]
         phases.append({"phase": row - 80, "revenue_cr": round(v[0], 2), "construction_cr": round(v[1], 2), "land_infra_cr": round(v[2], 2),
                        "selling_cr": round(v[3], 2), "contribution_cr": round(v[4], 2), "margin": round(v[5], 4), "row": row})
+    # section C: each product type, all phases combined, and the bridge from contribution to profit after tax
+    by_product = []
+    for row in range(24, 35):
+        if not txt(c, f"C{row}"):
+            continue
+        m = num(c, f"M{row}")
+        by_product.append({"product": txt(c, f"C{row}"), "land_ac": round(num(c, f"D{row}") or 0, 2), "units": int(num(c, f"E{row}") or 0),
+                           "saleable_sft": round(num(c, f"F{row}") or 0), "construction_sft": round(num(c, f"G{row}") or 0),
+                           "start": txt(c, f"H{row}"), "completion": txt(c, f"I{row}"), "revenue_cr": round(num(c, f"J{row}") or 0, 2),
+                           "direct_cost_cr": round(num(c, f"K{row}") or 0, 2), "contribution_cr": round(num(c, f"L{row}") or 0, 2),
+                           "margin": round(m, 4) if m is not None else txt(c, f"M{row}"), "row": row})
+    bridge = [{"label": txt(c, f"C{row}"), "cr": round(num(c, f"L{row}") or 0, 2), "row": row} for row in range(35, 40) if txt(c, f"C{row}")]
     return {"source": "Draft model.xlsx · One-Page Summary", "land": land, "land_total_ac": round(num(c, "D20") or 0, 2),
+            "by_product": by_product, "bridge": bridge,
             "funding": funding, "tickets": tickets, "tickets_average": avg, "tickets_note": txt(c, "C68"),
             "by_phase": by_phase, "phase_economics": phases, "phase_economics_source": "Summary B80:H85 (land & infra allocated)"}
 

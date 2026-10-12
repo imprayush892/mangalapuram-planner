@@ -12,15 +12,10 @@ import { cellAddress, formatValue, inputAddress } from './workbook';
 
 const AC = 4046.8564224;
 const ROW: Record<string, number> = {
-  C01: 97, C02: 98, C08: 100, C04: 101, C05: 102, 'C16-1': 103, C15: 104, C07: 105, C10: 109,
+  C01: 97, C02: 98, C08: 100, C04: 101, C05: 102, C15: 104, C07: 105, C10: 109,
   C13: 110, C11: 111, C19: 112, C20: 113, C12: 114, C14: 116, C16: 115,
 };
 const RETAIL_P1 = 'C12-1';
-const OFFICE_P1: Record<string, RawCellContent> = {
-  C103: 'Commercial office (strata) - Phase 1, 40%', D103: 1, E103: 'Commercial', F103: 'Y', H103: 1,
-  I103: 90000, K103: 'Office', L103: 1.15, P103: 3, Q103: 10, U103: 7500, V103: 3, X103: 6, Z103: 'COMM', AB103: 0.04,
-};
-const OFFICE_P3: Record<string, RawCellContent> = { C115: 'Commercial office (strata) - Phase 3, 60%', D115: 3, I115: 135000, P115: 10, V115: 10, X115: 8 };
 /**
  * Owner 12 Oct: retail 40% in Phase 1, 60% in Phase 3, as the office. The model's retail is one row (114), which its
  * Costs block (rows 96-99) and the Retail Lease sheet read, and no row is spare (the hospital's carries the office's
@@ -56,7 +51,7 @@ const APT_ROWS: Record<string, string> = { C02: 'E154', C11: 'E155', C19: 'E156'
 const PHRASE: Record<string, string> = {
   C08: 'villa clubhouse 1', C10: 'villa clubhouse 2 (mini-golf)', C04: '32 senior-living units', C07: 'senior enclave (160 units)',
   C15: 'senior clubhouse', C05: 'school stage A', C13: 'school stage B', 'C12-1': 'retail / F&B high street (40%)',
-  C12: 'retail / F&B high street (60%)', 'C16-1': 'offices (40%)', C16: 'offices (60%)', C14: 'apartment clubhouse',
+  C12: 'retail / F&B high street (60%)', 'C16-1': 'offices', C16: 'offices', C14: 'apartment clubhouse',
 };
 
 /** The plan's earthwork cost (Rs Cr): goes in as Inputs G45 (labelled in F45), and C45 (infrastructure, Rs Cr a gross
@@ -108,6 +103,8 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
   }
   comp.C12 = (comp.C12 ?? 0) + (comp[RETAIL_P1] ?? 0);
   delete comp[RETAIL_P1];
+  comp.C16 = (comp.C16 ?? 0) + (comp['C16-1'] ?? 0); // the office, both blocks, on row 115 (Phase 4)
+  delete comp['C16-1'];
   const villaAc = vland[1]! + vland[2]! + vland[3]! + vland[4]!;
   const openAc = L.openSpaceM2 / AC;
   const roadsAc = L.roadsM2 / AC;
@@ -122,6 +119,10 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
     H99: villas[1]!, H106: villas[2]!, H107: villas[3]!, H108: villas[4]!,
   };
   for (const [c, r] of Object.entries(ROW)) inputs[`G${r}`] = comp[c] ?? 0;
+  // Owner 12 Oct (later): the office all in Phase 4, the model's own row 115 (its area and timing); both office blocks'
+  // land on it (above); the hospital's row 103 empty (the hospital is on the deferred land)
+  inputs.G103 = 0;
+  inputs.H103 = 0;
   // The apartments' land as the plan has it, phase by phase, where the model splits its own (C151 x D154-D157; G98,
   // G111-G113 read it): the units stay the model's (its envelope), as the plan places them.
   for (const [c, a] of Object.entries(APT_ROWS)) inputs[a] = comp[c] ?? 0;
@@ -154,7 +155,7 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
   inputs['One-Page Summary!C15'] = 'Hospital (not in this plan)';
   // Owner 12 Oct: the earthwork at the owner's rates, into the model's infrastructure (see expandInputs)
   if (plan.earthworkCost) inputs[EARTHWORK] = plan.earthworkCost.rs.total / 1e7;
-  Object.assign(inputs, OFFICE_P1, OFFICE_P3, retailSplit());
+  Object.assign(inputs, retailSplit());
   const g = L.green;
   const meta = {
     earthwork: plan.earthworkCost,

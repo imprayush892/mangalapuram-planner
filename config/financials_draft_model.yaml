@@ -205,6 +205,155 @@ cases:
         phases: []
         cell: D19
       land_total_ac: 73.0
+      by_product:
+      - product: Apartments
+        land_ac: 12.0
+        units: 935
+        saleable_sft: 1496800
+        construction_sft: 1721320
+        start: Jan-27
+        completion: Mar-33
+        revenue_cr: 1113.51
+        direct_cost_cr: 772.39
+        contribution_cr: 341.13
+        margin: 0.3064
+        row: 24
+      - product: Villas
+        land_ac: 19.94
+        units: 320
+        saleable_sft: 766700
+        construction_sft: 766700
+        start: Jan-27
+        completion: Jun-32
+        revenue_cr: 721.91
+        direct_cost_cr: 494.7
+        contribution_cr: 227.21
+        margin: 0.3147
+        row: 25
+      - product: Senior living
+        land_ac: 6.0
+        units: 192
+        saleable_sft: 192000
+        construction_sft: 230400
+        start: Apr-27
+        completion: Mar-30
+        revenue_cr: 200.78
+        direct_cost_cr: 148.09
+        contribution_cr: 52.69
+        margin: 0.2624
+        row: 26
+      - product: Retail & F&B high street (leased)
+        land_ac: 1.5
+        units: 0
+        saleable_sft: 0
+        construction_sft: 90000
+        start: Oct-28
+        completion: Mar-30
+        revenue_cr: 103.38
+        direct_cost_cr: 62.58
+        contribution_cr: 40.8
+        margin: 0.3947
+        row: 27
+      - product: Commercial office
+        land_ac: 2.5
+        units: 0
+        saleable_sft: 225000
+        construction_sft: 258750
+        start: Jul-29
+        completion: Dec-31
+        revenue_cr: 209.16
+        direct_cost_cr: 159.41
+        contribution_cr: 49.74
+        margin: 0.2378
+        row: 28
+      - product: School (sale to operator)
+        land_ac: 4.0
+        units: 0
+        saleable_sft: 110000
+        construction_sft: 110000
+        start: Oct-27
+        completion: Mar-31
+        revenue_cr: 77.87
+        direct_cost_cr: 75.79
+        contribution_cr: 2.09
+        margin: 0.0268
+        row: 29
+      - product: Hospital (sale to operator)
+        land_ac: 5.0
+        units: 0
+        saleable_sft: 300000
+        construction_sft: 300000
+        start: Oct-27
+        completion: Mar-30
+        revenue_cr: 283.5
+        direct_cost_cr: 221.11
+        contribution_cr: 62.39
+        margin: 0.2201
+        row: 30
+      - product: Clubhouses (amenity — cost only)
+        land_ac: 3.0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 38000
+        start: Jul-27
+        completion: Sep-30
+        revenue_cr: 0
+        direct_cost_cr: 51.38
+        contribution_cr: -51.38
+        margin: cost only
+        row: 31
+      - product: Sales office & entry (cost only)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 12000
+        start: Oct-26
+        completion: Mar-27
+        revenue_cr: 0
+        direct_cost_cr: 5.11
+        contribution_cr: -5.11
+        margin: cost only
+        row: 32
+      - product: Township common land — roads & open space
+        land_ac: 19.06
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: ''
+        completion: ''
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: ''
+        row: 33
+      - product: Total
+        land_ac: 73.0
+        units: 1447
+        saleable_sft: 3090500
+        construction_sft: 3527170
+        start: Oct-26
+        completion: Mar-33
+        revenue_cr: 2710.1
+        direct_cost_cr: 1990.56
+        contribution_cr: 719.55
+        margin: 0.2655
+        row: 34
+      bridge:
+      - label: 'Less: professional fees, contingency & overheads (township)'
+        cr: -168.57
+        row: 35
+      - label: Profit before interest & tax
+        cr: 550.97
+        row: 36
+      - label: 'Less: interest & loan fees'
+        cr: -40.23
+        row: 37
+      - label: 'Less: tax (proxy)'
+        cr: -130.13
+        row: 38
+      - label: Profit after tax
+        cr: 380.62
+        row: 39
       funding:
       - label: Promoter equity committed
         value: 200.0
@@ -579,7 +728,6 @@ cases:
       G100: 0.499153
       G101: 0.729455
       G102: 1.959051
-      G103: 0.773934
       G104: 0.293561
       G105: 3.288478
       G109: 1.23355
@@ -589,7 +737,9 @@ cases:
       G113: 3.107597
       G114: 1.138662
       G116: 1.2464
-      G115: 1.111974
+      G115: 1.885908
+      G103: 0.0
+      H103: 0
       E154: 1.521181
       E155: 3.084864
       E156: 2.038125
@@ -630,32 +780,10 @@ cases:
       F45: Earthwork & retaining walls, this plan (Rs Cr)
       G45: 39.439297
       C45: =0.75+G45/C16
-      C90: 'Launch: retail / F&B high street (40%), offices (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase
-        1), sales office'
+      C90: 'Launch: retail / F&B high street (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase 1), sales office'
       C91: apartments (phase 2), senior enclave (160 units), school stage A, senior clubhouse, villas (phase 2)
-      C92: retail / F&B high street (60%), offices (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
-      C93: apartments (phase 4), apartment clubhouse, villas (phase 4)
-      C103: Commercial office (strata) - Phase 1, 40%
-      D103: 1
-      E103: Commercial
-      F103: Y
-      H103: 1
-      I103: 90000
-      K103: Office
-      L103: 1.15
-      P103: 3
-      Q103: 10
-      U103: 7500
-      V103: 3
-      X103: 6
-      Z103: COMM
-      AB103: 0.04
-      C115: Commercial office (strata) - Phase 3, 60%
-      D115: 3
-      I115: 135000
-      P115: 10
-      V115: 10
-      X115: 8
+      C92: retail / F&B high street (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
+      C93: offices, apartments (phase 4), apartment clubhouse, villas (phase 4)
       C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
       One-Page Summary!C15: Hospital (not in this plan)
       One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
@@ -666,34 +794,34 @@ cases:
     values:
       units: 1504.0
       saleable_lakh_sft: 29.196
-      revenue_cr: 2535.951197
-      cost_cr: 2067.319558
-      pbt_cr: 421.433418
-      pat_cr: 313.785502
-      pat_margin: 0.123735
-      project_irr: 0.187214
-      promoter_irr: 0.145569
-      peak_funding_cr: 511.774579
-      promoter_money_cr: 384.314786
-      peak_loan_cr: 156.088957
-      interest_cr: 47.198221
+      revenue_cr: 2555.811265
+      cost_cr: 2077.484806
+      pbt_cr: 432.00355
+      pat_cr: 321.695131
+      pat_margin: 0.125868
+      project_irr: 0.179971
+      promoter_irr: 0.14026
+      peak_funding_cr: 506.562539
+      promoter_money_cr: 393.453926
+      peak_loan_cr: 140.713325
+      interest_cr: 46.32291
       villa_units: 377.0
       villa_revenue_cr: 847.025272
       villa_margin: 0.202215
     text:
       units: 1,504
       saleable_lakh_sft: '29.2'
-      revenue_cr: 2,536.0
-      cost_cr: 2,067.3
-      pbt_cr: '421.4'
-      pat_cr: '313.8'
-      pat_margin: 12.4%
-      project_irr: 18.7%
-      promoter_irr: 14.6%
-      peak_funding_cr: '511.8'
-      promoter_money_cr: '384.3'
-      peak_loan_cr: '156.1'
-      interest_cr: '47.2'
+      revenue_cr: 2,555.8
+      cost_cr: 2,077.5
+      pbt_cr: '432.0'
+      pat_cr: '321.7'
+      pat_margin: 12.6%
+      project_irr: 18.0%
+      promoter_irr: 14.0%
+      peak_funding_cr: '506.6'
+      promoter_money_cr: '393.5'
+      peak_loan_cr: '140.7'
+      interest_cr: '46.3'
       villa_units: '377'
       villa_revenue_cr: '847.0'
       villa_margin: 20.2%
@@ -736,8 +864,7 @@ cases:
         acres: 1.886
         share: 0.0256
         phases:
-        - 1
-        - 3
+        - 4
         cell: D13
       - use: School (sale to operator)
         acres: 3.027
@@ -749,7 +876,8 @@ cases:
       - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
-        phases: []
+        phases:
+        - 2
         cell: D15
       - use: Clubhouses (amenity — cost only)
         acres: 3.273
@@ -777,28 +905,177 @@ cases:
         phases: []
         cell: D19
       land_total_ac: 73.54
+      by_product:
+      - product: Apartments
+        land_ac: 9.75
+        units: 935
+        saleable_sft: 1496800
+        construction_sft: 1721320
+        start: Jan-27
+        completion: Mar-33
+        revenue_cr: 1113.51
+        direct_cost_cr: 760.51
+        contribution_cr: 353.01
+        margin: 0.317
+        row: 24
+      - product: Villas
+        land_ac: 31.94
+        units: 377
+        saleable_sft: 895800
+        construction_sft: 895800
+        start: Jan-27
+        completion: Jun-32
+        revenue_cr: 847.03
+        direct_cost_cr: 675.74
+        contribution_cr: 171.28
+        margin: 0.2022
+        row: 25
+      - product: Senior living
+        land_ac: 4.02
+        units: 192
+        saleable_sft: 192000
+        construction_sft: 230400
+        start: Apr-27
+        completion: Mar-30
+        revenue_cr: 200.78
+        direct_cost_cr: 134.31
+        contribution_cr: 66.46
+        margin: 0.331
+        row: 26
+      - product: Retail & F&B high street (leased)
+        land_ac: 1.14
+        units: 0
+        saleable_sft: 0
+        construction_sft: 90000
+        start: Oct-28
+        completion: Mar-30
+        revenue_cr: 107.47
+        direct_cost_cr: 58.69
+        contribution_cr: 48.78
+        margin: 0.4539
+        row: 27
+      - product: Commercial office
+        land_ac: 1.89
+        units: 0
+        saleable_sft: 225000
+        construction_sft: 258750
+        start: Jul-29
+        completion: Dec-31
+        revenue_cr: 209.16
+        direct_cost_cr: 155.61
+        contribution_cr: 53.55
+        margin: 0.256
+        row: 28
+      - product: School (sale to operator)
+        land_ac: 3.03
+        units: 0
+        saleable_sft: 110000
+        construction_sft: 110000
+        start: Oct-27
+        completion: Mar-31
+        revenue_cr: 77.87
+        direct_cost_cr: 69.78
+        contribution_cr: 8.09
+        margin: 0.1039
+        row: 29
+      - product: Hospital (sale to operator)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: Oct-27
+        completion: Mar-30
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: cost only
+        row: 30
+      - product: Clubhouses (amenity — cost only)
+        land_ac: 3.27
+        units: 0
+        saleable_sft: 0
+        construction_sft: 38000
+        start: Jul-27
+        completion: Sep-30
+        revenue_cr: 0
+        direct_cost_cr: 56.04
+        contribution_cr: -56.04
+        margin: cost only
+        row: 31
+      - product: Sales office & entry (cost only)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 12000
+        start: Oct-26
+        completion: Mar-27
+        revenue_cr: 0
+        direct_cost_cr: 5.11
+        contribution_cr: -5.11
+        margin: cost only
+        row: 32
+      - product: Township common land — roads & open space
+        land_ac: 18.51
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: ''
+        completion: ''
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: ''
+        row: 33
+      - product: Total
+        land_ac: 73.54
+        units: 1504
+        saleable_sft: 2919600
+        construction_sft: 3356270
+        start: Oct-26
+        completion: Mar-33
+        revenue_cr: 2555.81
+        direct_cost_cr: 1915.79
+        contribution_cr: 640.03
+        margin: 0.2504
+        row: 34
+      bridge:
+      - label: 'Less: professional fees, contingency & overheads (township)'
+        cr: -161.7
+        row: 35
+      - label: Profit before interest & tax
+        cr: 478.33
+        row: 36
+      - label: 'Less: interest & loan fees'
+        cr: -46.32
+        row: 37
+      - label: 'Less: tax (proxy)'
+        cr: -110.31
+        row: 38
+      - label: Profit after tax
+        cr: 321.7
+        row: 39
       funding:
       - label: Promoter equity committed
         value: 200.0
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 184.31
+        value: 193.45
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 156.09
+        value: 140.71
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 47.2
+        value: 46.32
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
-        text: FY32 Q2
+        text: FY32 Q3
         cell: K13
       - label: Land rate
         text: 5.0 Cr/acre + 7% stamp/reg
@@ -990,15 +1267,15 @@ cases:
         row: 47
       - product: Commercial office
         area_sft:
-        - 90000
         - 0
-        - 135000
         - 0
+        - 0
+        - 225000
         revenue_cr:
-        - 71.32
         - 0
-        - 117.97
         - 0
+        - 0
+        - 209.16
         row: 48
       - product: School (sale to operator)
         area_sft:
@@ -1050,24 +1327,24 @@ cases:
         row: 52
       - product: Total
         area_sft:
-        - 361400
+        - 271400
         - 843150
-        - 946600
-        - 768450
+        - 811600
+        - 993450
         revenue_cr:
-        - 266.7
+        - 195.38
         - 704.09
-        - 896.5
-        - 668.66
+        - 778.53
+        - 877.82
         row: 53
       phase_economics:
       - phase: 1
-        revenue_cr: 266.7
-        construction_cr: 154.3
-        land_infra_cr: 75.68
-        selling_cr: 10.47
-        contribution_cr: 26.25
-        margin: 0.0984
+        revenue_cr: 195.38
+        construction_cr: 108.68
+        land_infra_cr: 68.61
+        selling_cr: 7.62
+        contribution_cr: 10.47
+        margin: 0.0536
         row: 81
       - phase: 2
         revenue_cr: 704.09
@@ -1078,20 +1355,20 @@ cases:
         margin: 0.2646
         row: 82
       - phase: 3
-        revenue_cr: 896.5
-        construction_cr: 465.63
-        land_infra_cr: 149.96
-        selling_cr: 30.15
-        contribution_cr: 250.76
-        margin: 0.2797
+        revenue_cr: 778.53
+        construction_cr: 389.86
+        land_infra_cr: 139.81
+        selling_cr: 25.43
+        contribution_cr: 223.43
+        margin: 0.287
         row: 83
       - phase: 4
-        revenue_cr: 668.66
-        construction_cr: 348.65
-        land_infra_cr: 127.49
-        selling_cr: 26.24
-        contribution_cr: 166.28
-        margin: 0.2487
+        revenue_cr: 877.82
+        construction_cr: 478.67
+        land_infra_cr: 144.72
+        selling_cr: 34.61
+        contribution_cr: 219.83
+        margin: 0.2504
         row: 84
       phase_economics_source: Summary B80:H85 (land & infra allocated)
   D2:
@@ -1151,7 +1428,6 @@ cases:
       G100: 0.499153
       G101: 0.729455
       G102: 1.959051
-      G103: 0.773934
       G104: 0.293561
       G105: 3.288478
       G109: 1.23355
@@ -1161,7 +1437,9 @@ cases:
       G113: 3.107597
       G114: 1.138662
       G116: 1.2464
-      G115: 1.111974
+      G115: 1.885908
+      G103: 0.0
+      H103: 0
       E154: 1.521181
       E155: 3.084864
       E156: 2.038125
@@ -1202,32 +1480,10 @@ cases:
       F45: Earthwork & retaining walls, this plan (Rs Cr)
       G45: 40.084045
       C45: =0.75+G45/C16
-      C90: 'Launch: retail / F&B high street (40%), offices (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase
-        1), sales office'
+      C90: 'Launch: retail / F&B high street (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase 1), sales office'
       C91: apartments (phase 2), senior enclave (160 units), school stage A, senior clubhouse, villas (phase 2)
-      C92: retail / F&B high street (60%), offices (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
-      C93: apartments (phase 4), apartment clubhouse, villas (phase 4)
-      C103: Commercial office (strata) - Phase 1, 40%
-      D103: 1
-      E103: Commercial
-      F103: Y
-      H103: 1
-      I103: 90000
-      K103: Office
-      L103: 1.15
-      P103: 3
-      Q103: 10
-      U103: 7500
-      V103: 3
-      X103: 6
-      Z103: COMM
-      AB103: 0.04
-      C115: Commercial office (strata) - Phase 3, 60%
-      D115: 3
-      I115: 135000
-      P115: 10
-      V115: 10
-      X115: 8
+      C92: retail / F&B high street (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
+      C93: offices, apartments (phase 4), apartment clubhouse, villas (phase 4)
       C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
       One-Page Summary!C15: Hospital (not in this plan)
       One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
@@ -1238,34 +1494,34 @@ cases:
     values:
       units: 1532.0
       saleable_lakh_sft: 29.907
-      revenue_cr: 2602.618615
-      cost_cr: 2100.481111
-      pbt_cr: 455.756413
-      pat_cr: 339.469399
-      pat_margin: 0.130434
-      project_irr: 0.199546
-      promoter_irr: 0.156628
-      peak_funding_cr: 511.365609
-      promoter_money_cr: 380.86094
-      peak_loan_cr: 159.480136
-      interest_cr: 46.381091
+      revenue_cr: 2622.478683
+      cost_cr: 2110.646359
+      pbt_cr: 466.545907
+      pat_cr: 347.543178
+      pat_margin: 0.132525
+      project_irr: 0.191826
+      promoter_irr: 0.150955
+      peak_funding_cr: 506.153569
+      promoter_money_cr: 390.00008
+      peak_loan_cr: 144.104504
+      interest_cr: 45.286416
       villa_units: 405.0
       villa_revenue_cr: 913.69269
       villa_margin: 0.227089
     text:
       units: 1,532
       saleable_lakh_sft: '29.9'
-      revenue_cr: 2,602.6
-      cost_cr: 2,100.5
-      pbt_cr: '455.8'
-      pat_cr: '339.5'
-      pat_margin: 13.0%
-      project_irr: 20.0%
-      promoter_irr: 15.7%
-      peak_funding_cr: '511.4'
-      promoter_money_cr: '380.9'
-      peak_loan_cr: '159.5'
-      interest_cr: '46.4'
+      revenue_cr: 2,622.5
+      cost_cr: 2,110.6
+      pbt_cr: '466.5'
+      pat_cr: '347.5'
+      pat_margin: 13.3%
+      project_irr: 19.2%
+      promoter_irr: 15.1%
+      peak_funding_cr: '506.2'
+      promoter_money_cr: '390.0'
+      peak_loan_cr: '144.1'
+      interest_cr: '45.3'
       villa_units: '405'
       villa_revenue_cr: '913.7'
       villa_margin: 22.7%
@@ -1308,8 +1564,7 @@ cases:
         acres: 1.886
         share: 0.0256
         phases:
-        - 1
-        - 3
+        - 4
         cell: D13
       - use: School (sale to operator)
         acres: 3.027
@@ -1321,7 +1576,8 @@ cases:
       - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
-        phases: []
+        phases:
+        - 2
         cell: D15
       - use: Clubhouses (amenity — cost only)
         acres: 3.273
@@ -1349,28 +1605,177 @@ cases:
         phases: []
         cell: D19
       land_total_ac: 73.54
+      by_product:
+      - product: Apartments
+        land_ac: 9.75
+        units: 935
+        saleable_sft: 1496800
+        construction_sft: 1721320
+        start: Jan-27
+        completion: Mar-33
+        revenue_cr: 1113.51
+        direct_cost_cr: 760.64
+        contribution_cr: 352.88
+        margin: 0.3169
+        row: 24
+      - product: Villas
+        land_ac: 31.94
+        units: 405
+        saleable_sft: 966900
+        construction_sft: 966900
+        start: Jan-27
+        completion: Jun-32
+        revenue_cr: 913.69
+        direct_cost_cr: 706.2
+        contribution_cr: 207.49
+        margin: 0.2271
+        row: 25
+      - product: Senior living
+        land_ac: 4.02
+        units: 192
+        saleable_sft: 192000
+        construction_sft: 230400
+        start: Apr-27
+        completion: Mar-30
+        revenue_cr: 200.78
+        direct_cost_cr: 134.37
+        contribution_cr: 66.41
+        margin: 0.3308
+        row: 26
+      - product: Retail & F&B high street (leased)
+        land_ac: 1.14
+        units: 0
+        saleable_sft: 0
+        construction_sft: 90000
+        start: Oct-28
+        completion: Mar-30
+        revenue_cr: 107.47
+        direct_cost_cr: 58.7
+        contribution_cr: 48.76
+        margin: 0.4538
+        row: 27
+      - product: Commercial office
+        land_ac: 1.89
+        units: 0
+        saleable_sft: 225000
+        construction_sft: 258750
+        start: Jul-29
+        completion: Dec-31
+        revenue_cr: 209.16
+        direct_cost_cr: 155.63
+        contribution_cr: 53.52
+        margin: 0.2559
+        row: 28
+      - product: School (sale to operator)
+        land_ac: 3.03
+        units: 0
+        saleable_sft: 110000
+        construction_sft: 110000
+        start: Oct-27
+        completion: Mar-31
+        revenue_cr: 77.87
+        direct_cost_cr: 69.82
+        contribution_cr: 8.05
+        margin: 0.1034
+        row: 29
+      - product: Hospital (sale to operator)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: Oct-27
+        completion: Mar-30
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: cost only
+        row: 30
+      - product: Clubhouses (amenity — cost only)
+        land_ac: 3.27
+        units: 0
+        saleable_sft: 0
+        construction_sft: 38000
+        start: Jul-27
+        completion: Sep-30
+        revenue_cr: 0
+        direct_cost_cr: 56.08
+        contribution_cr: -56.08
+        margin: cost only
+        row: 31
+      - product: Sales office & entry (cost only)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 12000
+        start: Oct-26
+        completion: Mar-27
+        revenue_cr: 0
+        direct_cost_cr: 5.11
+        contribution_cr: -5.11
+        margin: cost only
+        row: 32
+      - product: Township common land — roads & open space
+        land_ac: 18.51
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: ''
+        completion: ''
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: ''
+        row: 33
+      - product: Total
+        land_ac: 73.54
+        units: 1532
+        saleable_sft: 2990700
+        construction_sft: 3427370
+        start: Oct-26
+        completion: Mar-33
+        revenue_cr: 2622.48
+        direct_cost_cr: 1946.56
+        contribution_cr: 675.92
+        margin: 0.2577
+        row: 34
+      bridge:
+      - label: 'Less: professional fees, contingency & overheads (township)'
+        cr: -164.09
+        row: 35
+      - label: Profit before interest & tax
+        cr: 511.83
+        row: 36
+      - label: 'Less: interest & loan fees'
+        cr: -45.29
+        row: 37
+      - label: 'Less: tax (proxy)'
+        cr: -119.0
+        row: 38
+      - label: Profit after tax
+        cr: 347.54
+        row: 39
       funding:
       - label: Promoter equity committed
         value: 200.0
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 180.86
+        value: 190.0
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 159.48
+        value: 144.1
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 46.38
+        value: 45.29
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
-        text: FY32 Q1
+        text: FY32 Q2
         cell: K13
       - label: Land rate
         text: 5.0 Cr/acre + 7% stamp/reg
@@ -1562,15 +1967,15 @@ cases:
         row: 47
       - product: Commercial office
         area_sft:
-        - 90000
         - 0
-        - 135000
         - 0
+        - 0
+        - 225000
         revenue_cr:
-        - 71.32
         - 0
-        - 117.97
         - 0
+        - 0
+        - 209.16
         row: 48
       - product: School (sale to operator)
         area_sft:
@@ -1622,24 +2027,24 @@ cases:
         row: 52
       - product: Total
         area_sft:
-        - 384850
+        - 294850
         - 857450
-        - 950450
-        - 797950
+        - 815450
+        - 1022950
         revenue_cr:
-        - 286.79
+        - 215.47
         - 717.05
-        - 900.01
-        - 698.77
+        - 782.04
+        - 907.92
         row: 53
       phase_economics:
       - phase: 1
-        revenue_cr: 286.79
-        construction_cr: 162.52
-        land_infra_cr: 75.79
-        selling_cr: 11.26
-        contribution_cr: 37.21
-        margin: 0.1297
+        revenue_cr: 215.47
+        construction_cr: 116.91
+        land_infra_cr: 68.71
+        selling_cr: 8.41
+        contribution_cr: 21.43
+        margin: 0.0995
         row: 81
       - phase: 2
         revenue_cr: 717.05
@@ -1650,20 +2055,20 @@ cases:
         margin: 0.2695
         row: 82
       - phase: 3
-        revenue_cr: 900.01
-        construction_cr: 467.15
-        land_infra_cr: 150.18
-        selling_cr: 30.29
-        contribution_cr: 252.39
-        margin: 0.2804
+        revenue_cr: 782.04
+        construction_cr: 391.38
+        land_infra_cr: 140.01
+        selling_cr: 25.57
+        contribution_cr: 225.08
+        margin: 0.2878
         row: 83
       - phase: 4
-        revenue_cr: 698.77
-        construction_cr: 360.98
-        land_infra_cr: 127.68
-        selling_cr: 27.43
-        contribution_cr: 182.67
-        margin: 0.2614
+        revenue_cr: 907.92
+        construction_cr: 491.0
+        land_infra_cr: 144.93
+        selling_cr: 35.8
+        contribution_cr: 236.2
+        margin: 0.2601
         row: 84
       phase_economics_source: Summary B80:H85 (land & infra allocated)
   D3:
@@ -1723,7 +2128,6 @@ cases:
       G100: 0.499153
       G101: 0.729455
       G102: 1.959051
-      G103: 0.773934
       G104: 0.293561
       G105: 3.288478
       G109: 1.23355
@@ -1733,7 +2137,9 @@ cases:
       G113: 3.107597
       G114: 1.138662
       G116: 1.2464
-      G115: 1.111974
+      G115: 1.885908
+      G103: 0.0
+      H103: 0
       E154: 1.521181
       E155: 3.084864
       E156: 2.038125
@@ -1774,32 +2180,10 @@ cases:
       F45: Earthwork & retaining walls, this plan (Rs Cr)
       G45: 37.233818
       C45: =0.75+G45/C16
-      C90: 'Launch: retail / F&B high street (40%), offices (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase
-        1), sales office'
+      C90: 'Launch: retail / F&B high street (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase 1), sales office'
       C91: apartments (phase 2), senior enclave (160 units), school stage A, senior clubhouse, villas (phase 2)
-      C92: retail / F&B high street (60%), offices (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
-      C93: apartments (phase 4), apartment clubhouse, villas (phase 4)
-      C103: Commercial office (strata) - Phase 1, 40%
-      D103: 1
-      E103: Commercial
-      F103: Y
-      H103: 1
-      I103: 90000
-      K103: Office
-      L103: 1.15
-      P103: 3
-      Q103: 10
-      U103: 7500
-      V103: 3
-      X103: 6
-      Z103: COMM
-      AB103: 0.04
-      C115: Commercial office (strata) - Phase 3, 60%
-      D115: 3
-      I115: 135000
-      P115: 10
-      V115: 10
-      X115: 8
+      C92: retail / F&B high street (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
+      C93: offices, apartments (phase 4), apartment clubhouse, villas (phase 4)
       C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
       One-Page Summary!C15: Hospital (not in this plan)
       One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
@@ -1810,34 +2194,34 @@ cases:
     values:
       units: 1457.0
       saleable_lakh_sft: 28.054
-      revenue_cr: 2428.268933
-      cost_cr: 2012.150755
-      pbt_cr: 367.710526
-      pat_cr: 273.584661
-      pat_margin: 0.112667
-      project_irr: 0.168125
-      promoter_irr: 0.128203
-      peak_funding_cr: 510.892275
-      promoter_money_cr: 386.68389
-      peak_loan_cr: 152.49601
-      interest_cr: 48.407652
+      revenue_cr: 2448.129001
+      cost_cr: 2022.316003
+      pbt_cr: 377.836053
+      pat_cr: 281.161593
+      pat_margin: 0.114848
+      project_irr: 0.16165
+      promoter_irr: 0.123517
+      peak_funding_cr: 505.680235
+      promoter_money_cr: 395.82303
+      peak_loan_cr: 136.290881
+      interest_cr: 47.976945
       villa_units: 330.0
       villa_revenue_cr: 739.343009
       villa_margin: 0.16476
     text:
       units: 1,457
       saleable_lakh_sft: '28.1'
-      revenue_cr: 2,428.3
-      cost_cr: 2,012.2
-      pbt_cr: '367.7'
-      pat_cr: '273.6'
-      pat_margin: 11.3%
-      project_irr: 16.8%
-      promoter_irr: 12.8%
-      peak_funding_cr: '510.9'
-      promoter_money_cr: '386.7'
-      peak_loan_cr: '152.5'
-      interest_cr: '48.4'
+      revenue_cr: 2,448.1
+      cost_cr: 2,022.3
+      pbt_cr: '377.8'
+      pat_cr: '281.2'
+      pat_margin: 11.5%
+      project_irr: 16.2%
+      promoter_irr: 12.4%
+      peak_funding_cr: '505.7'
+      promoter_money_cr: '395.8'
+      peak_loan_cr: '136.3'
+      interest_cr: '48.0'
       villa_units: '330'
       villa_revenue_cr: '739.3'
       villa_margin: 16.5%
@@ -1880,8 +2264,7 @@ cases:
         acres: 1.886
         share: 0.0256
         phases:
-        - 1
-        - 3
+        - 4
         cell: D13
       - use: School (sale to operator)
         acres: 3.027
@@ -1893,7 +2276,8 @@ cases:
       - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
-        phases: []
+        phases:
+        - 2
         cell: D15
       - use: Clubhouses (amenity — cost only)
         acres: 3.273
@@ -1921,28 +2305,177 @@ cases:
         phases: []
         cell: D19
       land_total_ac: 73.54
+      by_product:
+      - product: Apartments
+        land_ac: 9.75
+        units: 935
+        saleable_sft: 1496800
+        construction_sft: 1721320
+        start: Jan-27
+        completion: Mar-33
+        revenue_cr: 1113.51
+        direct_cost_cr: 763.48
+        contribution_cr: 350.04
+        margin: 0.3144
+        row: 24
+      - product: Villas
+        land_ac: 29.89
+        units: 330
+        saleable_sft: 781600
+        construction_sft: 781600
+        start: Jan-27
+        completion: Jun-32
+        revenue_cr: 739.34
+        direct_cost_cr: 617.53
+        contribution_cr: 121.81
+        margin: 0.1648
+        row: 25
+      - product: Senior living
+        land_ac: 4.02
+        units: 192
+        saleable_sft: 192000
+        construction_sft: 230400
+        start: Apr-27
+        completion: Mar-30
+        revenue_cr: 200.78
+        direct_cost_cr: 135.54
+        contribution_cr: 65.24
+        margin: 0.3249
+        row: 26
+      - product: Retail & F&B high street (leased)
+        land_ac: 1.14
+        units: 0
+        saleable_sft: 0
+        construction_sft: 90000
+        start: Oct-28
+        completion: Mar-30
+        revenue_cr: 107.47
+        direct_cost_cr: 59.03
+        contribution_cr: 48.43
+        margin: 0.4507
+        row: 27
+      - product: Commercial office
+        land_ac: 1.89
+        units: 0
+        saleable_sft: 225000
+        construction_sft: 258750
+        start: Jul-29
+        completion: Dec-31
+        revenue_cr: 209.16
+        direct_cost_cr: 156.18
+        contribution_cr: 52.97
+        margin: 0.2533
+        row: 28
+      - product: School (sale to operator)
+        land_ac: 3.03
+        units: 0
+        saleable_sft: 110000
+        construction_sft: 110000
+        start: Oct-27
+        completion: Mar-31
+        revenue_cr: 77.87
+        direct_cost_cr: 70.7
+        contribution_cr: 7.17
+        margin: 0.0921
+        row: 29
+      - product: Hospital (sale to operator)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: Oct-27
+        completion: Mar-30
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: cost only
+        row: 30
+      - product: Clubhouses (amenity — cost only)
+        land_ac: 3.27
+        units: 0
+        saleable_sft: 0
+        construction_sft: 38000
+        start: Jul-27
+        completion: Sep-30
+        revenue_cr: 0
+        direct_cost_cr: 57.03
+        contribution_cr: -57.03
+        margin: cost only
+        row: 31
+      - product: Sales office & entry (cost only)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 12000
+        start: Oct-26
+        completion: Mar-27
+        revenue_cr: 0
+        direct_cost_cr: 5.11
+        contribution_cr: -5.11
+        margin: cost only
+        row: 32
+      - product: Township common land — roads & open space
+        land_ac: 20.56
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: ''
+        completion: ''
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: ''
+        row: 33
+      - product: Total
+        land_ac: 73.54
+        units: 1457
+        saleable_sft: 2805400
+        construction_sft: 3242070
+        start: Oct-26
+        completion: Mar-33
+        revenue_cr: 2448.13
+        direct_cost_cr: 1864.61
+        contribution_cr: 583.52
+        margin: 0.2384
+        row: 34
+      bridge:
+      - label: 'Less: professional fees, contingency & overheads (township)'
+        cr: -157.71
+        row: 35
+      - label: Profit before interest & tax
+        cr: 425.81
+        row: 36
+      - label: 'Less: interest & loan fees'
+        cr: -47.98
+        row: 37
+      - label: 'Less: tax (proxy)'
+        cr: -96.67
+        row: 38
+      - label: Profit after tax
+        cr: 281.16
+        row: 39
       funding:
       - label: Promoter equity committed
         value: 200.0
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 186.68
+        value: 195.82
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 152.5
+        value: 136.29
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 48.41
+        value: 47.98
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
-        text: FY32 Q2
+        text: FY32 Q3
         cell: K13
       - label: Land rate
         text: 5.0 Cr/acre + 7% stamp/reg
@@ -2134,15 +2667,15 @@ cases:
         row: 47
       - product: Commercial office
         area_sft:
-        - 90000
         - 0
-        - 135000
         - 0
+        - 0
+        - 225000
         revenue_cr:
-        - 71.32
         - 0
-        - 117.97
         - 0
+        - 0
+        - 209.16
         row: 48
       - product: School (sale to operator)
         area_sft:
@@ -2194,24 +2727,24 @@ cases:
         row: 52
       - product: Total
         area_sft:
-        - 342800
+        - 252800
         - 819750
-        - 903300
-        - 739550
+        - 768300
+        - 964550
         revenue_cr:
-        - 251.04
+        - 179.72
         - 682.88
-        - 854.66
-        - 639.69
+        - 736.69
+        - 848.85
         row: 53
       phase_economics:
       - phase: 1
-        revenue_cr: 251.04
-        construction_cr: 147.77
-        land_infra_cr: 75.31
-        selling_cr: 9.85
-        contribution_cr: 18.11
-        margin: 0.0721
+        revenue_cr: 179.72
+        construction_cr: 102.15
+        land_infra_cr: 68.0
+        selling_cr: 7.0
+        contribution_cr: 2.56
+        margin: 0.0143
         row: 81
       - phase: 2
         revenue_cr: 682.88
@@ -2222,20 +2755,20 @@ cases:
         margin: 0.2546
         row: 82
       - phase: 3
-        revenue_cr: 854.66
-        construction_cr: 448.56
-        land_infra_cr: 147.56
-        selling_cr: 28.5
-        contribution_cr: 230.05
-        margin: 0.2692
+        revenue_cr: 736.69
+        construction_cr: 372.79
+        land_infra_cr: 137.07
+        selling_cr: 23.78
+        contribution_cr: 203.06
+        margin: 0.2756
         row: 83
       - phase: 4
-        revenue_cr: 639.69
-        construction_cr: 336.57
-        land_infra_cr: 126.99
-        selling_cr: 25.09
-        contribution_cr: 151.03
-        margin: 0.2361
+        revenue_cr: 848.85
+        construction_cr: 466.59
+        land_infra_cr: 144.79
+        selling_cr: 33.46
+        contribution_cr: 204.0
+        margin: 0.2403
         row: 84
       phase_economics_source: Summary B80:H85 (land & infra allocated)
   D4:
@@ -2295,7 +2828,6 @@ cases:
       G100: 0.499153
       G101: 0.729455
       G102: 1.959051
-      G103: 0.773934
       G104: 0.293561
       G105: 3.288478
       G109: 1.23355
@@ -2305,7 +2837,9 @@ cases:
       G113: 3.107597
       G114: 1.138662
       G116: 1.2464
-      G115: 1.111974
+      G115: 1.885908
+      G103: 0.0
+      H103: 0
       E154: 1.521181
       E155: 3.084864
       E156: 2.038125
@@ -2346,32 +2880,10 @@ cases:
       F45: Earthwork & retaining walls, this plan (Rs Cr)
       G45: 37.948131
       C45: =0.75+G45/C16
-      C90: 'Launch: retail / F&B high street (40%), offices (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase
-        1), sales office'
+      C90: 'Launch: retail / F&B high street (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase 1), sales office'
       C91: apartments (phase 2), senior enclave (160 units), school stage A, senior clubhouse, villas (phase 2)
-      C92: retail / F&B high street (60%), offices (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
-      C93: apartments (phase 4), apartment clubhouse, villas (phase 4)
-      C103: Commercial office (strata) - Phase 1, 40%
-      D103: 1
-      E103: Commercial
-      F103: Y
-      H103: 1
-      I103: 90000
-      K103: Office
-      L103: 1.15
-      P103: 3
-      Q103: 10
-      U103: 7500
-      V103: 3
-      X103: 6
-      Z103: COMM
-      AB103: 0.04
-      C115: Commercial office (strata) - Phase 3, 60%
-      D115: 3
-      I115: 135000
-      P115: 10
-      V115: 10
-      X115: 8
+      C92: retail / F&B high street (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
+      C93: offices, apartments (phase 4), apartment clubhouse, villas (phase 4)
       C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
       One-Page Summary!C15: Hospital (not in this plan)
       One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
@@ -2382,34 +2894,34 @@ cases:
     values:
       units: 1483.0
       saleable_lakh_sft: 28.716
-      revenue_cr: 2490.648839
-      cost_cr: 2043.302365
-      pbt_cr: 399.447418
-      pat_cr: 297.333378
-      pat_margin: 0.11938
-      project_irr: 0.179634
-      promoter_irr: 0.138761
-      peak_funding_cr: 510.270391
-      promoter_money_cr: 383.001918
-      peak_loan_cr: 155.917819
-      interest_cr: 47.899056
+      revenue_cr: 2510.508907
+      cost_cr: 2053.467613
+      pbt_cr: 409.889709
+      pat_cr: 305.147344
+      pat_margin: 0.121548
+      project_irr: 0.17268
+      promoter_irr: 0.133655
+      peak_funding_cr: 505.058351
+      promoter_money_cr: 392.141058
+      peak_loan_cr: 140.542187
+      interest_cr: 47.151585
       villa_units: 356.0
       villa_revenue_cr: 801.722914
       villa_margin: 0.196035
     text:
       units: 1,483
       saleable_lakh_sft: '28.7'
-      revenue_cr: 2,490.6
-      cost_cr: 2,043.3
-      pbt_cr: '399.4'
-      pat_cr: '297.3'
-      pat_margin: 11.9%
-      project_irr: 18.0%
-      promoter_irr: 13.9%
-      peak_funding_cr: '510.3'
-      promoter_money_cr: '383.0'
-      peak_loan_cr: '155.9'
-      interest_cr: '47.9'
+      revenue_cr: 2,510.5
+      cost_cr: 2,053.5
+      pbt_cr: '409.9'
+      pat_cr: '305.1'
+      pat_margin: 12.2%
+      project_irr: 17.3%
+      promoter_irr: 13.4%
+      peak_funding_cr: '505.1'
+      promoter_money_cr: '392.1'
+      peak_loan_cr: '140.5'
+      interest_cr: '47.2'
       villa_units: '356'
       villa_revenue_cr: '801.7'
       villa_margin: 19.6%
@@ -2452,8 +2964,7 @@ cases:
         acres: 1.886
         share: 0.0256
         phases:
-        - 1
-        - 3
+        - 4
         cell: D13
       - use: School (sale to operator)
         acres: 3.027
@@ -2465,7 +2976,8 @@ cases:
       - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
-        phases: []
+        phases:
+        - 2
         cell: D15
       - use: Clubhouses (amenity — cost only)
         acres: 3.273
@@ -2493,28 +3005,177 @@ cases:
         phases: []
         cell: D19
       land_total_ac: 73.54
+      by_product:
+      - product: Apartments
+        land_ac: 9.75
+        units: 935
+        saleable_sft: 1496800
+        construction_sft: 1721320
+        start: Jan-27
+        completion: Mar-33
+        revenue_cr: 1113.51
+        direct_cost_cr: 764.27
+        contribution_cr: 349.24
+        margin: 0.3136
+        row: 24
+      - product: Villas
+        land_ac: 29.53
+        units: 356
+        saleable_sft: 847800
+        construction_sft: 847800
+        start: Jan-27
+        completion: Jun-32
+        revenue_cr: 801.72
+        direct_cost_cr: 644.56
+        contribution_cr: 157.17
+        margin: 0.196
+        row: 25
+      - product: Senior living
+        land_ac: 4.02
+        units: 192
+        saleable_sft: 192000
+        construction_sft: 230400
+        start: Apr-27
+        completion: Mar-30
+        revenue_cr: 200.78
+        direct_cost_cr: 135.86
+        contribution_cr: 64.91
+        margin: 0.3233
+        row: 26
+      - product: Retail & F&B high street (leased)
+        land_ac: 1.14
+        units: 0
+        saleable_sft: 0
+        construction_sft: 90000
+        start: Oct-28
+        completion: Mar-30
+        revenue_cr: 107.47
+        direct_cost_cr: 59.13
+        contribution_cr: 48.34
+        margin: 0.4498
+        row: 27
+      - product: Commercial office
+        land_ac: 1.89
+        units: 0
+        saleable_sft: 225000
+        construction_sft: 258750
+        start: Jul-29
+        completion: Dec-31
+        revenue_cr: 209.16
+        direct_cost_cr: 156.34
+        contribution_cr: 52.82
+        margin: 0.2525
+        row: 28
+      - product: School (sale to operator)
+        land_ac: 3.03
+        units: 0
+        saleable_sft: 110000
+        construction_sft: 110000
+        start: Oct-27
+        completion: Mar-31
+        revenue_cr: 77.87
+        direct_cost_cr: 70.95
+        contribution_cr: 6.92
+        margin: 0.0889
+        row: 29
+      - product: Hospital (sale to operator)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: Oct-27
+        completion: Mar-30
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: cost only
+        row: 30
+      - product: Clubhouses (amenity — cost only)
+        land_ac: 3.27
+        units: 0
+        saleable_sft: 0
+        construction_sft: 38000
+        start: Jul-27
+        completion: Sep-30
+        revenue_cr: 0
+        direct_cost_cr: 57.3
+        contribution_cr: -57.3
+        margin: cost only
+        row: 31
+      - product: Sales office & entry (cost only)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 12000
+        start: Oct-26
+        completion: Mar-27
+        revenue_cr: 0
+        direct_cost_cr: 5.11
+        contribution_cr: -5.11
+        margin: cost only
+        row: 32
+      - product: Township common land — roads & open space
+        land_ac: 20.92
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: ''
+        completion: ''
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: ''
+        row: 33
+      - product: Total
+        land_ac: 73.54
+        units: 1483
+        saleable_sft: 2871600
+        construction_sft: 3308270
+        start: Oct-26
+        completion: Mar-33
+        revenue_cr: 2510.51
+        direct_cost_cr: 1893.51
+        contribution_cr: 617.0
+        margin: 0.2458
+        row: 34
+      bridge:
+      - label: 'Less: professional fees, contingency & overheads (township)'
+        cr: -159.95
+        row: 35
+      - label: Profit before interest & tax
+        cr: 457.04
+        row: 36
+      - label: 'Less: interest & loan fees'
+        cr: -47.15
+        row: 37
+      - label: 'Less: tax (proxy)'
+        cr: -104.74
+        row: 38
+      - label: Profit after tax
+        cr: 305.15
+        row: 39
       funding:
       - label: Promoter equity committed
         value: 200.0
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 183.0
+        value: 192.14
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 155.92
+        value: 140.54
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 47.9
+        value: 47.15
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
-        text: FY32 Q2
+        text: FY32 Q3
         cell: K13
       - label: Land rate
         text: 5.0 Cr/acre + 7% stamp/reg
@@ -2706,15 +3367,15 @@ cases:
         row: 47
       - product: Commercial office
         area_sft:
-        - 90000
         - 0
-        - 135000
         - 0
+        - 0
+        - 225000
         revenue_cr:
-        - 71.32
         - 0
-        - 117.97
         - 0
+        - 0
+        - 209.16
         row: 48
       - product: School (sale to operator)
         area_sft:
@@ -2766,24 +3427,24 @@ cases:
         row: 52
       - product: Total
         area_sft:
-        - 367850
+        - 277850
         - 823600
-        - 911500
-        - 768650
+        - 776500
+        - 993650
         revenue_cr:
-        - 272.39
+        - 201.06
         - 686.22
-        - 862.7
-        - 669.34
+        - 744.73
+        - 878.5
         row: 53
       phase_economics:
       - phase: 1
-        revenue_cr: 272.39
-        construction_cr: 156.56
-        land_infra_cr: 76.75
-        selling_cr: 10.7
-        contribution_cr: 28.38
-        margin: 0.1042
+        revenue_cr: 201.06
+        construction_cr: 110.94
+        land_infra_cr: 69.39
+        selling_cr: 7.84
+        contribution_cr: 12.89
+        margin: 0.0641
         row: 81
       - phase: 2
         revenue_cr: 686.22
@@ -2794,20 +3455,20 @@ cases:
         margin: 0.259
         row: 82
       - phase: 3
-        revenue_cr: 862.7
-        construction_cr: 451.79
-        land_infra_cr: 148.24
-        selling_cr: 28.82
-        contribution_cr: 233.86
-        margin: 0.2711
+        revenue_cr: 744.73
+        construction_cr: 376.02
+        land_infra_cr: 137.65
+        selling_cr: 24.1
+        contribution_cr: 206.96
+        margin: 0.2779
         row: 83
       - phase: 4
-        revenue_cr: 669.34
-        construction_cr: 348.74
-        land_infra_cr: 127.76
-        selling_cr: 26.27
-        contribution_cr: 166.57
-        margin: 0.2489
+        revenue_cr: 878.5
+        construction_cr: 478.76
+        land_infra_cr: 145.72
+        selling_cr: 34.63
+        contribution_cr: 219.39
+        margin: 0.2497
         row: 84
       phase_economics_source: Summary B80:H85 (land & infra allocated)
   D5:
@@ -2867,7 +3528,6 @@ cases:
       G100: 0.499153
       G101: 0.729455
       G102: 1.959051
-      G103: 0.773934
       G104: 0.293561
       G105: 3.288478
       G109: 1.23355
@@ -2877,7 +3537,9 @@ cases:
       G113: 3.107597
       G114: 1.138662
       G116: 1.2464
-      G115: 1.111974
+      G115: 1.885908
+      G103: 0.0
+      H103: 0
       E154: 1.521181
       E155: 3.084864
       E156: 2.038125
@@ -2918,32 +3580,10 @@ cases:
       F45: Earthwork & retaining walls, this plan (Rs Cr)
       G45: 36.794433
       C45: =0.75+G45/C16
-      C90: 'Launch: retail / F&B high street (40%), offices (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase
-        1), sales office'
+      C90: 'Launch: retail / F&B high street (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase 1), sales office'
       C91: apartments (phase 2), senior enclave (160 units), school stage A, senior clubhouse, villas (phase 2)
-      C92: retail / F&B high street (60%), offices (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
-      C93: apartments (phase 4), apartment clubhouse, villas (phase 4)
-      C103: Commercial office (strata) - Phase 1, 40%
-      D103: 1
-      E103: Commercial
-      F103: Y
-      H103: 1
-      I103: 90000
-      K103: Office
-      L103: 1.15
-      P103: 3
-      Q103: 10
-      U103: 7500
-      V103: 3
-      X103: 6
-      Z103: COMM
-      AB103: 0.04
-      C115: Commercial office (strata) - Phase 3, 60%
-      D115: 3
-      I115: 135000
-      P115: 10
-      V115: 10
-      X115: 8
+      C92: retail / F&B high street (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
+      C93: offices, apartments (phase 4), apartment clubhouse, villas (phase 4)
       C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
       One-Page Summary!C15: Hospital (not in this plan)
       One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
@@ -2954,34 +3594,34 @@ cases:
     values:
       units: 1428.0
       saleable_lakh_sft: 27.376
-      revenue_cr: 2362.163961
-      cost_cr: 1978.953247
-      pbt_cr: 334.844008
-      pat_cr: 248.990646
-      pat_margin: 0.105408
-      project_irr: 0.157336
-      promoter_irr: 0.118139
-      peak_funding_cr: 511.013042
-      promoter_money_cr: 388.105042
-      peak_loan_cr: 151.042288
-      interest_cr: 48.366706
+      revenue_cr: 2382.024029
+      cost_cr: 1989.118495
+      pbt_cr: 344.955235
+      pat_cr: 256.556877
+      pat_margin: 0.107705
+      project_irr: 0.151284
+      promoter_irr: 0.113892
+      peak_funding_cr: 505.801002
+      promoter_money_cr: 397.244182
+      peak_loan_cr: 134.325683
+      interest_cr: 47.950299
       villa_units: 301.0
       villa_revenue_cr: 673.238036
       villa_margin: 0.145407
     text:
       units: 1,428
       saleable_lakh_sft: '27.4'
-      revenue_cr: 2,362.2
-      cost_cr: 1,979.0
-      pbt_cr: '334.8'
-      pat_cr: '249.0'
-      pat_margin: 10.5%
-      project_irr: 15.7%
-      promoter_irr: 11.8%
-      peak_funding_cr: '511.0'
-      promoter_money_cr: '388.1'
-      peak_loan_cr: '151.0'
-      interest_cr: '48.4'
+      revenue_cr: 2,382.0
+      cost_cr: 1,989.1
+      pbt_cr: '345.0'
+      pat_cr: '256.6'
+      pat_margin: 10.8%
+      project_irr: 15.1%
+      promoter_irr: 11.4%
+      peak_funding_cr: '505.8'
+      promoter_money_cr: '397.2'
+      peak_loan_cr: '134.3'
+      interest_cr: '48.0'
       villa_units: '301'
       villa_revenue_cr: '673.2'
       villa_margin: 14.5%
@@ -3024,8 +3664,7 @@ cases:
         acres: 1.886
         share: 0.0256
         phases:
-        - 1
-        - 3
+        - 4
         cell: D13
       - use: School (sale to operator)
         acres: 3.027
@@ -3037,7 +3676,8 @@ cases:
       - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
-        phases: []
+        phases:
+        - 2
         cell: D15
       - use: Clubhouses (amenity — cost only)
         acres: 3.273
@@ -3065,28 +3705,177 @@ cases:
         phases: []
         cell: D19
       land_total_ac: 73.54
+      by_product:
+      - product: Apartments
+        land_ac: 9.75
+        units: 935
+        saleable_sft: 1496800
+        construction_sft: 1721320
+        start: Jan-27
+        completion: Mar-33
+        revenue_cr: 1113.51
+        direct_cost_cr: 768.28
+        contribution_cr: 345.23
+        margin: 0.31
+        row: 24
+      - product: Villas
+        land_ac: 27.21
+        units: 301
+        saleable_sft: 713800
+        construction_sft: 713800
+        start: Jan-27
+        completion: Jun-32
+        revenue_cr: 673.24
+        direct_cost_cr: 575.34
+        contribution_cr: 97.89
+        margin: 0.1454
+        row: 25
+      - product: Senior living
+        land_ac: 4.02
+        units: 192
+        saleable_sft: 192000
+        construction_sft: 230400
+        start: Apr-27
+        completion: Mar-30
+        revenue_cr: 200.78
+        direct_cost_cr: 137.52
+        contribution_cr: 63.26
+        margin: 0.3151
+        row: 26
+      - product: Retail & F&B high street (leased)
+        land_ac: 1.14
+        units: 0
+        saleable_sft: 0
+        construction_sft: 90000
+        start: Oct-28
+        completion: Mar-30
+        revenue_cr: 107.47
+        direct_cost_cr: 59.59
+        contribution_cr: 47.87
+        margin: 0.4455
+        row: 27
+      - product: Commercial office
+        land_ac: 1.89
+        units: 0
+        saleable_sft: 225000
+        construction_sft: 258750
+        start: Jul-29
+        completion: Dec-31
+        revenue_cr: 209.16
+        direct_cost_cr: 157.11
+        contribution_cr: 52.04
+        margin: 0.2488
+        row: 28
+      - product: School (sale to operator)
+        land_ac: 3.03
+        units: 0
+        saleable_sft: 110000
+        construction_sft: 110000
+        start: Oct-27
+        completion: Mar-31
+        revenue_cr: 77.87
+        direct_cost_cr: 72.2
+        contribution_cr: 5.68
+        margin: 0.0729
+        row: 29
+      - product: Hospital (sale to operator)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: Oct-27
+        completion: Mar-30
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: cost only
+        row: 30
+      - product: Clubhouses (amenity — cost only)
+        land_ac: 3.27
+        units: 0
+        saleable_sft: 0
+        construction_sft: 38000
+        start: Jul-27
+        completion: Sep-30
+        revenue_cr: 0
+        direct_cost_cr: 58.65
+        contribution_cr: -58.65
+        margin: cost only
+        row: 31
+      - product: Sales office & entry (cost only)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 12000
+        start: Oct-26
+        completion: Mar-27
+        revenue_cr: 0
+        direct_cost_cr: 5.11
+        contribution_cr: -5.11
+        margin: cost only
+        row: 32
+      - product: Township common land — roads & open space
+        land_ac: 23.24
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: ''
+        completion: ''
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: ''
+        row: 33
+      - product: Total
+        land_ac: 73.54
+        units: 1428
+        saleable_sft: 2737600
+        construction_sft: 3174270
+        start: Oct-26
+        completion: Mar-33
+        revenue_cr: 2382.02
+        direct_cost_cr: 1833.8
+        contribution_cr: 548.22
+        margin: 0.2301
+        row: 34
+      bridge:
+      - label: 'Less: professional fees, contingency & overheads (township)'
+        cr: -155.31
+        row: 35
+      - label: Profit before interest & tax
+        cr: 392.91
+        row: 36
+      - label: 'Less: interest & loan fees'
+        cr: -47.95
+        row: 37
+      - label: 'Less: tax (proxy)'
+        cr: -88.4
+        row: 38
+      - label: Profit after tax
+        cr: 256.56
+        row: 39
       funding:
       - label: Promoter equity committed
         value: 200.0
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 188.11
+        value: 197.24
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 151.04
+        value: 134.33
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 48.37
+        value: 47.95
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
-        text: FY32 Q2
+        text: FY32 Q3
         cell: K13
       - label: Land rate
         text: 5.0 Cr/acre + 7% stamp/reg
@@ -3278,15 +4067,15 @@ cases:
         row: 47
       - product: Commercial office
         area_sft:
-        - 90000
         - 0
-        - 135000
         - 0
+        - 0
+        - 225000
         revenue_cr:
-        - 71.32
         - 0
-        - 117.97
         - 0
+        - 0
+        - 209.16
         row: 48
       - product: School (sale to operator)
         area_sft:
@@ -3338,24 +4127,24 @@ cases:
         row: 52
       - product: Total
         area_sft:
-        - 332400
+        - 242400
         - 820250
-        - 904400
-        - 680550
+        - 769400
+        - 905550
         revenue_cr:
-        - 242.51
+        - 171.19
         - 683.06
-        - 855.93
-        - 580.67
+        - 737.95
+        - 789.83
         row: 53
       phase_economics:
       - phase: 1
-        revenue_cr: 242.51
-        construction_cr: 144.12
-        land_infra_cr: 70.13
-        selling_cr: 9.52
-        contribution_cr: 18.75
-        margin: 0.0773
+        revenue_cr: 171.19
+        construction_cr: 98.5
+        land_infra_cr: 62.44
+        selling_cr: 6.67
+        contribution_cr: 3.58
+        margin: 0.0209
         row: 81
       - phase: 2
         revenue_cr: 683.06
@@ -3366,20 +4155,20 @@ cases:
         margin: 0.2443
         row: 82
       - phase: 3
-        revenue_cr: 855.93
-        construction_cr: 448.99
-        land_infra_cr: 150.74
-        selling_cr: 28.55
-        contribution_cr: 227.65
-        margin: 0.266
+        revenue_cr: 737.95
+        construction_cr: 373.22
+        land_infra_cr: 139.7
+        selling_cr: 23.83
+        contribution_cr: 201.21
+        margin: 0.2727
         row: 83
       - phase: 4
-        revenue_cr: 580.67
-        construction_cr: 311.92
-        land_infra_cr: 121.49
-        selling_cr: 22.76
-        contribution_cr: 124.5
-        margin: 0.2144
+        revenue_cr: 789.83
+        construction_cr: 441.94
+        land_infra_cr: 140.22
+        selling_cr: 31.13
+        contribution_cr: 176.54
+        margin: 0.2235
         row: 84
       phase_economics_source: Summary B80:H85 (land & infra allocated)
   D6:
@@ -3439,7 +4228,6 @@ cases:
       G100: 0.499153
       G101: 0.729455
       G102: 1.959051
-      G103: 0.773934
       G104: 0.293561
       G105: 3.288478
       G109: 1.23355
@@ -3449,7 +4237,9 @@ cases:
       G113: 3.107597
       G114: 1.138662
       G116: 1.2464
-      G115: 1.111974
+      G115: 1.885908
+      G103: 0.0
+      H103: 0
       E154: 1.521181
       E155: 3.084864
       E156: 2.038125
@@ -3490,32 +4280,10 @@ cases:
       F45: Earthwork & retaining walls, this plan (Rs Cr)
       G45: 37.125754
       C45: =0.75+G45/C16
-      C90: 'Launch: retail / F&B high street (40%), offices (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase
-        1), sales office'
+      C90: 'Launch: retail / F&B high street (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase 1), sales office'
       C91: apartments (phase 2), senior enclave (160 units), school stage A, senior clubhouse, villas (phase 2)
-      C92: retail / F&B high street (60%), offices (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
-      C93: apartments (phase 4), apartment clubhouse, villas (phase 4)
-      C103: Commercial office (strata) - Phase 1, 40%
-      D103: 1
-      E103: Commercial
-      F103: Y
-      H103: 1
-      I103: 90000
-      K103: Office
-      L103: 1.15
-      P103: 3
-      Q103: 10
-      U103: 7500
-      V103: 3
-      X103: 6
-      Z103: COMM
-      AB103: 0.04
-      C115: Commercial office (strata) - Phase 3, 60%
-      D115: 3
-      I115: 135000
-      P115: 10
-      V115: 10
-      X115: 8
+      C92: retail / F&B high street (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
+      C93: offices, apartments (phase 4), apartment clubhouse, villas (phase 4)
       C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
       One-Page Summary!C15: Hospital (not in this plan)
       One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
@@ -3526,34 +4294,34 @@ cases:
     values:
       units: 1457.0
       saleable_lakh_sft: 28.1085
-      revenue_cr: 2431.231
-      cost_cr: 2012.790489
-      pbt_cr: 371.106372
-      pat_cr: 276.125773
-      pat_margin: 0.113574
-      project_irr: 0.170743
-      promoter_irr: 0.130339
-      peak_funding_cr: 510.477947
-      promoter_money_cr: 384.74801
-      peak_loan_cr: 154.187778
-      interest_cr: 47.334139
+      revenue_cr: 2451.091068
+      cost_cr: 2022.955737
+      pbt_cr: 381.651762
+      pat_cr: 284.016888
+      pat_margin: 0.115874
+      project_irr: 0.164098
+      promoter_irr: 0.125647
+      peak_funding_cr: 505.265907
+      promoter_money_cr: 393.887151
+      peak_loan_cr: 138.812146
+      interest_cr: 46.483569
       villa_units: 330.0
       villa_revenue_cr: 742.305075
       villa_margin: 0.176907
     text:
       units: 1,457
       saleable_lakh_sft: '28.1'
-      revenue_cr: 2,431.2
-      cost_cr: 2,012.8
-      pbt_cr: '371.1'
-      pat_cr: '276.1'
-      pat_margin: 11.4%
-      project_irr: 17.1%
-      promoter_irr: 13.0%
-      peak_funding_cr: '510.5'
-      promoter_money_cr: '384.7'
-      peak_loan_cr: '154.2'
-      interest_cr: '47.3'
+      revenue_cr: 2,451.1
+      cost_cr: 2,023.0
+      pbt_cr: '381.7'
+      pat_cr: '284.0'
+      pat_margin: 11.6%
+      project_irr: 16.4%
+      promoter_irr: 12.6%
+      peak_funding_cr: '505.3'
+      promoter_money_cr: '393.9'
+      peak_loan_cr: '138.8'
+      interest_cr: '46.5'
       villa_units: '330'
       villa_revenue_cr: '742.3'
       villa_margin: 17.7%
@@ -3596,8 +4364,7 @@ cases:
         acres: 1.886
         share: 0.0256
         phases:
-        - 1
-        - 3
+        - 4
         cell: D13
       - use: School (sale to operator)
         acres: 3.027
@@ -3609,7 +4376,8 @@ cases:
       - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
-        phases: []
+        phases:
+        - 2
         cell: D15
       - use: Clubhouses (amenity — cost only)
         acres: 3.273
@@ -3637,28 +4405,177 @@ cases:
         phases: []
         cell: D19
       land_total_ac: 73.54
+      by_product:
+      - product: Apartments
+        land_ac: 9.75
+        units: 935
+        saleable_sft: 1496800
+        construction_sft: 1721320
+        start: Jan-27
+        completion: Mar-33
+        revenue_cr: 1113.51
+        direct_cost_cr: 766.49
+        contribution_cr: 347.02
+        margin: 0.3116
+        row: 24
+      - product: Villas
+        land_ac: 28.2
+        units: 330
+        saleable_sft: 787050
+        construction_sft: 787050
+        start: Jan-27
+        completion: Jun-32
+        revenue_cr: 742.31
+        direct_cost_cr: 610.99
+        contribution_cr: 131.32
+        margin: 0.1769
+        row: 25
+      - product: Senior living
+        land_ac: 4.02
+        units: 192
+        saleable_sft: 192000
+        construction_sft: 230400
+        start: Apr-27
+        completion: Mar-30
+        revenue_cr: 200.78
+        direct_cost_cr: 136.78
+        contribution_cr: 64.0
+        margin: 0.3187
+        row: 26
+      - product: Retail & F&B high street (leased)
+        land_ac: 1.14
+        units: 0
+        saleable_sft: 0
+        construction_sft: 90000
+        start: Oct-28
+        completion: Mar-30
+        revenue_cr: 107.47
+        direct_cost_cr: 59.38
+        contribution_cr: 48.08
+        margin: 0.4474
+        row: 27
+      - product: Commercial office
+        land_ac: 1.89
+        units: 0
+        saleable_sft: 225000
+        construction_sft: 258750
+        start: Jul-29
+        completion: Dec-31
+        revenue_cr: 209.16
+        direct_cost_cr: 156.77
+        contribution_cr: 52.39
+        margin: 0.2505
+        row: 28
+      - product: School (sale to operator)
+        land_ac: 3.03
+        units: 0
+        saleable_sft: 110000
+        construction_sft: 110000
+        start: Oct-27
+        completion: Mar-31
+        revenue_cr: 77.87
+        direct_cost_cr: 71.64
+        contribution_cr: 6.23
+        margin: 0.08
+        row: 29
+      - product: Hospital (sale to operator)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: Oct-27
+        completion: Mar-30
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: cost only
+        row: 30
+      - product: Clubhouses (amenity — cost only)
+        land_ac: 3.27
+        units: 0
+        saleable_sft: 0
+        construction_sft: 38000
+        start: Jul-27
+        completion: Sep-30
+        revenue_cr: 0
+        direct_cost_cr: 58.05
+        contribution_cr: -58.05
+        margin: cost only
+        row: 31
+      - product: Sales office & entry (cost only)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 12000
+        start: Oct-26
+        completion: Mar-27
+        revenue_cr: 0
+        direct_cost_cr: 5.11
+        contribution_cr: -5.11
+        margin: cost only
+        row: 32
+      - product: Township common land — roads & open space
+        land_ac: 22.25
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: ''
+        completion: ''
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: ''
+        row: 33
+      - product: Total
+        land_ac: 73.54
+        units: 1457
+        saleable_sft: 2810850
+        construction_sft: 3247520
+        start: Oct-26
+        completion: Mar-33
+        revenue_cr: 2451.09
+        direct_cost_cr: 1865.21
+        contribution_cr: 585.88
+        margin: 0.239
+        row: 34
+      bridge:
+      - label: 'Less: professional fees, contingency & overheads (township)'
+        cr: -157.75
+        row: 35
+      - label: Profit before interest & tax
+        cr: 428.14
+        row: 36
+      - label: 'Less: interest & loan fees'
+        cr: -46.48
+        row: 37
+      - label: 'Less: tax (proxy)'
+        cr: -97.63
+        row: 38
+      - label: Profit after tax
+        cr: 284.02
+        row: 39
       funding:
       - label: Promoter equity committed
         value: 200.0
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 184.75
+        value: 193.89
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 154.19
+        value: 138.81
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 47.33
+        value: 46.48
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
-        text: FY32 Q2
+        text: FY32 Q3
         cell: K13
       - label: Land rate
         text: 5.0 Cr/acre + 7% stamp/reg
@@ -3850,15 +4767,15 @@ cases:
         row: 47
       - product: Commercial office
         area_sft:
-        - 90000
         - 0
-        - 135000
         - 0
+        - 0
+        - 225000
         revenue_cr:
-        - 71.32
         - 0
-        - 117.97
         - 0
+        - 0
+        - 209.16
         row: 48
       - product: School (sale to operator)
         area_sft:
@@ -3910,24 +4827,24 @@ cases:
         row: 52
       - product: Total
         area_sft:
-        - 355050
+        - 265050
         - 832700
-        - 914100
-        - 709000
+        - 779100
+        - 934000
         revenue_cr:
-        - 261.82
+        - 190.49
         - 694.44
-        - 865.33
-        - 609.65
+        - 747.35
+        - 818.81
         row: 53
       phase_economics:
       - phase: 1
-        revenue_cr: 261.82
-        construction_cr: 152.07
-        land_infra_cr: 72.0
-        selling_cr: 10.28
-        contribution_cr: 27.47
-        margin: 0.1049
+        revenue_cr: 190.49
+        construction_cr: 106.45
+        land_infra_cr: 64.46
+        selling_cr: 7.43
+        contribution_cr: 12.16
+        margin: 0.0638
         row: 81
       - phase: 2
         revenue_cr: 694.44
@@ -3938,20 +4855,20 @@ cases:
         margin: 0.2532
         row: 82
       - phase: 3
-        revenue_cr: 865.33
-        construction_cr: 452.81
-        land_infra_cr: 151.23
-        selling_cr: 28.92
-        contribution_cr: 232.36
-        margin: 0.2685
+        revenue_cr: 747.35
+        construction_cr: 377.04
+        land_infra_cr: 140.39
+        selling_cr: 24.2
+        contribution_cr: 205.72
+        margin: 0.2753
         row: 83
       - phase: 4
-        revenue_cr: 609.65
-        construction_cr: 323.81
-        land_infra_cr: 122.12
-        selling_cr: 23.91
-        contribution_cr: 139.82
-        margin: 0.2293
+        revenue_cr: 818.81
+        construction_cr: 453.83
+        land_infra_cr: 140.5
+        selling_cr: 32.28
+        contribution_cr: 192.21
+        margin: 0.2347
         row: 84
       phase_economics_source: Summary B80:H85 (land & infra allocated)
   D7:
@@ -4025,7 +4942,6 @@ cases:
       G100: 0.494211
       G101: 0.729455
       G102: 1.959051
-      G103: 0.773934
       G104: 0.293561
       G105: 3.288478
       G109: 1.186106
@@ -4035,7 +4951,9 @@ cases:
       G113: 3.107597
       G114: 1.138662
       G116: 1.2464
-      G115: 1.111974
+      G115: 1.885908
+      G103: 0.0
+      H103: 0
       E154: 1.521181
       E155: 3.084864
       E156: 2.038125
@@ -4076,32 +4994,10 @@ cases:
       F45: Earthwork & retaining walls, this plan (Rs Cr)
       G45: 28.772122
       C45: =0.75+G45/C16
-      C90: 'Launch: retail / F&B high street (40%), offices (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase
-        1), sales office'
+      C90: 'Launch: retail / F&B high street (40%), apartments (phase 1), 32 senior-living units, villa clubhouse 1, villas (phase 1), sales office'
       C91: apartments (phase 2), senior enclave (160 units), school stage A, senior clubhouse, villas (phase 2)
-      C92: retail / F&B high street (60%), offices (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
-      C93: apartments (phase 4), apartment clubhouse, villas (phase 4)
-      C103: Commercial office (strata) - Phase 1, 40%
-      D103: 1
-      E103: Commercial
-      F103: Y
-      H103: 1
-      I103: 90000
-      K103: Office
-      L103: 1.15
-      P103: 3
-      Q103: 10
-      U103: 7500
-      V103: 3
-      X103: 6
-      Z103: COMM
-      AB103: 0.04
-      C115: Commercial office (strata) - Phase 3, 60%
-      D115: 3
-      I115: 135000
-      P115: 10
-      V115: 10
-      X115: 8
+      C92: retail / F&B high street (60%), apartments (phase 3), school stage B, villa clubhouse 2 (mini-golf), villas (phase 3)
+      C93: offices, apartments (phase 4), apartment clubhouse, villas (phase 4)
       C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
       One-Page Summary!C15: Hospital (not in this plan)
       One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
@@ -4112,34 +5008,34 @@ cases:
     values:
       units: 1451.0
       saleable_lakh_sft: 27.958
-      revenue_cr: 2413.224217
-      cost_cr: 1993.66841
-      pbt_cr: 374.184646
-      pat_cr: 278.429246
-      pat_margin: 0.115376
-      project_irr: 0.173706
-      promoter_irr: 0.132797
-      peak_funding_cr: 504.920161
-      promoter_money_cr: 378.787386
-      peak_loan_cr: 154.716756
-      interest_cr: 45.371161
+      revenue_cr: 2433.084285
+      cost_cr: 2003.833658
+      pbt_cr: 384.754777
+      pat_cr: 286.338875
+      pat_margin: 0.117686
+      project_irr: 0.166837
+      promoter_irr: 0.127938
+      peak_funding_cr: 499.708121
+      promoter_money_cr: 387.926527
+      peak_loan_cr: 139.341125
+      interest_cr: 44.49585
       villa_units: 324.0
       villa_revenue_cr: 724.298292
       villa_margin: 0.190125
     text:
       units: 1,451
       saleable_lakh_sft: '28.0'
-      revenue_cr: 2,413.2
-      cost_cr: 1,993.7
-      pbt_cr: '374.2'
-      pat_cr: '278.4'
-      pat_margin: 11.5%
-      project_irr: 17.4%
-      promoter_irr: 13.3%
-      peak_funding_cr: '504.9'
-      promoter_money_cr: '378.8'
-      peak_loan_cr: '154.7'
-      interest_cr: '45.4'
+      revenue_cr: 2,433.1
+      cost_cr: 2,003.8
+      pbt_cr: '384.8'
+      pat_cr: '286.3'
+      pat_margin: 11.8%
+      project_irr: 16.7%
+      promoter_irr: 12.8%
+      peak_funding_cr: '499.7'
+      promoter_money_cr: '387.9'
+      peak_loan_cr: '139.3'
+      interest_cr: '44.5'
       villa_units: '324'
       villa_revenue_cr: '724.3'
       villa_margin: 19.0%
@@ -4182,8 +5078,7 @@ cases:
         acres: 1.886
         share: 0.0256
         phases:
-        - 1
-        - 3
+        - 4
         cell: D13
       - use: School (sale to operator)
         acres: 3.027
@@ -4195,7 +5090,8 @@ cases:
       - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
-        phases: []
+        phases:
+        - 2
         cell: D15
       - use: Clubhouses (amenity — cost only)
         acres: 3.22
@@ -4223,28 +5119,177 @@ cases:
         phases: []
         cell: D19
       land_total_ac: 73.54
+      by_product:
+      - product: Apartments
+        land_ac: 9.75
+        units: 935
+        saleable_sft: 1496800
+        construction_sft: 1721320
+        start: Jan-27
+        completion: Mar-33
+        revenue_cr: 1113.51
+        direct_cost_cr: 769.57
+        contribution_cr: 343.94
+        margin: 0.3089
+        row: 24
+      - product: Villas
+        land_ac: 25.69
+        units: 324
+        saleable_sft: 772000
+        construction_sft: 772000
+        start: Jan-27
+        completion: Jun-32
+        revenue_cr: 724.3
+        direct_cost_cr: 586.59
+        contribution_cr: 137.71
+        margin: 0.1901
+        row: 25
+      - product: Senior living
+        land_ac: 4.02
+        units: 192
+        saleable_sft: 192000
+        construction_sft: 230400
+        start: Apr-27
+        completion: Mar-30
+        revenue_cr: 200.78
+        direct_cost_cr: 138.05
+        contribution_cr: 62.73
+        margin: 0.3124
+        row: 26
+      - product: Retail & F&B high street (leased)
+        land_ac: 1.14
+        units: 0
+        saleable_sft: 0
+        construction_sft: 90000
+        start: Oct-28
+        completion: Mar-30
+        revenue_cr: 107.47
+        direct_cost_cr: 59.74
+        contribution_cr: 47.72
+        margin: 0.4441
+        row: 27
+      - product: Commercial office
+        land_ac: 1.89
+        units: 0
+        saleable_sft: 225000
+        construction_sft: 258750
+        start: Jul-29
+        completion: Dec-31
+        revenue_cr: 209.16
+        direct_cost_cr: 157.36
+        contribution_cr: 51.8
+        margin: 0.2476
+        row: 28
+      - product: School (sale to operator)
+        land_ac: 3.03
+        units: 0
+        saleable_sft: 110000
+        construction_sft: 110000
+        start: Oct-27
+        completion: Mar-31
+        revenue_cr: 77.87
+        direct_cost_cr: 72.59
+        contribution_cr: 5.28
+        margin: 0.0678
+        row: 29
+      - product: Hospital (sale to operator)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: Oct-27
+        completion: Mar-30
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: cost only
+        row: 30
+      - product: Clubhouses (amenity — cost only)
+        land_ac: 3.22
+        units: 0
+        saleable_sft: 0
+        construction_sft: 38000
+        start: Jul-27
+        completion: Sep-30
+        revenue_cr: 0
+        direct_cost_cr: 58.55
+        contribution_cr: -58.55
+        margin: cost only
+        row: 31
+      - product: Sales office & entry (cost only)
+        land_ac: 0
+        units: 0
+        saleable_sft: 0
+        construction_sft: 12000
+        start: Oct-26
+        completion: Mar-27
+        revenue_cr: 0
+        direct_cost_cr: 5.11
+        contribution_cr: -5.11
+        margin: cost only
+        row: 32
+      - product: Township common land — roads & open space
+        land_ac: 24.82
+        units: 0
+        saleable_sft: 0
+        construction_sft: 0
+        start: ''
+        completion: ''
+        revenue_cr: 0
+        direct_cost_cr: 0
+        contribution_cr: 0
+        margin: ''
+        row: 33
+      - product: Total
+        land_ac: 73.54
+        units: 1451
+        saleable_sft: 2795800
+        construction_sft: 3232470
+        start: Oct-26
+        completion: Mar-33
+        revenue_cr: 2433.08
+        direct_cost_cr: 1847.57
+        contribution_cr: 585.51
+        margin: 0.2406
+        row: 34
+      bridge:
+      - label: 'Less: professional fees, contingency & overheads (township)'
+        cr: -156.26
+        row: 35
+      - label: Profit before interest & tax
+        cr: 429.25
+        row: 36
+      - label: 'Less: interest & loan fees'
+        cr: -44.5
+        row: 37
+      - label: 'Less: tax (proxy)'
+        cr: -98.42
+        row: 38
+      - label: Profit after tax
+        cr: 286.34
+        row: 39
       funding:
       - label: Promoter equity committed
         value: 200.0
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 178.79
+        value: 187.93
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 154.72
+        value: 139.34
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 45.37
+        value: 44.5
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
-        text: FY32 Q2
+        text: FY32 Q3
         cell: K13
       - label: Land rate
         text: 5.0 Cr/acre + 7% stamp/reg
@@ -4436,15 +5481,15 @@ cases:
         row: 47
       - product: Commercial office
         area_sft:
-        - 90000
         - 0
-        - 135000
         - 0
+        - 0
+        - 225000
         revenue_cr:
-        - 71.32
         - 0
-        - 117.97
         - 0
+        - 0
+        - 209.16
         row: 48
       - product: School (sale to operator)
         area_sft:
@@ -4496,24 +5541,24 @@ cases:
         row: 52
       - product: Total
         area_sft:
-        - 386100
+        - 296100
         - 825100
-        - 883000
-        - 701600
+        - 748000
+        - 926600
         revenue_cr:
-        - 288.07
+        - 216.75
         - 687.8
-        - 835.52
-        - 601.84
+        - 717.54
+        - 810.99
         row: 53
       phase_economics:
       - phase: 1
-        revenue_cr: 288.07
-        construction_cr: 162.96
-        land_infra_cr: 68.29
-        selling_cr: 11.32
-        contribution_cr: 45.51
-        margin: 0.158
+        revenue_cr: 216.75
+        construction_cr: 117.35
+        land_infra_cr: 60.5
+        selling_cr: 8.46
+        contribution_cr: 30.44
+        margin: 0.1404
         row: 81
       - phase: 2
         revenue_cr: 687.8
@@ -4524,19 +5569,19 @@ cases:
         margin: 0.2467
         row: 82
       - phase: 3
-        revenue_cr: 835.52
-        construction_cr: 440.55
-        land_infra_cr: 149.39
-        selling_cr: 27.74
-        contribution_cr: 217.83
-        margin: 0.2607
+        revenue_cr: 717.54
+        construction_cr: 364.78
+        land_infra_cr: 138.2
+        selling_cr: 23.02
+        contribution_cr: 191.54
+        margin: 0.2669
         row: 83
       - phase: 4
-        revenue_cr: 601.84
-        construction_cr: 320.71
-        land_infra_cr: 115.45
-        selling_cr: 23.6
-        contribution_cr: 142.08
-        margin: 0.2361
+        revenue_cr: 810.99
+        construction_cr: 450.73
+        land_infra_cr: 134.42
+        selling_cr: 31.97
+        contribution_cr: 193.87
+        margin: 0.2391
         row: 84
       phase_economics_source: Summary B80:H85 (land & infra allocated)

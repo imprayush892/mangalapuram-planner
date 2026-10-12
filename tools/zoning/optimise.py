@@ -98,9 +98,9 @@ SENIOR_FSI = 1.35         # ASSUMPTION: senior living low-rise (G+3 to G+5, a qu
 RETAIL_FSI = 2.0          # ASSUMPTION: a G+2 high street with its frontage and parking
 COMPONENTS = [
     ("C12-1", "retail", 1, "RETAIL & F&B · PHASE 1", fsi_ac(0.4 * 90000, RETAIL_FSI), "40% of 90,000 sq ft at FSI 2.0 (G+2 high street)"),
-    ("C16-1", "office", 1, "COMMERCIAL OFFICE · PHASE 1", fsi_ac(0.4 * 258750, FSI["office"]), "40% of 2,58,750 sq ft at KMBR's free FSI 3"),
+    ("C16-1", "office", 4, "COMMERCIAL OFFICE · PHASE 4 · A", fsi_ac(0.4 * 258750, FSI["office"]), "40% of 2,58,750 sq ft at KMBR's free FSI 3"),
     ("C12", "retail", 3, "RETAIL & F&B · PHASE 3", fsi_ac(0.6 * 90000, RETAIL_FSI), "60% of 90,000 sq ft at FSI 2.0"),
-    ("C16", "office", 3, "COMMERCIAL OFFICE · PHASE 3", fsi_ac(0.6 * 258750, FSI["office"]), "60% of 2,58,750 sq ft at KMBR's free FSI 3"),
+    ("C16", "office", 4, "COMMERCIAL OFFICE · PHASE 4 · B", fsi_ac(0.6 * 258750, FSI["office"]), "60% of 2,58,750 sq ft at KMBR's free FSI 3"),
     ("C02", "apartments", 1, "APARTMENTS · PHASE 1", tower_land(93), "93 flats in 1 tower: the towers and their room (township FSI)"),
     ("C11", "apartments", 2, "APARTMENTS · PHASE 2", tower_land(234), "234 flats in 2 towers: the towers and their room (township FSI)"),
     ("C19", "apartments", 3, "APARTMENTS · PHASE 3", tower_land(304), "304 flats in 2 towers: the towers and their room (township FSI)"),
