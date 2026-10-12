@@ -63,6 +63,7 @@ earthwork_costs:
   excavation_rs_per_m3: 350          # owner: earthwork excavation
   backfill_rs_per_m3: 300            # owner: backfill with excavated earth
   rcc_wall_rs_per_m3: 21500          # owner: RCC retaining wall incl. reinforcement
+  plinth_rs_per_m3: 21500            # ASSUMPTION (D7): a split-level house's plinth step, RCC at the wall rate (conservative: it is also the house's wall)
   wall_min_step_m: 0.5               # ASSUMPTION: a step in the finished ground over this between neighbouring 2 m cells is walled; under it, graded
   wall_max_height_m: 6.0             # ASSUMPTION: walls up to this height; a taller step (a deep road cut or fill) is a sloped bank, its earth in the cut and fill, its length reported
   wall_concrete_m3_per_m: [0.38, 0.04]   # ASSUMPTION: cantilever RCC wall of height H, concrete per metre run = a*H + b*H^2 (stem 0.2 m at the top widening 0.08 m a metre of height; base 0.6 H wide, 0.3 m thick)

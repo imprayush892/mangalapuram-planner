@@ -5,12 +5,12 @@ import { withPath } from './plan';
 import type { PlanInput } from './plan';
 
 export type PlanBasis = 'client' | 'draft_model';
-export type DraftZoning = 'model' | 'green_pockets' | 'green_chain';
+export type DraftZoning = 'model' | 'green_pockets' | 'green_chain' | 'least_earthwork';
 
 /** Which of the draft-model zonings the plan is drawn on (planning_rules.yaml options.draft_zoning). */
 export function draftZoningOf(planning: YamlDoc): DraftZoning {
   const z = pick<string>(planning, 'options.draft_zoning', 'model');
-  return z === 'green_pockets' || z === 'green_chain' ? z : 'model';
+  return z === 'green_pockets' || z === 'green_chain' || z === 'least_earthwork' ? z : 'model';
 }
 
 /**
@@ -19,6 +19,8 @@ export function draftZoningOf(planning: YamlDoc): DraftZoning {
  */
 export function draftZoneSetName(zoning: DraftZoning, roads: string): string | null {
   if (zoning === 'model') return null;
+  // owner 12 Oct: D7, least earthwork (zones_draft_model_d7.geojson), one zoning for its terrain roads
+  if (zoning === 'least_earthwork') return 'd7';
   return `${zoning === 'green_pockets' ? 'pockets' : 'chain'}${roads === 'north_south' ? '_ns' : ''}`;
 }
 

@@ -111,7 +111,7 @@ export interface LoadSiteOptions {
 }
 
 /** The draft-model zonings beside the model's own: data/processed/zones_draft_model_<name>.geojson. */
-export const DRAFT_ZONE_SETS = ['pockets', 'pockets_ns', 'chain', 'chain_ns'] as const;
+export const DRAFT_ZONE_SETS = ['pockets', 'pockets_ns', 'chain', 'chain_ns', 'd7'] as const;
 
 export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Promise<SiteModel> {
   const [origin, registration, parcelFc, zonesFc, featuresFc, contoursFc, demMeta] = await Promise.all([

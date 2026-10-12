@@ -32,6 +32,10 @@ options:
   # green_chain (owner 9 Oct, options D5/D6) = zones_draft_model_chain(_ns).geojson: the gardens one continuous
   # chain through the villa blocks, lake to lake, open space on top of the 8.3 ac (at least 300 villas).
   draft_zoning: model
+  # Owner 12 Oct (D7): the plan with the least cut, fill and retaining wall. least_earthwork (draft_zoning) =
+  # zones_draft_model_d7.geojson: the villas on the gentle land, the steep land green. earthwork_mode min: each plot
+  # graded in bands with a split-level house taking its fall (least_earthwork below); standard: one plane a plot.
+  earthwork_mode: standard
 
 # Rules that replace the client-basis values on the draft-model basis (dotted path: value).
 bases:
@@ -221,7 +225,7 @@ villas:
   # south-west (south-east is fine there, the grid's angle is the one with the least cut and fill).
   facing_forbidden_deg: {north_south: [112.5, 247.5], terrain: [157.5, 247.5]}
   # (owner 12 Oct, later: villas on the land the towers give up; the count up to 420, 15 an acre still the limit)
-  count_by_zoning: {model: [350, 420], green_pockets: [300, 420], green_chain: [300, 420]}
+  count_by_zoning: {model: [350, 420], green_pockets: [300, 420], green_chain: [300, 420], least_earthwork: [300, 420]}
   # Villa land is 80% plots and 20% roads, with 5% leeway either way; the open space comes from the
   # water and the slope, not from the villa land. Reported against each plan, not forced.
   land_split: {plots: 0.80, roads: 0.20, tolerance: 0.05}
@@ -413,3 +417,11 @@ amenities:                                 # school and clubhouse buildings
   min_clear_between_wings_m: 12            # ASSUMPTION: as the senior and apartment spacing
   plate_aspects: [2, 1.5, 1, 3]            # ASSUMPTION: wing shapes tried, long side : short side, first that fits
   setback_m: 3.0                           # KMBR Table 4 front average; height-driven yards to be checked
+
+# Owner 12 Oct (D7, options.earthwork_mode min): a plot's fall taken by its house, not by retaining walls. The plot is
+# graded in bands, each at most slope.plot_max: the front garden, the house in levels, the rear yard; the steps
+# between them fall on the house's walls (its plinth, priced as RCC: assumptions earthwork_costs.plinth_rs_per_m3).
+least_earthwork:
+  garden_at_road_level: true       # the garden starts at the road's finished level at the gate (no wall along the road)
+  house_levels_max: 2              # a split-level house: two floor levels a storey (ASSUMPTION)
+  house_level_min_depth_m: 4       # each level at least this deep (ASSUMPTION)
