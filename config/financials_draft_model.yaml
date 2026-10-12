@@ -3,10 +3,10 @@ source: Draft model.xlsx (owner, 7 Oct 2026), re-run for each plan by tools/fina
 run: '2026-10-12'
 inputs_changed: Inputs C16 (gross land), G97-G116 (each component's land), C33, C35 (roads), C37 (open space), C41 (villa plot efficiency), D123-D126
   (villa land by phase), H99, H106-H108 (villas by phase), D130-D133 (villa mix); row 103 (the hospital's, out of the plan) as the office's Phase
-  1 (40%), row 115 as its Phase 3 (60%)
+  1 (40%), row 115 as its Phase 3 (60%); retail 40% Phase 1 / 60% Phase 3 on row 114's Costs G97:AT97, G99:AT99 and Retail Lease G10:AT10
 limitations:
-- 'Retail: the model has one retail row (tied to its Retail Lease sheet), so all the retail runs as Phase 3; the 40% the plan builds in Phase
-  1 is not timed earlier in the model.'
+- 'Retail: the 40% in Phase 1 is timed on the one retail row''s formulas (built from quarter 3, let from its possession); its land and the Summary
+  sheet''s by-phase lines stay with Phase 3. The Phase 1 start is an assumption.'
 - 'Office: the Phase 1 and Phase 3 timing (start quarters 3 and 10, sold over 6 and 8 quarters) is an assumption.'
 metrics:
 - key: units
@@ -501,37 +501,44 @@ cases:
       P115: 10
       V115: 10
       X115: 8
+      C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
+      One-Page Summary!C15: Hospital (not in this plan)
+      One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
+        ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,4)>0,"P4 ","")
+      Costs!G97:AT97: =0.6*IF(G$4<Inputs!$R$114,0,IF(G$4>=Inputs!$S$114,1,(1-COS(PI()*(G$4-Inputs!$R$114+1)/Inputs!$Q$114))/2))+0.4*IF(G$4<(3+Inputs!$C$12),0,IF(G$4>=((3+Inputs!$C$12)+Inputs!$Q$114-1),1,(1-COS(PI()*(G$4-(3+Inputs!$C$12)+1)/Inputs!$Q$114))/2))
+      Costs!G99:AT99: =0.6*IF(G$4=Inputs!$R$114,Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)+0.4*IF(G$4=(3+Inputs!$C$12),Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)
+      Retail Lease!G10:AT10: =0.6*IF(OR(G$4<Inputs!$T$114,G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-Inputs!$T$114+1)/Inputs!$C$190))+0.4*IF(OR(G$4<(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60),G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60)+1)/Inputs!$C$190))
     values:
       units: 1522.0
       saleable_lakh_sft: 29.6285
-      revenue_cr: 2571.741254
-      cost_cr: 2085.625735
-      pbt_cr: 443.0138
-      pat_cr: 329.934101
-      pat_margin: 0.128292
-      project_irr: 0.196565
-      promoter_irr: 0.153816
-      peak_funding_cr: 491.361767
-      promoter_money_cr: 375.607167
-      peak_loan_cr: 143.763734
-      interest_cr: 43.10172
+      revenue_cr: 2575.830107
+      cost_cr: 2083.808817
+      pbt_cr: 445.991953
+      pat_cr: 332.162653
+      pat_margin: 0.128954
+      project_irr: 0.196281
+      promoter_irr: 0.153653
+      peak_funding_cr: 509.924061
+      promoter_money_cr: 380.561869
+      peak_loan_cr: 158.225081
+      interest_cr: 46.029337
       villa_units: 395.0
       villa_revenue_cr: 886.904182
       villa_margin: 0.219488
     text:
       units: 1,522
       saleable_lakh_sft: '29.6'
-      revenue_cr: 2,571.7
-      cost_cr: 2,085.6
-      pbt_cr: '443.0'
-      pat_cr: '329.9'
-      pat_margin: 12.8%
-      project_irr: 19.7%
+      revenue_cr: 2,575.8
+      cost_cr: 2,083.8
+      pbt_cr: '446.0'
+      pat_cr: '332.2'
+      pat_margin: 12.9%
+      project_irr: 19.6%
       promoter_irr: 15.4%
-      peak_funding_cr: '491.4'
-      promoter_money_cr: '375.6'
-      peak_loan_cr: '143.8'
-      interest_cr: '43.1'
+      peak_funding_cr: '509.9'
+      promoter_money_cr: '380.6'
+      peak_loan_cr: '158.2'
+      interest_cr: '46.0'
       villa_units: '395'
       villa_revenue_cr: '886.9'
       villa_margin: 21.9%
@@ -567,6 +574,7 @@ cases:
         acres: 1.139
         share: 0.0155
         phases:
+        - 1
         - 3
         cell: D12
       - use: Commercial office
@@ -583,7 +591,7 @@ cases:
         - 2
         - 3
         cell: D14
-      - use: Hospital (sale to operator)
+      - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
         phases: []
@@ -620,18 +628,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 175.61
+        value: 180.56
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 143.76
+        value: 158.23
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 43.1
+        value: 46.03
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -910,37 +918,44 @@ cases:
       P115: 10
       V115: 10
       X115: 8
+      C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
+      One-Page Summary!C15: Hospital (not in this plan)
+      One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
+        ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,4)>0,"P4 ","")
+      Costs!G97:AT97: =0.6*IF(G$4<Inputs!$R$114,0,IF(G$4>=Inputs!$S$114,1,(1-COS(PI()*(G$4-Inputs!$R$114+1)/Inputs!$Q$114))/2))+0.4*IF(G$4<(3+Inputs!$C$12),0,IF(G$4>=((3+Inputs!$C$12)+Inputs!$Q$114-1),1,(1-COS(PI()*(G$4-(3+Inputs!$C$12)+1)/Inputs!$Q$114))/2))
+      Costs!G99:AT99: =0.6*IF(G$4=Inputs!$R$114,Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)+0.4*IF(G$4=(3+Inputs!$C$12),Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)
+      Retail Lease!G10:AT10: =0.6*IF(OR(G$4<Inputs!$T$114,G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-Inputs!$T$114+1)/Inputs!$C$190))+0.4*IF(OR(G$4<(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60),G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60)+1)/Inputs!$C$190))
     values:
       units: 1523.0
       saleable_lakh_sft: 29.6805
-      revenue_cr: 2576.826643
-      cost_cr: 2089.537526
-      pbt_cr: 444.168652
-      pat_cr: 330.798277
-      pat_margin: 0.128374
-      project_irr: 0.197019
-      promoter_irr: 0.15417
-      peak_funding_cr: 492.208746
-      promoter_money_cr: 376.702201
-      peak_loan_cr: 143.473286
-      interest_cr: 43.120465
+      revenue_cr: 2580.915496
+      cost_cr: 2087.720608
+      pbt_cr: 447.08076
+      pat_cr: 332.977408
+      pat_margin: 0.129015
+      project_irr: 0.196727
+      promoter_irr: 0.153982
+      peak_funding_cr: 510.771039
+      promoter_money_cr: 381.656902
+      peak_loan_cr: 157.934633
+      interest_cr: 46.114128
       villa_units: 396.0
       villa_revenue_cr: 891.989571
       villa_margin: 0.220574
     text:
       units: 1,523
       saleable_lakh_sft: '29.7'
-      revenue_cr: 2,576.8
-      cost_cr: 2,089.5
-      pbt_cr: '444.2'
-      pat_cr: '330.8'
-      pat_margin: 12.8%
+      revenue_cr: 2,580.9
+      cost_cr: 2,087.7
+      pbt_cr: '447.1'
+      pat_cr: '333.0'
+      pat_margin: 12.9%
       project_irr: 19.7%
       promoter_irr: 15.4%
-      peak_funding_cr: '492.2'
-      promoter_money_cr: '376.7'
-      peak_loan_cr: '143.5'
-      interest_cr: '43.1'
+      peak_funding_cr: '510.8'
+      promoter_money_cr: '381.7'
+      peak_loan_cr: '157.9'
+      interest_cr: '46.1'
       villa_units: '396'
       villa_revenue_cr: '892.0'
       villa_margin: 22.1%
@@ -976,6 +991,7 @@ cases:
         acres: 1.139
         share: 0.0155
         phases:
+        - 1
         - 3
         cell: D12
       - use: Commercial office
@@ -992,7 +1008,7 @@ cases:
         - 2
         - 3
         cell: D14
-      - use: Hospital (sale to operator)
+      - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
         phases: []
@@ -1029,18 +1045,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 176.7
+        value: 181.66
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 143.47
+        value: 157.93
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 43.12
+        value: 46.11
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -1319,37 +1335,44 @@ cases:
       P115: 10
       V115: 10
       X115: 8
+      C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
+      One-Page Summary!C15: Hospital (not in this plan)
+      One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
+        ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,4)>0,"P4 ","")
+      Costs!G97:AT97: =0.6*IF(G$4<Inputs!$R$114,0,IF(G$4>=Inputs!$S$114,1,(1-COS(PI()*(G$4-Inputs!$R$114+1)/Inputs!$Q$114))/2))+0.4*IF(G$4<(3+Inputs!$C$12),0,IF(G$4>=((3+Inputs!$C$12)+Inputs!$Q$114-1),1,(1-COS(PI()*(G$4-(3+Inputs!$C$12)+1)/Inputs!$Q$114))/2))
+      Costs!G99:AT99: =0.6*IF(G$4=Inputs!$R$114,Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)+0.4*IF(G$4=(3+Inputs!$C$12),Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)
+      Retail Lease!G10:AT10: =0.6*IF(OR(G$4<Inputs!$T$114,G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-Inputs!$T$114+1)/Inputs!$C$190))+0.4*IF(OR(G$4<(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60),G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60)+1)/Inputs!$C$190))
     values:
       units: 1480.0
       saleable_lakh_sft: 28.6395
-      revenue_cr: 2478.538359
-      cost_cr: 2038.266068
-      pbt_cr: 395.612733
-      pat_cr: 294.463883
-      pat_margin: 0.118805
-      project_irr: 0.17975
-      promoter_irr: 0.138798
-      peak_funding_cr: 490.137075
-      promoter_money_cr: 376.356813
-      peak_loan_cr: 141.611511
-      interest_cr: 44.659558
+      revenue_cr: 2482.627211
+      cost_cr: 2036.44915
+      pbt_cr: 398.719278
+      pat_cr: 296.788511
+      pat_margin: 0.119546
+      project_irr: 0.179721
+      promoter_irr: 0.138807
+      peak_funding_cr: 508.699369
+      promoter_money_cr: 381.311514
+      peak_loan_cr: 156.072858
+      interest_cr: 47.458784
       villa_units: 353.0
       villa_revenue_cr: 793.701287
       villa_margin: 0.192676
     text:
       units: 1,480
       saleable_lakh_sft: '28.6'
-      revenue_cr: 2,478.5
-      cost_cr: 2,038.3
-      pbt_cr: '395.6'
-      pat_cr: '294.5'
-      pat_margin: 11.9%
+      revenue_cr: 2,482.6
+      cost_cr: 2,036.4
+      pbt_cr: '398.7'
+      pat_cr: '296.8'
+      pat_margin: 12.0%
       project_irr: 18.0%
       promoter_irr: 13.9%
-      peak_funding_cr: '490.1'
-      promoter_money_cr: '376.4'
-      peak_loan_cr: '141.6'
-      interest_cr: '44.7'
+      peak_funding_cr: '508.7'
+      promoter_money_cr: '381.3'
+      peak_loan_cr: '156.1'
+      interest_cr: '47.5'
       villa_units: '353'
       villa_revenue_cr: '793.7'
       villa_margin: 19.3%
@@ -1385,6 +1408,7 @@ cases:
         acres: 1.139
         share: 0.0155
         phases:
+        - 1
         - 3
         cell: D12
       - use: Commercial office
@@ -1401,7 +1425,7 @@ cases:
         - 2
         - 3
         cell: D14
-      - use: Hospital (sale to operator)
+      - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
         phases: []
@@ -1438,18 +1462,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 176.36
+        value: 181.31
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 141.61
+        value: 156.07
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 44.66
+        value: 47.46
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -1728,37 +1752,44 @@ cases:
       P115: 10
       V115: 10
       X115: 8
+      C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
+      One-Page Summary!C15: Hospital (not in this plan)
+      One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
+        ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,4)>0,"P4 ","")
+      Costs!G97:AT97: =0.6*IF(G$4<Inputs!$R$114,0,IF(G$4>=Inputs!$S$114,1,(1-COS(PI()*(G$4-Inputs!$R$114+1)/Inputs!$Q$114))/2))+0.4*IF(G$4<(3+Inputs!$C$12),0,IF(G$4>=((3+Inputs!$C$12)+Inputs!$Q$114-1),1,(1-COS(PI()*(G$4-(3+Inputs!$C$12)+1)/Inputs!$Q$114))/2))
+      Costs!G99:AT99: =0.6*IF(G$4=Inputs!$R$114,Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)+0.4*IF(G$4=(3+Inputs!$C$12),Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)
+      Retail Lease!G10:AT10: =0.6*IF(OR(G$4<Inputs!$T$114,G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-Inputs!$T$114+1)/Inputs!$C$190))+0.4*IF(OR(G$4<(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60),G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60)+1)/Inputs!$C$190))
     values:
       units: 1487.0
       saleable_lakh_sft: 28.812
-      revenue_cr: 2495.019786
-      cost_cr: 2047.647492
-      pbt_cr: 402.808571
-      pat_cr: 299.848529
-      pat_margin: 0.120179
-      project_irr: 0.182267
-      promoter_irr: 0.141053
-      peak_funding_cr: 491.010299
-      promoter_money_cr: 377.220775
-      peak_loan_cr: 141.603334
-      interest_cr: 44.563723
+      revenue_cr: 2499.108638
+      cost_cr: 2045.830574
+      pbt_cr: 405.915116
+      pat_cr: 302.173156
+      pat_margin: 0.120912
+      project_irr: 0.182199
+      promoter_irr: 0.141034
+      peak_funding_cr: 509.572592
+      promoter_money_cr: 382.175476
+      peak_loan_cr: 156.064681
+      interest_cr: 47.362949
       villa_units: 360.0
       villa_revenue_cr: 810.182713
       villa_margin: 0.198674
     text:
       units: 1,487
       saleable_lakh_sft: '28.8'
-      revenue_cr: 2,495.0
-      cost_cr: 2,047.6
-      pbt_cr: '402.8'
-      pat_cr: '299.8'
-      pat_margin: 12.0%
+      revenue_cr: 2,499.1
+      cost_cr: 2,045.8
+      pbt_cr: '405.9'
+      pat_cr: '302.2'
+      pat_margin: 12.1%
       project_irr: 18.2%
       promoter_irr: 14.1%
-      peak_funding_cr: '491.0'
-      promoter_money_cr: '377.2'
-      peak_loan_cr: '141.6'
-      interest_cr: '44.6'
+      peak_funding_cr: '509.6'
+      promoter_money_cr: '382.2'
+      peak_loan_cr: '156.1'
+      interest_cr: '47.4'
       villa_units: '360'
       villa_revenue_cr: '810.2'
       villa_margin: 19.9%
@@ -1794,6 +1825,7 @@ cases:
         acres: 1.139
         share: 0.0155
         phases:
+        - 1
         - 3
         cell: D12
       - use: Commercial office
@@ -1810,7 +1842,7 @@ cases:
         - 2
         - 3
         cell: D14
-      - use: Hospital (sale to operator)
+      - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
         phases: []
@@ -1847,18 +1879,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 177.22
+        value: 182.18
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 141.6
+        value: 156.06
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 44.56
+        value: 47.36
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -2137,37 +2169,44 @@ cases:
       P115: 10
       V115: 10
       X115: 8
+      C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
+      One-Page Summary!C15: Hospital (not in this plan)
+      One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
+        ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,4)>0,"P4 ","")
+      Costs!G97:AT97: =0.6*IF(G$4<Inputs!$R$114,0,IF(G$4>=Inputs!$S$114,1,(1-COS(PI()*(G$4-Inputs!$R$114+1)/Inputs!$Q$114))/2))+0.4*IF(G$4<(3+Inputs!$C$12),0,IF(G$4>=((3+Inputs!$C$12)+Inputs!$Q$114-1),1,(1-COS(PI()*(G$4-(3+Inputs!$C$12)+1)/Inputs!$Q$114))/2))
+      Costs!G99:AT99: =0.6*IF(G$4=Inputs!$R$114,Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)+0.4*IF(G$4=(3+Inputs!$C$12),Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)
+      Retail Lease!G10:AT10: =0.6*IF(OR(G$4<Inputs!$T$114,G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-Inputs!$T$114+1)/Inputs!$C$190))+0.4*IF(OR(G$4<(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60),G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60)+1)/Inputs!$C$190))
     values:
       units: 1470.0
       saleable_lakh_sft: 28.3825
-      revenue_cr: 2451.564663
-      cost_cr: 2025.412842
-      pbt_cr: 381.614808
-      pat_cr: 283.989236
-      pat_margin: 0.11584
-      project_irr: 0.175833
-      promoter_irr: 0.135055
-      peak_funding_cr: 490.190474
-      promoter_money_cr: 376.044186
-      peak_loan_cr: 142.019274
-      interest_cr: 44.537013
+      revenue_cr: 2455.653516
+      cost_cr: 2023.595924
+      pbt_cr: 384.721353
+      pat_cr: 286.313864
+      pat_margin: 0.116594
+      project_irr: 0.175864
+      promoter_irr: 0.135095
+      peak_funding_cr: 508.752767
+      promoter_money_cr: 380.998887
+      peak_loan_cr: 156.480621
+      interest_cr: 47.336238
       villa_units: 343.0
       villa_revenue_cr: 766.727591
       villa_margin: 0.176568
     text:
       units: 1,470
       saleable_lakh_sft: '28.4'
-      revenue_cr: 2,451.6
-      cost_cr: 2,025.4
-      pbt_cr: '381.6'
-      pat_cr: '284.0'
-      pat_margin: 11.6%
+      revenue_cr: 2,455.7
+      cost_cr: 2,023.6
+      pbt_cr: '384.7'
+      pat_cr: '286.3'
+      pat_margin: 11.7%
       project_irr: 17.6%
       promoter_irr: 13.5%
-      peak_funding_cr: '490.2'
-      promoter_money_cr: '376.0'
-      peak_loan_cr: '142.0'
-      interest_cr: '44.5'
+      peak_funding_cr: '508.8'
+      promoter_money_cr: '381.0'
+      peak_loan_cr: '156.5'
+      interest_cr: '47.3'
       villa_units: '343'
       villa_revenue_cr: '766.7'
       villa_margin: 17.7%
@@ -2203,6 +2242,7 @@ cases:
         acres: 1.139
         share: 0.0155
         phases:
+        - 1
         - 3
         cell: D12
       - use: Commercial office
@@ -2219,7 +2259,7 @@ cases:
         - 2
         - 3
         cell: D14
-      - use: Hospital (sale to operator)
+      - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
         phases: []
@@ -2256,18 +2296,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 176.04
+        value: 181.0
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 142.02
+        value: 156.48
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 44.54
+        value: 47.34
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -2546,37 +2586,44 @@ cases:
       P115: 10
       V115: 10
       X115: 8
+      C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3'
+      One-Page Summary!C15: Hospital (not in this plan)
+      One-Page Summary!F12: ="P1 "&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,2)>0,"P2 ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,3)>0,"P3
+        ","")&IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,4)>0,"P4 ","")
+      Costs!G97:AT97: =0.6*IF(G$4<Inputs!$R$114,0,IF(G$4>=Inputs!$S$114,1,(1-COS(PI()*(G$4-Inputs!$R$114+1)/Inputs!$Q$114))/2))+0.4*IF(G$4<(3+Inputs!$C$12),0,IF(G$4>=((3+Inputs!$C$12)+Inputs!$Q$114-1),1,(1-COS(PI()*(G$4-(3+Inputs!$C$12)+1)/Inputs!$Q$114))/2))
+      Costs!G99:AT99: =0.6*IF(G$4=Inputs!$R$114,Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)+0.4*IF(G$4=(3+Inputs!$C$12),Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((G$4-1)/4),0)
+      Retail Lease!G10:AT10: =0.6*IF(OR(G$4<Inputs!$T$114,G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-Inputs!$T$114+1)/Inputs!$C$190))+0.4*IF(OR(G$4<(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60),G$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(G$4-(((3+Inputs!$C$12)+Inputs!$Q$114-1)+Inputs!$C$60)+1)/Inputs!$C$190))
     values:
       units: 1468.0
       saleable_lakh_sft: 28.3665
-      revenue_cr: 2451.393348
-      cost_cr: 2025.184718
-      pbt_cr: 382.122635
-      pat_cr: 284.369243
-      pat_margin: 0.116003
-      project_irr: 0.1757
-      promoter_irr: 0.134866
-      peak_funding_cr: 491.324515
-      promoter_money_cr: 379.124647
-      peak_loan_cr: 139.815884
-      interest_cr: 44.085994
+      revenue_cr: 2455.4822
+      cost_cr: 2023.3678
+      pbt_cr: 385.235882
+      pat_cr: 286.698885
+      pat_margin: 0.116759
+      project_irr: 0.175733
+      promoter_irr: 0.1349
+      peak_funding_cr: 509.886808
+      promoter_money_cr: 384.079348
+      peak_loan_cr: 154.277231
+      interest_cr: 46.878518
       villa_units: 341.0
       villa_revenue_cr: 766.556275
       villa_margin: 0.176815
     text:
       units: 1,468
       saleable_lakh_sft: '28.4'
-      revenue_cr: 2,451.4
-      cost_cr: 2,025.2
-      pbt_cr: '382.1'
-      pat_cr: '284.4'
-      pat_margin: 11.6%
+      revenue_cr: 2,455.5
+      cost_cr: 2,023.4
+      pbt_cr: '385.2'
+      pat_cr: '286.7'
+      pat_margin: 11.7%
       project_irr: 17.6%
       promoter_irr: 13.5%
-      peak_funding_cr: '491.3'
-      promoter_money_cr: '379.1'
-      peak_loan_cr: '139.8'
-      interest_cr: '44.1'
+      peak_funding_cr: '509.9'
+      promoter_money_cr: '384.1'
+      peak_loan_cr: '154.3'
+      interest_cr: '46.9'
       villa_units: '341'
       villa_revenue_cr: '766.6'
       villa_margin: 17.7%
@@ -2612,6 +2659,7 @@ cases:
         acres: 1.139
         share: 0.0155
         phases:
+        - 1
         - 3
         cell: D12
       - use: Commercial office
@@ -2628,7 +2676,7 @@ cases:
         - 2
         - 3
         cell: D14
-      - use: Hospital (sale to operator)
+      - use: Hospital (not in this plan)
         acres: 0.0
         share: 0.0
         phases: []
@@ -2665,18 +2713,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 179.12
+        value: 184.08
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 139.82
+        value: 154.28
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 44.09
+        value: 46.88
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive

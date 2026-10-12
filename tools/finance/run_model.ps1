@@ -1,7 +1,7 @@
 # Runs the owner's draft financial model (Draft model.xlsx) once per case and reads its One-Page Summary.
 # Input: a JSON file { "model": path, "cases": [ { "id": "D1", "inputs": { "C33": 0.117, "C103": "Office", ... } }, ... ] }
-# (cells on the Inputs sheet: a number is written as a number, text as text; an empty inputs map runs the model as
-# given). The workbook is opened read-only and closed without saving: nothing is written to it.
+# (cells on the Inputs sheet, or "Sheet!A1" on another: a number is written as a number, text as text, "=..." as a
+# formula; an empty inputs map runs the model as given). The workbook is opened read-only and closed without saving: nothing is written to it.
 # Output: a JSON file { "D1": { "<cell>": { "t": text, "v": value }, ... }, ... }: the summary's key cells and every
 # cell of its sections A (C8:F20), B (H8:K17) and E (B57:M68).
 param([string]$in, [string]$out)
@@ -30,8 +30,10 @@ try {
     $wb = $xl.Workbooks.Open($spec.model, 0, $true)
     $inp = $wb.Worksheets.Item('Inputs')
     foreach ($p in $case.inputs.PSObject.Properties) {
-      if ($p.Value -is [string]) { if ($p.Value.StartsWith('=')) { $inp.Range($p.Name).Formula = $p.Value } else { $inp.Range($p.Name).Value2 = $p.Value } }
-      else { $inp.Range($p.Name).Formula = ([double]$p.Value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) }
+      $k = $p.Name.LastIndexOf('!')
+      if ($k -lt 0) { $rg = $inp.Range($p.Name) } else { $rg = $wb.Worksheets.Item($p.Name.Substring(0, $k).Trim("'")).Range($p.Name.Substring($k + 1)) }
+      if ($p.Value -is [string]) { if ($p.Value.StartsWith('=')) { $rg.Formula = $p.Value } else { $rg.Value2 = $p.Value } }
+      else { $rg.Formula = ([double]$p.Value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) }
     }
     $xl.CalculateFull()
     $s = $wb.Worksheets.Item('One-Page Summary')

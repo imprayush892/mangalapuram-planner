@@ -14,8 +14,12 @@ never saved. From the plan's land account (plan.land, app/src/engine/pipeline/pl
   H99, H106-H108  villas by phase: the plan's plots;  D130-D133  the villa mix: the plan's plot types
   Row 103      the hospital's row (out of the plan, owner 12 Oct) carries the office's Phase 1, 40% (owner 12 Oct:
                retail and office 40% in Phase 1, 60% in Phase 3); row 115 is the office's Phase 3, 60%
-  Row 114      retail: the model has one retail row, tied to its Retail Lease sheet; it stays one Phase 3 line with
-               all the retail land (LIMITATION: the 40% built in Phase 1 is not timed earlier in the model)
+  Row 114      retail, 40% Phase 1 / 60% Phase 3 (owner 12 Oct): the model's one retail row, which its Costs block
+               (rows 96-99) and the Retail Lease sheet read; no row is spare, so the 40% is timed in Costs G97:AT97
+               (progress), G99:AT99 (approvals) and Retail Lease G10:AT10 (occupancy): built from quarter 3 over row
+               114's quarters, let from its possession, the 60% on row 114's own timing; One-Page Summary F12 shows
+               it in P1 and P3. All the retail land stays on row 114 (Phase 3), so the Summary sheet's by-phase
+               lines carry the retail in Phase 3.
 Writes config/financials_draft_model.yaml, which the presentation reads (ui/PresentFinance.tsx, ui/PresentFigures.tsx).
 
 Run: python tools/finance/run_model.py ["C:/path/Draft model.xlsx"]   (Windows, Excel installed)
@@ -46,6 +50,7 @@ OPTIONS = [
 ROW = {"C01": 97, "C02": 98, "C08": 100, "C04": 101, "C05": 102, "C16-1": 103, "C15": 104, "C07": 105, "C10": 109,
        "C13": 110, "C11": 111, "C19": 112, "C20": 113, "C12": 114, "C14": 116, "C16": 115}
 RETAIL_P1 = "C12-1"          # into row 114 with the rest of the retail (see above)
+RETAIL_P1_START = 3          # retail Phase 1 built from quarter 3, as the office's. ASSUMPTION (owner to confirm).
 VILLA_PHASE_ROW = {1: 99, 2: 106, 3: 107, 4: 108}
 # Row 103 as the office's Phase 1 (40% of row 115's 2,25,000 sft saleable), priced and paid like row 115; built from
 # quarter 3 with the Phase 1 launch, sold over 6 quarters (40% of the office's 14). ASSUMPTION: the timing (owner to confirm).
@@ -54,6 +59,37 @@ OFFICE_P1 = {"C103": "Commercial office (strata) - Phase 1, 40%", "D103": 1, "E1
              "Z103": "COMM", "AB103": 0.04}
 # Row 115 as the office's Phase 3, 60%: built from quarter 10 with the Phase 3 villas, sold over 8 quarters (60% of 14).
 OFFICE_P3 = {"C115": "Commercial office (strata) - Phase 3, 60%", "D115": 3, "I115": 135000, "P115": 10, "V115": 10, "X115": 8}
+
+
+def retail_split():
+    """Retail 40% Phase 1, 60% Phase 3 on row 114's formulas (as optionRun.ts retailSplit): cost, approvals, rent and
+    commission are linear in the area, so this runs as two rows would."""
+    r1 = f"({RETAIL_P1_START}+Inputs!$C$12)"
+    s1 = f"({r1}+Inputs!$Q$114-1)"
+    t1 = f"({s1}+Inputs!$C$60)"
+
+    def prog(c, r, s):
+        return f"IF({c}$4<{r},0,IF({c}$4>={s},1,(1-COS(PI()*({c}$4-{r}+1)/Inputs!$Q$114))/2))"
+
+    def appr(c, r):
+        return f"IF({c}$4={r},Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^(({c}$4-1)/4),0)"
+
+    def occ(c, t):
+        return f"IF(OR({c}$4<{t},{c}$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*({c}$4-{t}+1)/Inputs!$C$190))"
+
+    def ph(n):
+        return f'IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,{n})>0,"P{n} ","")'
+
+    out = {"C114": "Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3",
+           "One-Page Summary!F12": f'="P1 "&{ph(2)}&{ph(3)}&{ph(4)}'}  # the land card's phases: P1 with the rest
+    for i in range(6, 46):  # columns G-AT, quarters 1-40
+        c = chr(65 + i) if i < 26 else "A" + chr(65 + i - 26)
+        out[f"Costs!{c}97"] = f"=0.6*{prog(c, 'Inputs!$R$114', 'Inputs!$S$114')}+0.4*{prog(c, r1, s1)}"
+        out[f"Costs!{c}99"] = f"=0.6*{appr(c, 'Inputs!$R$114')}+0.4*{appr(c, r1)}"
+        out[f"Retail Lease!{c}10"] = f"=0.6*{occ(c, 'Inputs!$T$114')}+0.4*{occ(c, t1)}"
+    return out
+
+
 TYPES = ["1,800 sq ft plot", "2,250 sq ft plot", "2,500 sq ft plot", "2,800 sq ft plot"]
 APT_ROWS = {"C02": "E154", "C11": "E155", "C19": "E156", "C20": "E157"}
 PHRASE = {"C08": "villa clubhouse 1", "C10": "villa clubhouse 2 (mini-golf)", "C04": "32 senior-living units", "C07": "senior enclave (160 units)",
@@ -129,8 +165,10 @@ for oid, label in OPTIONS:
     for ph in (1, 2, 3, 4):
         items = list(dict.fromkeys(by_phase[ph]))
         inputs[f"C{89 + ph}"] = ("Launch: " if ph == 1 else "") + ", ".join(items)
+    inputs["One-Page Summary!C15"] = "Hospital (not in this plan)"
     inputs.update(OFFICE_P1)
     inputs.update(OFFICE_P3)
+    inputs.update(retail_split())
     cases.append({"id": oid, "inputs": inputs})
     g = L["green"]
     meta[oid] = {"label": label, "villas": nv, "villas_by_phase": [villas[k] for k in (1, 2, 3, 4)],
@@ -199,6 +237,20 @@ def summary(c):
             "funding": funding, "tickets": tickets, "tickets_average": avg, "tickets_note": txt(c, "C68")}
 
 
+def brief(inputs):
+    """The inputs for the record: a row of formulas on another sheet (the retail split) as its range and first cell."""
+    out, rows = {}, {}
+    for k, v in inputs.items():
+        m = re.fullmatch(r"(.+)!([A-Z]+)(\d+)", k)
+        if m:
+            rows.setdefault((m[1], m[3]), []).append((m[2], v))
+        else:
+            out[k] = v
+    for (sh, r), cs in rows.items():
+        out[f"{sh}!{cs[0][0]}{r}:{cs[-1][0]}{r}" if len(cs) > 1 else f"{sh}!{cs[0][0]}{r}"] = cs[0][1]
+    return out
+
+
 KEYS = [  # (key, label, cell, unit, better)
     ("units", "Residential units", "D5", "count", "up"),
     ("saleable_lakh_sft", "Saleable area", "E5", "lakh sft", "up"),
@@ -222,9 +274,10 @@ doc = {
     "run": datetime.date.today().isoformat(),
     "inputs_changed": "Inputs C16 (gross land), G97-G116 (each component's land), C33, C35 (roads), C37 (open space), C41 (villa plot "
                       "efficiency), D123-D126 (villa land by phase), H99, H106-H108 (villas by phase), D130-D133 (villa mix); row 103 "
-                      "(the hospital's, out of the plan) as the office's Phase 1 (40%), row 115 as its Phase 3 (60%)",
-    "limitations": ["Retail: the model has one retail row (tied to its Retail Lease sheet), so all the retail runs as Phase 3; "
-                    "the 40% the plan builds in Phase 1 is not timed earlier in the model.",
+                      "(the hospital's, out of the plan) as the office's Phase 1 (40%), row 115 as its Phase 3 (60%); retail 40% Phase 1 / "
+                      "60% Phase 3 on row 114's Costs G97:AT97, G99:AT99 and Retail Lease G10:AT10",
+    "limitations": ["Retail: the 40% in Phase 1 is timed on the one retail row's formulas (built from quarter 3, let from its "
+                    "possession); its land and the Summary sheet's by-phase lines stay with Phase 3. The Phase 1 start is an assumption.",
                     "Office: the Phase 1 and Phase 3 timing (start quarters 3 and 10, sold over 6 and 8 quarters) is an assumption."],
     "metrics": [{"key": k, "label": l, "cell": c, "unit": u, "better": b} for k, l, c, u, b in KEYS],
     "cases": {},
@@ -233,7 +286,7 @@ for c in ["model"] + [o[0] for o in OPTIONS]:
     e = {"label": "Draft model as given" if c == "model" else meta[c]["label"]}
     if c != "model":
         e.update({k: v for k, v in meta[c].items() if k != "label"})
-        e["inputs"] = {k: (round(v, 6) if isinstance(v, float) else v) for k, v in next(x for x in cases if x["id"] == c)["inputs"].items()}
+        e["inputs"] = brief({k: (round(v, 6) if isinstance(v, float) else v) for k, v in next(x for x in cases if x["id"] == c)["inputs"].items()})
     e["values"] = {k: num(c, cell) for k, _, cell, _, _ in KEYS}
     e["text"] = {k: R[c][cell]["t"] for k, _, cell, _, _ in KEYS}
     e["summary"] = summary(c)

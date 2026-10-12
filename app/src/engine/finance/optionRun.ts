@@ -5,8 +5,9 @@ import { cellAddress, formatValue, inputAddress } from './workbook';
 
 /**
  * The draft model run on a master plan, in the app (owner 12 Oct): the plan's land, villas and the office split go into
- * the Inputs sheet, the workbook recalculates, the One-Page Summary is read back, and the inputs are put back as they
- * were. The same inputs as tools/finance/run_model.py (its docstring says why each one).
+ * the Inputs sheet (the retail split on its Costs and Retail Lease rows), the workbook recalculates, the One-Page
+ * Summary is read back, and the inputs are put back as they were. The same inputs as tools/finance/run_model.py (its
+ * docstring says why each one).
  */
 
 const AC = 4046.8564224;
@@ -20,6 +21,35 @@ const OFFICE_P1: Record<string, RawCellContent> = {
   I103: 90000, K103: 'Office', L103: 1.15, P103: 3, Q103: 10, U103: 7500, V103: 3, X103: 6, Z103: 'COMM', AB103: 0.04,
 };
 const OFFICE_P3: Record<string, RawCellContent> = { C115: 'Commercial office (strata) - Phase 3, 60%', D115: 3, I115: 135000, P115: 10, V115: 10, X115: 8 };
+/**
+ * Owner 12 Oct: retail 40% in Phase 1, 60% in Phase 3, as the office. The model's retail is one row (114), which its
+ * Costs block (rows 96-99) and the Retail Lease sheet read, and no row is spare (the hospital's carries the office's
+ * Phase 1), so the 40% is timed in those formulas: built from quarter 3 with the Phase 1 launch, over row 114's
+ * quarters, let from its possession; the 60% keeps row 114's timing. Cost, approvals, rent and commission are linear
+ * in the area, so this runs as two rows would. ASSUMPTION: the Phase 1 start (as the office's).
+ */
+const RETAIL_P1_START = 3;
+function retailSplit(): Record<string, RawCellContent> {
+  const r1 = `(${RETAIL_P1_START}+Inputs!$C$12)`;
+  const s1 = `(${r1}+Inputs!$Q$114-1)`;
+  const t1 = `(${s1}+Inputs!$C$60)`;
+  const prog = (c: string, r: string, s: string): string => `IF(${c}$4<${r},0,IF(${c}$4>=${s},1,(1-COS(PI()*(${c}$4-${r}+1)/Inputs!$Q$114))/2))`;
+  const appr = (c: string, r: string): string => `IF(${c}$4=${r},Inputs!$C$51*Inputs!$M$114/10^7*(1+Inputs!$C$10)*(1+Inputs!$C$54)^((${c}$4-1)/4),0)`;
+  const occ = (c: string, t: string): string =>
+    `IF(OR(${c}$4<${t},${c}$4>MIN(Inputs!$C$193,Inputs!$C$6)),0,MIN(Inputs!$C$189,Inputs!$C$189*(${c}$4-${t}+1)/Inputs!$C$190))`;
+  const ph = (n: number): string => `IF(COUNTIFS($Q$8:$Q$27,"Retail F&B",$R$8:$R$27,${n})>0,"P${n} ","")`;
+  const out: Record<string, RawCellContent> = {
+    C114: 'Retail high street — primarily F&B (leased, not sold): 40% from Phase 1, 60% Phase 3',
+    'One-Page Summary!F12': `="P1 "&${ph(2)}&${ph(3)}&${ph(4)}`, // the land card's phases: P1 with the rest
+  };
+  for (let i = 6; i < 46; i += 1) { // columns G-AT, quarters 1-40
+    const c = i < 26 ? String.fromCharCode(65 + i) : `A${String.fromCharCode(65 + i - 26)}`;
+    out[`Costs!${c}97`] = `=0.6*${prog(c, 'Inputs!$R$114', 'Inputs!$S$114')}+0.4*${prog(c, r1, s1)}`;
+    out[`Costs!${c}99`] = `=0.6*${appr(c, 'Inputs!$R$114')}+0.4*${appr(c, r1)}`;
+    out[`Retail Lease!${c}10`] = `=0.6*${occ(c, 'Inputs!$T$114')}+0.4*${occ(c, t1)}`;
+  }
+  return out;
+}
 const TYPES = ['1,800 sq ft plot', '2,250 sq ft plot', '2,500 sq ft plot', '2,800 sq ft plot'];
 const APT_ROWS: Record<string, string> = { C02: 'E154', C11: 'E155', C19: 'E156', C20: 'E157' };
 /** What each component is called in the phase descriptions (Inputs C90-C93). */
@@ -124,7 +154,7 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
   inputs['One-Page Summary!C15'] = 'Hospital (not in this plan)';
   // Owner 12 Oct: the earthwork at the owner's rates, into the model's infrastructure (see expandInputs)
   if (plan.earthworkCost) inputs[EARTHWORK] = plan.earthworkCost.rs.total / 1e7;
-  Object.assign(inputs, OFFICE_P1, OFFICE_P3);
+  Object.assign(inputs, OFFICE_P1, OFFICE_P3, retailSplit());
   const g = L.green;
   const meta = {
     earthwork: plan.earthworkCost,

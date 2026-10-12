@@ -544,9 +544,11 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - Numbers: the hospital is out (no land, no figure; Excel row 103 carries the office's Phase 1); the villa rows ask
   "up to 15 an acre" instead of the old model's 48/80/96/96; apartments report the flats the towers hold. The model
   is run on each plan (tools/finance/run_model.py): C16 = 73.54 ac, every component's land from its zone, roads,
-  open space, villas by phase and the villa mix from the plan. LIMITATION: retail is one row in the model (its
-  Retail Lease sheet), so all of it is timed in Phase 3. The presentation's land, ticket and funding cards read the
-  run of the option on screen.
+  open space, villas by phase and the villa mix from the plan. Retail 40% Phase 1 / 60% Phase 3 (owner 12 Oct, as
+  the office): the model has one retail row (114, its Retail Lease sheet) and no spare row, so the 40% is timed on
+  that row's Costs progress/approvals and Retail Lease occupancy formulas (built from quarter 3, ASSUMPTION; let from
+  its possession); its land stays on row 114. The presentation's land, ticket and funding cards read the run of the
+  option on screen.
 - Result (villas; furthest walk to green; PAT, project IRR): D1 361, 213 m, ₹340.7 Cr, 20.6%; D2 351, 238 m,
   ₹331.1 Cr, 20.2%; D3 340, 108 m, ₹322.6 Cr, 19.8%; D4 341, 90 m, ₹322.2 Cr, 19.8%; D5 308, 126 m, ₹293.5 Cr, 18.3%;
   D6 300, 131 m, ₹286.0 Cr, 17.9%. The model as given: ₹380.6 Cr, 22.0% (with the hospital's ₹270 Cr sale, now out).
