@@ -233,8 +233,21 @@ def summary(c):
                         "share_of_res_revenue": round(num(c, f"M{row}") or 0, 4), "row": row})
     avg = {"units": int(num(c, "D67") or 0), "size_sft": round(num(c, "E67") or 0), "ticket_lakh": round(num(c, "J67") or 0, 1),
            "revenue_cr": round(num(c, "K67") or 0, 1), "row": 67}
+    # section D: each product's saleable area and revenue by phase; Summary B80:H85: each phase's economics
+    by_phase = []
+    for row in range(44, 54):
+        if not txt(c, f"C{row}"):
+            continue
+        by_phase.append({"product": txt(c, f"C{row}"), "area_sft": [round(num(c, f"{k}{row}") or 0) for k in "DEFG"],
+                         "revenue_cr": [round(num(c, f"{k}{row}") or 0, 2) for k in "IJKL"], "row": row})
+    phases = []
+    for row in range(81, 85):
+        v = [num(c, f"Summary!{k}{row}") or 0 for k in "CDEFGH"]
+        phases.append({"phase": row - 80, "revenue_cr": round(v[0], 2), "construction_cr": round(v[1], 2), "land_infra_cr": round(v[2], 2),
+                       "selling_cr": round(v[3], 2), "contribution_cr": round(v[4], 2), "margin": round(v[5], 4), "row": row})
     return {"source": "Draft model.xlsx · One-Page Summary", "land": land, "land_total_ac": round(num(c, "D20") or 0, 2),
-            "funding": funding, "tickets": tickets, "tickets_average": avg, "tickets_note": txt(c, "C68")}
+            "funding": funding, "tickets": tickets, "tickets_average": avg, "tickets_note": txt(c, "C68"),
+            "by_phase": by_phase, "phase_economics": phases, "phase_economics_source": "Summary B80:H85 (land & infra allocated)"}
 
 
 def brief(inputs):

@@ -609,5 +609,12 @@ def main():
     print("wrote", os.path.relpath(OUT, REPO))
 
 
+# the score maps behind the zoning, for the deck's design-logic slides (DUMP=path.npz)
+if os.environ.get("DUMP"):
+    np.savez(os.environ["DUMP"], VPn=VPn, TALLn=TALLn, LOWn=LOWn, LAKEFRONT=LAKEFRONT, LEVEL=LEVEL, LEVELn=LEVELn, PREMn=PREMn,
+             INTERIORn=INTERIORn, SLOPEn=SLOPEn, FLOORS_CAP=FLOORS_CAP, DIST=DIST, RANK=RANK, GX=GX, GY=GY, IN_SITE=IN_SITE, USABLE=USABLE,
+             LAKE_CELL=LAKE_CELL)
+
+
 if __name__ == "__main__":
     main()
