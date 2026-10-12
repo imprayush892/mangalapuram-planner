@@ -489,3 +489,30 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - D5 (roads to the ground) 323 villas, open space 10.4 ac net of roads (chain 2.9 ac); D6 (north-south) 312 villas,
   10.8 ac (chain 3.4 ac). The financial model takes each plan's open space (Inputs C37): D5 PAT ₹321.7 Cr, project
   IRR 18.7%; D6 ₹312.1 Cr, 18.3%.
+
+## 12 Oct 2026 · the client's permanent roads: the 18 m N-S road and the loop (client, via owner)
+
+- New client requirement: the 18 m N-S road and the loop round Projects 2 and 3 are permanent roads. The 18 m road
+  is the zoning plan's commercial strip (18 m wide, x 281-304): it runs dead straight from the parcel's north edge
+  to the strip's south end (296, 160), and on along Project 2's south edge to the road between the two parcels.
+  The loop is that road between the parcels (outside our land), the existing road up the batching strip, and its
+  north side along Project 3, now a fixed primary (planning_rules bases.draft_model roads.owner_routes; an owner
+  route may carry its own width, `width_m: 18`). The gate arm's road from the main gate joins the 18 m road at its
+  top; the old entry road (x 325-340, through Project 1) is gone.
+- Zoning (tools/zoning/draft_model.py): every zone off the fixed roads. The high street fronts the 18 m road at
+  the top; villa clubhouse 2 and its mini-golf, whose land was the strip, move to the 18 m road's east side below
+  the high street (with villa clubhouse 1); the gate's west-wing park is gone (it was the road and its frontage),
+  the open space is made up at the south pond's bank walk. The small green pocket by the west lake is not drawn (what
+  was left of it was an 11 m strip against the 18 m road). D3-D6: only the north pond's dry west side goes to the
+  villas (to x = 408, about what the gardens take); the bank walk's west end stays park, as giving it turned the
+  south-east block's grid and cost ten villas. A pocket garden under KMBR's 200 m2 takes the next touching plot.
+- The loop's north side climbs 36 m in its 230 m (RL 78 to 114, 1:6.4 average) against the primary's 1:8: about
+  19,700 m3 of cut on that road alone. The 18 m road crosses two steep banks (y 390-420, 210-240): 9,800 m3 cut,
+  7,500 m3 fill.
+- The green chain (D5/D6) is now one plot wide with small pockets (CHAIN_HALF 0, BEAD_R 3 m) to stay above 300 villas.
+- Result (villas; cut / fill m3; PAT, project IRR from the draft model per plan): D1 359, 70k / 69k, ₹352.8 Cr, 20.3%;
+  D2 357, 85k / 69k, ₹350.9 Cr, 20.3%; D3 341, 69k / 67k, ₹336.7 Cr, 19.5%; D4 345, 84k / 69k, ₹340.2 Cr, 19.8%;
+  D5 316, 67k / 65k, ₹314.7 Cr, 18.5%; D6 321, 83k / 67k, ₹319.1 Cr, 18.7%. (Before the client's roads: D1 373, D2 370.)
+- Re-plan order (each D3-D6 zoning is snapped to plots of a plan): D1/D2 on the base zoning; pockets from D1/D2, then
+  from D3/D4's own plots; chain base (`CHAIN_HALF=-1 BEAD_R=-1 ... --chain`), then the chain on it; then
+  `npm run build:deploy` and `python tools/finance/run_model.py`.

@@ -1098,10 +1098,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const roads: RoadRec[] = [];
   const network: Mask = Uint8Array.from(L.existingRoads.mask);
   const scratch = new Float32Array(n);
-  const addRoad = (tier: Exclude<RoadTier, 'existing'>, line: Pt[], why: string, row = false): RoadRec | null => {
+  const addRoad = (tier: Exclude<RoadTier, 'existing'>, line: Pt[], why: string, row = false, widthM = width[tier]): RoadRec | null => {
     if (line.length < 2 || lineLength(line) < 4) return null;
     const prof = gradeLimitedProfile(dem, line, lim[tier]);
-    const cor = corridor(dem, line, width[tier], prof, scratch);
+    const cor = corridor(dem, line, widthM, prof, scratch);
     const cells: number[] = [];
     const dzCells: number[] = [];
     const dz: number[] = [];
@@ -1121,8 +1121,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       id: '',
       tier,
       centreline: line,
-      widthM: width[tier],
-      geom: roadStrip(line, width[tier]),
+      widthM,
+      geom: roadStrip(line, widthM),
       lengthM: lineLength(line),
       limit: lim[tier],
       terrainMaxGrade: prof.terrainMaxGrade,
@@ -1172,8 +1172,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     if (k0 !== undefined) network[k0] = 1;
   }
   // Owner's roads first (roads.owner_routes): laid as drawn, the routed roads then join them.
-  for (const or of pick<{ tier: Exclude<RoadTier, 'existing'>; why: string; points: Pt[] }[]>(planning, 'roads.owner_routes', [])) {
-    addRoad(or.tier, or.points, or.why);
+  // A route may carry its own width (client 12 Oct: the client's 18 m N-S road).
+  for (const or of pick<{ tier: Exclude<RoadTier, 'existing'>; why: string; points: Pt[]; width_m?: number }[]>(planning, 'roads.owner_routes', [])) {
+    addRoad(or.tier, or.points, or.why, false, or.width_m ?? width[or.tier]);
   }
   const minPiece = num(planning, 'roads.primary_serves_pieces_over_m2');
   let unreached = 0;

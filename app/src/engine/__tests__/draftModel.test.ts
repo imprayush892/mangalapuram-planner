@@ -48,7 +48,8 @@ describe('the draft model basis (owner, 7 Oct)', () => {
       expect(z!.use === l.use || (z!.use === 'clubhouse' && l.use === 'club'), `${l.id} use`).toBe(true);
       // Owner 7 Oct: the villas keep the land added south of Phase 4 and Phase 2, less the green pockets.
       if (l.use === 'villas') expect(z!.computedInScopeAc, `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeGreaterThan(l.land_ac! - 0.35);
-      else expect(Math.abs(z!.computedInScopeAc - l.land_ac!), `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeLessThan(0.06);
+      // Client 12 Oct: the fixed roads come off the zones first; the east lobe's last zone (C19) takes what is left of it.
+      else expect(Math.abs(z!.computedInScopeAc - l.land_ac!), `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeLessThan(0.1);
     }
     const villaModel = zoned.filter((l) => l.use === 'villas').reduce((a, l) => a + l.land_ac!, 0);
     const villaDrawn = s.draftZones.filter((z) => z.use === 'villas').reduce((a, z) => a + z.computedInScopeAc, 0);
@@ -87,7 +88,9 @@ describe('the draft model basis (owner, 7 Oct)', () => {
       expect(zs.length).toBeGreaterThan(s.draftZones.length);
       // The parks give a fixed piece (so the villa land's outline, and the street grid, stay put); the gardens
       // take back the whole plots nearest the sketch's points: within a tenth of an acre.
-      expect(Math.abs(openNet(zs) - openNet(s.draftZones)), 'open space unchanged').toBeLessThan(0.1);
+      // never less than the model's; whole plots can give back up to a fifth of an acre more than the parks gave.
+      expect(openNet(zs) - openNet(s.draftZones), 'open space kept').toBeGreaterThan(-0.1);
+      expect(openNet(zs) - openNet(s.draftZones), 'open space kept').toBeLessThan(0.2);
       const gardens = zs.filter((z) => z.component?.startsWith('OS-P'));
       expect(gardens.length).toBe(9);
       for (const g of gardens) {
@@ -95,7 +98,7 @@ describe('the draft model basis (owner, 7 Oct)', () => {
         expect(multiPolyArea(g.geom), g.name).toBeGreaterThanOrEqual(200);
       }
       // The villa land: what the parks gave, the gardens took back.
-      expect(Math.abs(ac(zs, 'villas') - ac(s.draftZones, 'villas'))).toBeLessThan(0.1);
+      expect(Math.abs(ac(zs, 'villas') - ac(s.draftZones, 'villas'))).toBeLessThan(0.2);
     }
   });
 
@@ -111,7 +114,7 @@ describe('the draft model basis (owner, 7 Oct)', () => {
         expect(multiPolyArea(g.geom), g.name).toBeGreaterThanOrEqual(200); // KMBR Rule 31(vi)
       }
       // More open space than the model's, by the chain less what the parks gave the villas.
-      expect(open(zs), name).toBeGreaterThan(open(s.draftZones) + 1.5);
+      expect(open(zs), name).toBeGreaterThan(open(s.draftZones) + 0.8); // one plot wide (client 12 Oct: at least 300 villas)
     }
   });
 

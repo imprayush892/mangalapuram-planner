@@ -26,6 +26,12 @@ writes a base64 `.txt` sibling that the loader falls back to. Hosts that
 sandbox the page may also block the file downloads the Exports tab uses — run
 it locally to get the DXF, XLSX, PDF and GLB out.
 
+The six master plans the presentation offers (D1-D6, on the owner's draft model) are planned ahead of time
+and kept in `app/prebuilt/plans` (not in git, 11 MB). On a fresh clone run `npm run plans` once (about two
+minutes) — without them the app still works and plans each option the first time it is opened (about 20 s).
+Their financial figures are in `config/financials_draft_model.yaml` (`python tools/finance/run_model.py`,
+Windows with Excel; see `docs/DECISIONS.md`, 9 and 12 Oct).
+
 `npm run dev`, `build` and `test` all run `scripts/sync-data.mjs` first, which
 copies `data/processed/`, `config/` and `tests/` into `app/public/data/`. That
 folder is generated — never edit it by hand.

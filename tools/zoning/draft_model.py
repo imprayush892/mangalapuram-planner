@@ -75,9 +75,22 @@ def mask_poly(m):
 WET = mask_poly(layer("waterlogging")).buffer(2)
 
 
+# Client 12 Oct (permanent roads): the client's 18 m N-S road runs dead straight down the commercial strip of the
+# zoning plan, from the parcel's north edge to the strip's south end, and on along Project 2's south edge to the loop
+# round Projects 2 and 3 (the road between the two parcels, the existing road up the batching strip, and the loop's
+# north side along Project 3). The gate arm's road joins it at its top. As planning_rules.yaml bases.draft_model
+# roads.owner_routes draws them.
+MAIN = LineString([(287.6, 606), (295.6, 160)])                      # the strip's centreline, 18 m
+MAIN_LINK = LineString([(295.6, 160), (300, 156), (366, 156)])        # to the road between the parcels
+ARM = LineString([(340, 662), (334, 630), (331, 600), (318, 582), (289, 572)])
+LOOP_TOP = LineString([(398, 398), (420, 414), (654, 414)])
+FIXED_ROADS = unary_union([MAIN.buffer(9, cap_style=2), MAIN_LINK.buffer(5), ARM.buffer(5), LOOP_TOP.buffer(5)]).buffer(0)
+
+
 def cz(prefix):
-    """A client zone (by name prefix), in scope and off the waterlogged ground."""
-    return unary_union([g for n, g in CLIENT.items() if n.upper().startswith(prefix.upper())]).difference(WET).buffer(0)
+    """A client zone (by name prefix), in scope and off the waterlogged ground"""
+    # (client 12 Oct) and off the fixed roads, so each zone is sized on land it can use
+    return unary_union([g for n, g in CLIENT.items() if n.upper().startswith(prefix.upper())]).difference(WET).difference(FIXED_ROADS).buffer(0)
 
 
 INF = 5000
@@ -138,12 +151,13 @@ def add(comp, name, use, phase, acres, g):
 # the retail street is the land east of it, from the gate south, one strip deep; the thin wing west of
 # the road is left as the gate's open space.
 from shapely.geometry import LineString
-# The entry road as planning_rules.yaml bases.draft_model roads.owner_routes draws it (primary, 10 m).
-ENTRY = LineString([(340, 662), (334, 630), (331, 600), (329, 575), (326, 540), (325, 440), (329, 370), (332, 348)])
-ENTRY_ROAD = ENTRY.buffer(5, cap_style=2)
+# The road the high street and the villas front: from the gate down the arm onto the client's road.
+ENTRY = LineString(list(ARM.coords) + [MAIN.interpolate(MAIN.project(Point(289, 572))).coords[0], (295.6, 160)])
+ENTRY_ROAD = FIXED_ROADS
 EAST_OF_ENTRY = ENTRY.buffer(400, single_sided=True, cap_style=2)   # the line runs south: its left is east
 RETAIL_DEPTH = 45                                              # one row of high-street blocks with its yards
-retail_band = ENTRY.buffer(5 + RETAIL_DEPTH, single_sided=True, cap_style=2).difference(ENTRY_ROAD)
+COMM, P1V = COMM.difference(FIXED_ROADS).buffer(0), P1V.difference(FIXED_ROADS).buffer(0)
+retail_band = ENTRY.buffer(9 + RETAIL_DEPTH, single_sided=True, cap_style=2).difference(ENTRY_ROAD)
 retail, _ = take(unary_union([COMM, P1V]).intersection(retail_band).intersection(above(380)), 1.5, "N")
 COMM = COMM.difference(retail)
 P1V = P1V.difference(retail)
@@ -204,8 +218,11 @@ add("C05", "SCHOOL · STAGE A", "school", 2, 2.5, schA)
 v3, _ = take(P3V, 5.982, "W")
 add("C17", "VILLAS · PHASE 3", "villas", 3, 5.982, v3)
 add("C19", "APARTMENTS · PHASE 3", "apartments", 3, 3.9, east)              # the rest of the east lobe
-# Villa clubhouse 2 and its mini-golf on the land west of the entry road, by the central lake.
-ch2, _ = take(COMM.difference(ENTRY_ROAD).difference(EAST_OF_ENTRY).difference(h_top).intersection(below(575)), 1.2, "S")
+# Villa clubhouse 2 and its mini-golf (client 12 Oct: its strip is the client's road): on the client's road, south of
+# the high street, the frontage the old entry road and the gate's west wing leave between the road and the villas.
+club_band = ENTRY.buffer(9 + 70, single_sided=True, cap_style=2).difference(ENTRY_ROAD)   # a clubhouse and its mini-golf: a deeper lot
+ch2, _ = take(unary_union([COMM, P1V]).intersection(club_band).difference(retail).difference(ch1).intersection(above(330)), 1.2, "N")
+P1V = P1V.difference(ch2).buffer(0)
 add("C10", "VILLA CLUBHOUSE 2 + MINI-GOLF", "clubhouse", 3, 1.2, ch2)
 schB, ph3_rest = take(ph3_rest, 1.5, "E")
 add("C13", "SCHOOL · STAGE B", "school", 3, 1.5, schB)
@@ -229,6 +246,8 @@ add("C14", "APARTMENT CLUBHOUSE", "clubhouse", 4, 1.0, cha)
 #     of the villa land as green pockets, a chain from the west lake through the villas to the south pond, put
 #     where the villas lose least (Phase 2's steep west edge, Phase 3's Rule 22 slope) and in Phase 4, which gains.
 OS_TARGET = 8.30
+for _z in Z:
+    _z["geom"] = _z["geom"].difference(FIXED_ROADS).buffer(0)
 SOUTH_ROAD = LineString([(471, 11), (527, 28), (585, 30), (632, 37), (646, 57), (649, 72), (675, 87)]).buffer(6)
 ZD = {z["component"]: z for z in Z}
 VILLAS = unary_union([ZD[c]["geom"] for c in ("C03", "C09", "C17", "C18")])
@@ -247,7 +266,8 @@ def piece_at(f, pt):
 
 
 FREE = free_land()
-KEPT = [piece_at(FREE, pt) for pt in ((470, 500), (309, 489), (274, 603), (828, 146))]
+# (Client 12 Oct: the gate's west wing is the client's road and the frontage on it; no park there.)
+KEPT = [piece_at(FREE, pt) for pt in ((470, 500), (274, 603), (828, 146))]
 kept_ac = sum(g.area for g in KEPT) / AC
 # The villa streets run on through the pockets (so each fronts a street): the pockets are drawn larger by the
 # streets' share of the grid, 6.5 m of street to every 46.5 m (14%), so the open space net of them is the model's.
@@ -258,7 +278,11 @@ POCKET_STREETS = 0.30   # owner 8 Oct: cross streets are back, so more of a pock
 strip = FREE.intersection(box(300, 150, 465, 190))
 strip = max(getattr(strip, "geoms", [strip]), key=lambda g: g.area)
 south_all = piece_at(FREE, (540, 130))
-ZD["C09"]["geom"] = unary_union([ZD["C09"]["geom"], strip]).buffer(0)
+# Client 12 Oct: the 18 m road's link to the loop runs along this strip; what is left of it (under 0.3 ac) stays
+# open ground, and the green pocket that matched it (11 m wide against the 18 m road, a street on it) is not drawn.
+STRIP_KEPT = strip.area / AC >= 0.3
+if STRIP_KEPT:
+    ZD["C09"]["geom"] = unary_union([ZD["C09"]["geom"], strip]).buffer(0)
 ZD["C18"]["geom"] = unary_union([ZD["C18"]["geom"], south_all]).buffer(0)
 VILLAS = unary_union([ZD[c]["geom"] for c in ("C03", "C09", "C17", "C18")])
 FREE2 = free_land()
@@ -315,7 +339,7 @@ def carve_disk(comp, centre, acres):
 from shapely.ops import nearest_points
 # Green pockets, each on land the villas sell least on: Phase 2's steep west edge by the west lake (outlook 0.38
 # against the phase's 0.44) and Phase 3's Rule 22 slope.
-g1 = carve("C09", box(0, 205, 5000, 285), strip.area / AC, "W")
+g1 = carve("C09", box(0, 205, 5000, 285), strip.area / AC, "W") if STRIP_KEPT else Polygon()
 g2 = carve_disk("C17", (522, 245), 0.30)
 # Owner 8 Oct: part of the ponds counts toward the 8.3 ac: a pond counts where a park gives it a landscaped edge
 # (the north pond in its park, the south pond with a bank walk). The south pond's park is that bank, a strip of the
@@ -329,8 +353,8 @@ taken_now = unary_union([z["geom"] for z in Z] + KEPT + [g for g, _ in EXTRA] + 
 LAKES = [(unary_union(north_pond).difference(taken_now).difference(SOUTH_ROAD).buffer(0), "NORTH POND (WATER)", 1),
          (unary_union(south_pond).difference(taken_now).difference(SOUTH_ROAD).buffer(0), "SOUTH POND (WATER)", 4)]
 lakes_ac = sum(g.area for g, _, _ in LAKES) / AC
-# 0.1 ac over, for the trunk roads that cross the parks' edges (the open space net of them is the model's 8.3 ac).
-need = OS_TARGET + 0.1 - kept_ac - extra_ac - lakes_ac - (g1.area + g2.area) / AC * (1 - POCKET_STREETS)
+# (Client 12 Oct: the fixed roads are already off the parks; no allowance for roads crossing them.)
+need = OS_TARGET - kept_ac - extra_ac - lakes_ac - (g1.area + g2.area) / AC * (1 - POCKET_STREETS)
 SOUTH_WATER = unary_union(south_pond)
 bank = None
 for w in [6 + 0.5 * k for k in range(0, 120)]:
@@ -339,9 +363,11 @@ for w in [6 + 0.5 * k for k in range(0, 120)]:
         break
 ZD["C18"]["geom"] = ZD["C18"]["geom"].difference(bank).buffer(0)
 for i, (g, where, ph) in enumerate(((g1, "by the west lake", 2), (g2, "Phase 3 slope", 3)), 1):
+    if g.is_empty:
+        continue
     Z.append(dict(component=f"OS-G{i}", name=f"GREEN POCKET {i} ({where})", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0), within="villas"))
 Z.append(dict(component="OS-G3", name="SOUTH POND BANK WALK", use="park", phase=4, model_ac=round(bank.area / AC, 3), geom=bank))
-for i, (g, where, ph) in enumerate(zip(KEPT, ("NORTH POND", "GATE WEST WING", "NORTH-WEST CORNER", "SOUTH-EAST CORNER"), (1, 1, 2, 2)), 1):
+for i, (g, where, ph) in zip((1, 3, 4), [(g, w, p) for g, w, p in zip(KEPT, ("NORTH POND", "NORTH-WEST CORNER", "SOUTH-EAST CORNER"), (1, 2, 2))]):
     Z.append(dict(component=f"OS-{i}", name=f"OPEN SPACE · {where}", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0)))
 for k, (g, ph) in enumerate(EXTRA, 5):
     Z.append(dict(component=f"OS-{k}", name=f"OPEN SPACE · POCKET PARK {k - 4}", use="park", phase=ph, model_ac=round(g.area / AC, 3), geom=g.buffer(0)))
@@ -390,6 +416,12 @@ if GREEN_POCKETS or GREEN_CHAIN:
         # its neighbour in the row: same street, sharing a side
         nb = [k for k in cand[1:12] if plots[k][1]["roadId"] == qa["roadId"] and plots[k][0].buffer(0.3).intersection(pa.buffer(0.3)).area > 4]
         pick = [a0] + nb[:1]
+        # KMBR Rule 31(vi): no piece of open space under 200 m2: a garden that falls short takes the next touching plot.
+        for k in cand[1:16]:
+            if sum(plots[q][0].area for q in pick) >= 200:
+                break
+            if k not in pick and any(plots[k][0].buffer(0.3).intersection(plots[q][0].buffer(0.3)).area > 4 for q in pick):
+                pick.append(k)
         used.update(pick)
         g = unary_union([plots[k][0].buffer(0.25) for k in pick]).buffer(-0.25).buffer(0)
         zone = BYNAME.get(qa["zone"]) or ZD[min(VZ, key=lambda v: ZD[v]["geom"].distance(pt))]
@@ -402,7 +434,7 @@ if GREEN_POCKETS or GREEN_CHAIN:
         CHAIN = [LineString([(360, 352), (398, 343), (470, 336), (560, 318), (575, 295), (548, 212), (508, 150), (515, 105)]),
                  LineString([(258, 560), (237, 455), (233, 380), (275, 370)])]
         BEADS = [(237, 455), (398, 343), (500, 333), (575, 300), (528, 180)]
-        CHAIN_HALF, BEAD_R = float(os.environ.get("CHAIN_HALF", 2)), float(os.environ.get("BEAD_R", 11))
+        CHAIN_HALF, BEAD_R = float(os.environ.get("CHAIN_HALF", 0)), float(os.environ.get("BEAD_R", 3))
         line = unary_union(CHAIN)
         pick = [k for k, (g, _) in enumerate(plots) if g.distance(line) <= CHAIN_HALF or min(g.distance(Point(b)) for b in BEADS) <= BEAD_R]
         merged = unary_union([plots[k][0].buffer(0.3) for k in pick]).buffer(-0.3).buffer(0)
@@ -425,10 +457,13 @@ if GREEN_POCKETS or GREEN_CHAIN:
         return g.area / AC
 
     # The parks give the villas about what the gardens take: the west end of the bank walk (to x = 500) and the dry
-    # ground west of the north pond from the entry road to x = 404 (fixed, so the villa land's outline, and with it
+    # ground west of the north pond from the client's road to x = 408 (fixed, so the villa land's outline, and with it
     # the street grid, stays the same whichever plots the gardens are snapped to).
-    moved = _to_villas("OS-G3", box(0, 0, 500, 300), "C18")
-    lo = 404.0
+    # (Client 12 Oct: the bank walk's west end now stays park: giving it to the villas changed the south-east block's
+    # outline enough to turn its grid and lose ten villas; the north pond's dry west side gives all of it instead.)
+    _bank_x = float(os.environ.get("BANK_X", 0))
+    moved = _to_villas("OS-G3", box(0, 0, _bank_x, 300), "C18") if _bank_x > 0 else 0.0
+    lo = float(os.environ.get("OS1_X", 408))
     moved += _to_villas("OS-1", box(330, 380, lo, 520), "C03")
     for k, (g, zone) in enumerate(gardens, 1):
         for v in VZ:                                            # a plot may straddle a phase line

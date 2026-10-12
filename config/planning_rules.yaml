@@ -65,9 +65,19 @@ bases:
     # Owner's roads: the client's 18 m entry road from the main gate on the Mangalapuram-Pothencode
     # road south to the existing road (zoning plan: "Main gate / commercial strip, 18 m N-S road"),
     # through the retail street; and the south road along the parcel edge (owner 28 Sep).
+    # Client 12 Oct: permanent roads. The client's 18 m N-S road runs straight down the zoning plan's commercial strip,
+    # from the parcel's north edge to the strip's south end, and on along Project 2's south edge to the loop round
+    # Projects 2 and 3 (the road between the two parcels and the existing road up the batching strip, both fixed;
+    # its north side along Project 3 is drawn here). The gate arm's road joins the client's road at its top.
     roads.owner_routes:
-      - {tier: primary, why: "the main entry road from the gate on the Mangalapuram-Pothencode road (client zoning plan, 18 m N-S road)",
-         points: [[340, 662], [334, 630], [331, 600], [329, 575], [326, 540], [325, 440], [329, 370], [332, 348]]}   # along the gate arm's west edge, ending on the existing road (not into the Phase 2 villas, owner 7 Oct)
+      - {tier: primary, width_m: 18, why: "the client's 18 m N-S road, straight down the commercial strip (client zoning plan; permanent, client 12 Oct)",
+         points: [[287.6, 606], [295.6, 160]]}
+      - {tier: primary, why: "the client's road on to the loop round Projects 2 and 3, along Project 2's south edge (client 12 Oct)",
+         points: [[295.6, 160], [300, 156], [366, 156]]}
+      - {tier: primary, why: "from the main gate on the Mangalapuram-Pothencode road down the gate arm to the client's road",
+         points: [[340, 662], [334, 630], [331, 600], [318, 582], [289, 572]]}
+      - {tier: primary, why: "the loop's north side, along Project 3 (client 12 Oct)",
+         points: [[398, 398], [420, 414], [654, 414]]}
       - {tier: primary, why: "the owner's south road, along the parcel edge",
          points: [[471, 11], [527, 28], [585, 30], [632, 37], [646, 57], [649, 72], [675, 87]]}
 
