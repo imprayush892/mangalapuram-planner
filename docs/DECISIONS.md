@@ -660,3 +660,16 @@ Each of these is a switch or an editable assumption, not a silent decision.
   (C07), never on the green path.
 - Tools: `tools/zoning/optimise.py` (C19_PIN / C19_OK / C19_PIECE_AC; the senior blocks seeded beside the enclave;
   MULTI_PIECE for zones allowed in pieces). Test: a villa phase under 5 ac may stray 0.2 from the plot mix (0.15 above).
+
+## 12 Oct 2026 (owner): Vastu facings, D6's empty land green, clean DXF
+- No villa entrance on the south (planning_rules villas.facing_forbidden_deg). North-south options (D2, D4, D6): the
+  villa streets run north-south only, so plots face east or west (none south-east, south or south-west); roads to the
+  ground (D1, D3, D5): any facing but south or south-west, the grid turned within that range to the angle whose
+  streets climb least. A plot that would face a forbidden way is not laid (the draft model's plans only).
+- Result: D1 377, D2 405, D3 330, D4 356, D5 301, D6 330 villas; none faces S or SW. D3 digs 37% less than D2
+  (75k against 120k m3) but its earthwork is ₹37.2 Cr against ₹40.1 Cr: retaining walls between the terraces are
+  ~85% of the cost on this slope whichever way the streets run (a strict least-climb angle did not lower it).
+- The link options' villa land left without a villa or a street becomes green (greens.py fill; D6 2.2 ac, D5 3.2 ac).
+- DXF (tools/export/clean_dxf.py, after the owner's D6-revised.dxf): road edges once, as the blocks' outlines with
+  3 m fillets as arcs; green (ACI 64) and water (ACI 5) solid fills; plots grey, houses white, buildings by use; zone
+  outlines and labels on layers that start off; R2000, ASCII.
