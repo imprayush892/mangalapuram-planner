@@ -171,6 +171,10 @@ roads:
   existing: fixed                          # built roads: kept exactly, checked against the limits below and reported
   existing_tier: primary                   # the built roads are checked against the primary limit
   max_gradient: {primary: "1:8", secondary: "1:7", tertiary: "1:6"}   # replaces client/assumptions road_gradient
+  # How a road's vertical profile is set within those limits (route.ts). grade_limited: the line nearest the ground,
+  # a forward then a backward pass (D1-D6). least_earthwork (D7): the line within the limit that costs least in cut,
+  # fill and verge walls, at the assumptions.yaml earthwork_costs rates (exact dynamic programme over the stations).
+  profile_mode: grade_limited
   # DEFAULT pending owner (asked 2026-09-24): primary = client public width, secondary = KMBR
   # through-street width, tertiary = client internal width. The client's strictly north-south
   # 18 m spine is not used: a straight N-S line cannot keep within 1:8 on this terrain.

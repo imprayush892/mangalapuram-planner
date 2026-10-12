@@ -13,7 +13,7 @@ import type { AnalysisResult } from './analysis';
 import { parseRatio } from './analysis';
 import type { Mask } from './mask';
 import { and, areaM2, count, dilate, distanceTo, emptyMask, erode, maskFrom, minus, or, patches, rasterise, toMulti } from './mask';
-import { corridor, gradeLimitedProfile, lineLength, pathToLine, route, simplify } from './route';
+import { corridor, gradeLimitedProfile, lineLength, pathToLine, profileOptions, RoadLevels, route, simplify } from './route';
 
 /**
  * Planning steps 8-16, led by the client's zoning plan (owner, 25 Sep 2026).
@@ -1171,9 +1171,10 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const roads: RoadRec[] = [];
   const network: Mask = Uint8Array.from(L.existingRoads.mask);
   const scratch = new Float32Array(n);
+  const roadLevels = new RoadLevels(dem, L.existingRoads.mask); // D7: least_earthwork roads meet the levels of the roads they join
   const addRoad = (tier: Exclude<RoadTier, 'existing'>, line: Pt[], why: string, row = false, widthM = width[tier]): RoadRec | null => {
     if (line.length < 2 || lineLength(line) < 4) return null;
-    const prof = gradeLimitedProfile(dem, line, lim[tier]);
+    const prof = gradeLimitedProfile(dem, line, lim[tier], 2, profileOptions(planning, input.assumptions, widthM, roadLevels));
     const cor = corridor(dem, line, widthM, prof, scratch);
     const cells: number[] = [];
     const dzCells: number[] = [];
@@ -1739,7 +1740,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             // Square-only: long enough to join at least two villa streets (a street and its two rows of plots).
             if (y - start >= (squareOnly ? pitch : 20)) {
               const line: Pt[] = [toWorld(f, wc + start * cot, start), toWorld(f, wc + (y - 1) * cot, y - 1)];
-              const prof = gradeLimitedProfile(dem, line, lim.secondary);
+              const prof = gradeLimitedProfile(dem, line, lim.secondary, 2, profileOptions(planning, input.assumptions, width.secondary, roadLevels));
               let earth = 0;
               for (let q = 1; q < prof.s.length; q += 1) {
                 earth += Math.abs(prof.design[q]! - prof.terrain[q]!) * (prof.s[q]! - prof.s[q - 1]!) * width.secondary;
