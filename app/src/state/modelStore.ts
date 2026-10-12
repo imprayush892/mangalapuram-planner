@@ -17,6 +17,11 @@ import { usePresent } from './presentStore';
 
 type Call = <T>(method: keyof ModelCore, ...args: unknown[]) => Promise<T>;
 
+function onPage(): Call {
+  const core = new ModelCore();
+  return async <T,>(method: keyof ModelCore, ...args: unknown[]) => (core[method] as unknown as (...a: unknown[]) => T).apply(core, args);
+}
+
 function host(): Call {
   try {
     const w = new Worker(new URL('../engine/finance/model.worker.ts', import.meta.url), { type: 'module' });
@@ -36,9 +41,7 @@ function host(): Call {
         w.postMessage({ id, method, args });
       });
   } catch {
-    // no worker on this host: on the page
-    const core = new ModelCore();
-    return async <T,>(method: keyof ModelCore, ...args: unknown[]) => (core[method] as unknown as (...a: unknown[]) => T).apply(core, args);
+    return onPage(); // no worker on this host: on the page
   }
 }
 
@@ -121,8 +124,18 @@ export const useModel = create<ModelState>((set, get) => ({
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
       workbookBuf = bytes.buffer;
+      // In a worker; on the page where the host starts none, or one that does not answer within 10 s
       call = host();
-      const sheets = await call<SheetMeta[]>('init', workbookBuf.slice(0));
+      let sheets: SheetMeta[];
+      try {
+        sheets = await Promise.race([
+          call<SheetMeta[]>('init', workbookBuf.slice(0)),
+          new Promise<never>((_, no) => setTimeout(() => no(new Error('worker silent')), 10000)),
+        ]);
+      } catch {
+        call = onPage();
+        sheets = await call<SheetMeta[]>('init', workbookBuf.slice(0));
+      }
       await call('setEdits', get().edits);
       set({ status: 'ready', sheets });
       await runAll();
