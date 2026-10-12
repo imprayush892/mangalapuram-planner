@@ -130,6 +130,11 @@ hydrology:
   # joins into one usable piece; the high ground above takes the water to the drains.
   # Patches smaller than this are ignored (was 20 m2, puddles only).
   min_waterlogging_patch_m2: 1000
+  # Owner 12 Oct (optimised zoning): water is kept to three lakes, the north pond, the south pond and the west lake
+  # in the low ground west of the 18 m road; the other waterlogged patches (the corners, the east lobe, the one under
+  # the 18 m road) are drained and built on, and the lakes are dug deeper to hold their water at the 300 mm peak.
+  # A lake is the waterlogged patch at, or within 20 m of, its point (local metres).
+  keep_lakes: [[491, 477], [552, 44], [252, 255]]
   # ASSUMPTION (owner 25 Sep direction): water running in a channel narrower than this
   # is carried by the storm-water drains, not left as a waterlogged strip. 0 = off.
   # The surveyed natural drains (Rule 22(4)) are kept clear regardless.
@@ -139,6 +144,11 @@ public_space:
   may_overlap_waterlogging: true         # landscape, recreation, ecological infrastructure
   includes_non_buildable_slope: true
   includes_natural_drains: true          # Rule 22(4): kept unobstructed
+
+open_space:
+  # Owner 12 Oct: the green by kind. A park this big or bigger is RC, the large public open space; a smaller one is
+  # landscape (with the strips no zone took and the grounds round the buildings). 0.25 ac. ASSUMPTION (owner to confirm).
+  rc_min_m2: 1000
 
 slope:
   # Non-buildable ground is KMBR Rule 22(3) (2025 amendment): no development on a slope over
@@ -203,6 +213,10 @@ plotable:
 # Owner 28 Sep: the villas, re-based on the client's cashflow (Outflow C9/C17, E9/E17). Replaces the
 # client's 50/30/20 land split and the 25 Sep plot rules (2,500-3,000 + 2,000-2,500 sq ft, FSI 1.0).
 villas:
+  # Owner 12 Oct (optimised zoning): villas as the land holds, never more than max_per_acre on a villa zone's land;
+  # the count each zoning aims for (D1/D2 350-370; the green options may go lower, but not below 300, owner 9 Oct).
+  max_per_acre: 15
+  count_by_zoning: {model: [350, 370], green_pockets: [300, 370], green_chain: [300, 370]}
   # Villa land is 80% plots and 20% roads, with 5% leeway either way; the open space comes from the
   # water and the slope, not from the villa land. Reported against each plan, not forced.
   land_split: {plots: 0.80, roads: 0.20, tolerance: 0.05}

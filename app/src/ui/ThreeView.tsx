@@ -16,6 +16,8 @@ import { useRules } from '../state/useRules';
 import { pick } from '../engine/data/config';
 import { usePresent } from '../state/presentStore';
 import { zoneColour } from './draw';
+import { hexOf } from './presentKit';
+import { draftZonesFor } from '../engine/pipeline/basis';
 import { useWalk } from '../state/walkStore';
 
 /** Walk mode (owner 9 Oct): eye height on the ground, walking and running speeds. */
@@ -56,6 +58,9 @@ export default function ThreeView(): React.ReactElement {
   const planVisible = usePlanning((s) => s.planVisible);
   const villaMasses = usePlanning((s) => s.villaMasses);
   const presenting = usePresent((s) => s.active);
+  const presentPlan = usePresent((s) => s.plans[s.option]);
+  // The plan whose zoning the presentation shows: the option on screen (its plan may not be drawn yet).
+  const zoningPlan = presentPlan ?? pipelinePlan;
   const zonesOn = useSite((s) => s.layers.zones);
   const rules = useRules();
   const unbuildableSlope = pick<number>(rules?.kmbr, 'rule22_site_suitability.no_building_slope_deg_over', 45);
@@ -98,7 +103,12 @@ export default function ThreeView(): React.ReactElement {
           pipelinePlan,
           planVisible,
           presenting && zonesOn
-            ? site.zones.filter((z) => z.geom.length > 0).map((z) => ({ geom: z.geom, colour: zoneColour(z.name) }))
+            ? zoningPlan?.option.basis === 'draft_model'
+              ? // Owner 12 Oct: the option's own zoning (optimised, with its pockets or link), coloured by use.
+                draftZonesFor(site, zoningPlan.option.zoning ?? 'model', zoningPlan.option.roads)
+                  .filter((z) => z.geom.length > 0)
+                  .map((z) => ({ geom: z.geom, colour: z.water ? '#2f7fa3' : hexOf(z.use ?? 'park') }))
+              : site.zones.filter((z) => z.geom.length > 0).map((z) => ({ geom: z.geom, colour: zoneColour(z.name) }))
             : [],
         ) ?? undefined,
       plan: pipelinePlan && planVisible.includes('buildings') ? pipelinePlan : undefined,
@@ -459,6 +469,7 @@ export default function ThreeView(): React.ReactElement {
     villaMasses,
     presenting,
     zonesOn,
+    zoningPlan,
   ]);
 
   return (

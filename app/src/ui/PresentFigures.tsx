@@ -11,7 +11,9 @@ import { GlassPanel } from './shell/Glass';
 /**
  * The presentation's closing figures (owner 7 Oct): the draft model's One-Page Summary, sections A (land by
  * product type), E (unit sizes and tickets) and B (funding and key assumptions), drawn over the master plan.
- * Every figure is read from config/programme_draft_model.yaml `summary`, which carries the workbook cell.
+ * Owner 12 Oct: the figures are the model run on the option on screen (config/financials_draft_model.yaml
+ * cases.<option>.summary, tools/finance/run_model.py: its land, villas and the office split put into the model),
+ * not the model as given; each value carries its workbook cell.
  */
 
 interface LandRow {
@@ -48,14 +50,14 @@ const short = (use: string): string => use.replace(/\s*\((.*)\)\s*$/, '');
 const note = (use: string): string | null => use.match(/\((.*)\)\s*$/)?.[1] ?? null;
 
 function Source({ cells }: { cells: string }): React.ReactElement {
-  return <p className="mt-4 text-[10px] text-muted/80">Draft model.xlsx · One-Page Summary · {cells}</p>;
+  return <p className="mt-4 text-[10px] text-muted/80">Draft model.xlsx, run on this plan (tools/finance/run_model.py) · One-Page Summary · {cells}</p>;
 }
 
 function Land({ rows, total }: { rows: LandRow[]; total: number }): React.ReactElement {
   const shown = rows.filter((r) => r.acres > 0);
   return (
     <>
-      <Heading kicker="A · Land allocation by product type" title={`${n0(total)} acres, by what is built on them`} />
+      <Heading kicker="A · Land allocation by product type" title={`${Number.isInteger(total) ? n0(total) : total.toFixed(2)} acres, by what is built on them`} />
       <div className="flex h-5 w-full overflow-hidden rounded-full ring-1 ring-line">
         {shown.map((r) => (
           <div key={r.use} title={`${short(r.use)} · ${r.acres} ac`} style={{ width: `${r.share * 100}%`, background: colourOf(r.use) }} />
@@ -202,6 +204,7 @@ export default function PresentFigures(): React.ReactElement | null {
   const cardsOn = usePresent((st) => st.cards);
   const toggle = usePresent((st) => st.toggleCards);
   const plan = usePresent((st) => st.plans[st.option]);
+  const option = usePresent((st) => st.option);
   const rules = useRules();
   const a = useAnalysisForViews();
   const site = useSite((st) => st.site);
@@ -214,7 +217,8 @@ export default function PresentFigures(): React.ReactElement | null {
     return () => clearTimeout(t);
   }, [key]);
   if (!s || !cardsOn || !rules) return null;
-  const doc = rules.programmeDraft;
+  // The option's own run of the model; the model as given only when no run is there yet.
+  const doc = pick(rules.financials, `cases.${option}.summary`, null) ? { summary: pick(rules.financials, `cases.${option}.summary`, {}) } : rules.programmeDraft;
   let body: React.ReactElement | null = null;
   if (s.card === 'land') body = <Land rows={pick<LandRow[]>(doc, 'summary.land', [])} total={pick<number>(doc, 'summary.land_total_ac', 73)} />;
   else if (s.card === 'tickets')

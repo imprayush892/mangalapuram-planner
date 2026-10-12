@@ -11,7 +11,7 @@ import { multiPolyArea } from '../geom/planar';
 import { PRESENT_PLAN_OPTIONS } from '../present/prebuilt';
 
 // Owner 7 Oct 2026: the plan on the owner's draft financial model ("Draft model.xlsx"): its programme
-// (config/programme_draft_model.yaml) on the zoning drawn for it (tools/zoning/draft_model.py).
+// (config/programme_draft_model.yaml) on the optimised zoning (owner 12 Oct: tools/zoning/optimise.py, greens.py).
 
 interface Line {
   id: string;
@@ -36,85 +36,88 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     expect(basisOf(c.planning)).toBe('draft_model');
   });
 
-  it('draws one zone per component, each at the land the model gives it', async () => {
+  it('draws one zone per component, in one piece; retail and office on the 18 m road (owner 12 Oct)', async () => {
     const [s, c] = await Promise.all([site(), config()]);
     const lines = pick<Line[]>(c.programmeDraft, 'lines', []);
-    // Owner 8 Oct: the hospital is built on the 26 ac deferred land; its lobe here is villas.
-    const zoned = lines.filter((l) => (l.land_ac ?? 0) > 0 && !l.deferred);
+    // Owner 12 Oct: the hospital is out; the sales office has no land of its own.
+    const zoned = lines.filter((l) => !l.deferred && l.use !== 'site_office');
     expect(s.draftZones.filter((z) => z.use !== 'park').length).toBe(zoned.length);
+    const routes = pick<{ points: [number, number][]; width_m?: number }[]>(planBasis(s, c).planning, 'roads.owner_routes', []);
+    const main = routes.find((r) => (r.width_m ?? 0) >= 18)!.points;
+    const [a, b] = [main[0]!, main[main.length - 1]!];
+    const fromMain = (p: [number, number]): number => {
+      const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)));
+      return Math.hypot(p[0] - a[0] - t * (b[0] - a[0]), p[1] - a[1] - t * (b[1] - a[1]));
+    };
     for (const l of zoned) {
       const z = s.draftZones.find((q) => q.component === l.id);
       expect(z, l.id).toBeDefined();
       expect(z!.use === l.use || (z!.use === 'clubhouse' && l.use === 'club'), `${l.id} use`).toBe(true);
-      // Owner 7 Oct: the villas keep the land added south of Phase 4 and Phase 2, less the green pockets.
-      if (l.use === 'villas') expect(z!.computedInScopeAc, `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeGreaterThan(l.land_ac! - 0.35);
-      // Client 12 Oct: the fixed roads come off the zones first; the east lobe's last zone (C19) takes what is left of it.
-      else expect(Math.abs(z!.computedInScopeAc - l.land_ac!), `${l.id} ${z!.computedInScopeAc.toFixed(2)} ac`).toBeLessThan(0.1);
+      // No stray piece (owner 12 Oct: no isolated building or zone); a villa phase is a band the fixed roads may
+      // cross, each of its pieces at least a block of villas (0.4 ac).
+      const pieces = z!.geom.filter((poly) => multiPolyArea([poly]) > 400);
+      if (l.use === 'villas') for (const q of pieces) expect(m2ToAcres(multiPolyArea([q])), `${l.id} piece`).toBeGreaterThan(0.4);
+      else expect(pieces.length, `${l.id} pieces`).toBe(1);
+      if (l.use === 'retail' || l.use === 'office') {
+        const near = Math.min(...z!.geom.flatMap((poly) => poly[0]!.map((v) => fromMain(v as [number, number]))));
+        expect(near, `${l.id} from the 18 m road`).toBeLessThan(9 + 4);
+      }
     }
-    const villaModel = zoned.filter((l) => l.use === 'villas').reduce((a, l) => a + l.land_ac!, 0);
-    const villaDrawn = s.draftZones.filter((z) => z.use === 'villas').reduce((a, z) => a + z.computedInScopeAc, 0);
-    expect(villaDrawn, `villa land ${villaDrawn.toFixed(2)} ac`).toBeGreaterThanOrEqual(villaModel - 0.06);
   });
 
-  it('designates the model open space, each piece usable and reached (KMBR Rule 31(v)-(vi))', async () => {
+  it('designates the open space, each piece usable and clear of plots (KMBR Rule 31(v)-(vi)); every acre counted once', async () => {
     const [s, c, p] = await Promise.all([site(), config(), plan()]);
-    const model = pick<number>(c.programmeDraft, 'scope.open_space_ac', 8.3);
     const rule = pick<{ min_area_m2: number; min_width_m: number }>(c.kmbr, 'rule31_subdivision.recreation', { min_area_m2: 200, min_width_m: 6 });
     const open = s.draftZones.filter((z) => z.use === 'park');
     const roads = p.roads.flatMap((r) => r.geom);
-    let net = 0;
     for (const z of open) {
       const a = multiPolyArea(z.geom);
       expect(a, z.name).toBeGreaterThanOrEqual(rule.min_area_m2);
-      // The villa streets run on through a green pocket (a fifth of it at most); other open space keeps its land.
-      const under = multiPolyArea(intersect(z.geom, roads));
-      expect(under / a, `${z.name} under roads`).toBeLessThan(z.within ? 0.25 : 0.1);
-      net += (a - under) / 4046.8564224;
+      // A park (RC size) keeps its land; the villa streets run on through the green in the villas.
+      if (a >= pick<number>(c.planning, 'open_space.rc_min_m2', 1000)) expect(multiPolyArea(intersect(z.geom, roads)) / a, `${z.name} under roads`).toBeLessThan(0.25);
     }
-    // The model's open space, net of the roads that cross it (within a fifth of an acre).
-    expect(Math.abs(net - model), `open space net of roads ${net.toFixed(2)} ac`).toBeLessThan(0.2);
     // No plot in the open space (a few square metres at an edge: the zones are read on the 2 m grid).
     for (const q of p.plots) for (const z of open) expect(multiPolyArea(intersect([[q.ring as [number, number][]]], z.geom)), `${q.id} in ${z.name}`).toBeLessThan(5);
+    // The land account: the parcel's 73.54 ac, at least a tenth of it open space, the lakes in it (owner 12 Oct).
+    const L = p.land;
+    expect(m2ToAcres(L.parcelM2)).toBeCloseTo(73.54, 1);
+    expect(L.openSpaceM2 / L.parcelM2).toBeGreaterThan(0.1);
+    expect(L.green.lakesM2).toBeGreaterThan(0);
+    const zones = L.zones.reduce((t, z) => t + z.areaM2, 0);
+    const parks = L.zones.filter((z) => z.use === 'park').reduce((t, z) => t + z.areaM2, 0);
+    // The zones other than parks, the roads and the open space make up the parcel.
+    expect(Math.abs(zones - parks + L.roadsM2 + L.openSpaceM2 - L.parcelM2)).toBeLessThan(50);
   });
 
-  it('green pockets (D3/D4, owner 9 Oct): two parks give land to villas, pocket gardens give it back', async () => {
+  it('green pockets (D3/D4, owner 12 Oct): whole plots turned to gardens in the villa land', async () => {
     const s = await site();
     const ac = (zs: typeof s.draftZones, use: string): number => zs.filter((z) => z.use === use).reduce((a, z) => a + multiPolyArea(z.geom), 0) / 4046.8564224;
-    // Open space, with the villa streets' share (tools/zoning, 30%) taken out of the pockets the street grid runs
-    // through; the pocket gardens are whole plots between the streets (OS-P*), counted in full.
-    const openNet = (zs: typeof s.draftZones): number =>
-      zs.filter((z) => z.use === 'park').reduce((a, z) => a + multiPolyArea(z.geom) * (z.within && !z.component?.startsWith('OS-P') ? 0.7 : 1), 0) / 4046.8564224;
     for (const zs of [s.draftZoneSets.pockets!, s.draftZoneSets.pockets_ns!]) {
-      expect(zs.length).toBeGreaterThan(s.draftZones.length);
-      // The parks give a fixed piece (so the villa land's outline, and the street grid, stay put); the gardens
-      // take back the whole plots nearest the sketch's points: within a tenth of an acre.
-      // never less than the model's; whole plots can give back up to a fifth of an acre more than the parks gave.
-      expect(openNet(zs) - openNet(s.draftZones), 'open space kept').toBeGreaterThan(-0.1);
-      expect(openNet(zs) - openNet(s.draftZones), 'open space kept').toBeLessThan(0.2);
       const gardens = zs.filter((z) => z.component?.startsWith('OS-P'));
-      expect(gardens.length).toBe(9);
+      expect(gardens.length).toBeGreaterThanOrEqual(1);
       for (const g of gardens) {
-        expect(g.within).toBe('villas');
-        expect(multiPolyArea(g.geom), g.name).toBeGreaterThanOrEqual(200);
-      }
-      // The villa land: what the parks gave, the gardens took back.
-      expect(Math.abs(ac(zs, 'villas') - ac(s.draftZones, 'villas'))).toBeLessThan(0.2);
-    }
-  });
-
-  it('green chain (D5/D6, owner 9 Oct): the gardens run on block to block, open space on top of the model', async () => {
-    const s = await site();
-    const open = (zs: typeof s.draftZones): number => zs.filter((z) => z.use === 'park').reduce((a, z) => a + multiPolyArea(z.geom), 0) / 4046.8564224;
-    for (const name of ['chain', 'chain_ns']) {
-      const zs = s.draftZoneSets[name]!;
-      const chain = zs.filter((z) => z.component?.startsWith('OS-C'));
-      expect(chain.length, name).toBeGreaterThanOrEqual(10);
-      for (const g of chain) {
         expect(g.within).toBe('villas');
         expect(multiPolyArea(g.geom), g.name).toBeGreaterThanOrEqual(200); // KMBR Rule 31(vi)
       }
-      // More open space than the model's, by the chain less what the parks gave the villas.
-      expect(open(zs), name).toBeGreaterThan(open(s.draftZones) + 0.8); // one plot wide (client 12 Oct: at least 300 villas)
+      // The gardens come out of the villa land, and only out of it.
+      const garden = gardens.reduce((a, z) => a + multiPolyArea(z.geom), 0) / 4046.8564224;
+      expect(Math.abs(ac(s.draftZones, 'villas') - ac(zs, 'villas') - garden)).toBeLessThan(0.05);
+    }
+  });
+
+  it('green link (D5/D6, owner 12 Oct): a corridor through the villas, keeping at least 300 villas', async () => {
+    const s = await site();
+    for (const name of ['chain', 'chain_ns']) {
+      const zs = s.draftZoneSets[name]!;
+      const link = zs.filter((z) => z.component?.startsWith('OS-L'));
+      expect(link.length, name).toBeGreaterThanOrEqual(3);
+      for (const g of link) {
+        expect(g.within).toBe('villas');
+        expect(multiPolyArea(g.geom), g.name).toBeGreaterThanOrEqual(200);
+      }
+      const area = link.reduce((a, z) => a + multiPolyArea(z.geom), 0) / 4046.8564224;
+      expect(area, name).toBeGreaterThan(1);
+      expect(area, name).toBeLessThan(3);
     }
   });
 
@@ -142,16 +145,17 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     expect(p.programme.find((r) => /hospital/i.test(r.use))?.placed).toMatch(/not in these 73 ac/);
   });
 
-  it('keeps each villa zone to its component count and the model plot mix', async () => {
+  it('fills the villa land within 15 an acre, in the model plot mix', async () => {
     const [p, c] = await Promise.all([plan(), config()]);
     const types = pick<{ name: string; share: number; plot_sft: number }[]>(c.programmeDraft, 'villa_types', []);
     expect(p.option.villaSizing).toBe('MIX');
-    expect(p.option.villaTarget).toBe(320);
-    // Owner 8 Oct: the villa land is filled; the township holds at least the model's 320.
-    expect(p.plots.length).toBeGreaterThanOrEqual(320);
+    // Owner 12 Oct: D1 holds 350-370 villas, never more than 15 an acre of a villa zone.
+    expect(p.plots.length).toBeGreaterThanOrEqual(350);
+    expect(p.plots.length).toBeLessThanOrEqual(370);
     for (const z of p.zones.filter((q) => q.use === 'villas')) {
       const ps = p.plots.filter((q) => q.zone === z.name);
       expect(ps.length).toBeGreaterThan(0);
+      expect(ps.length / m2ToAcres(z.areaM2), `${z.name} an acre`).toBeLessThanOrEqual(15);
       for (const t of types) {
         const share = ps.filter((q) => q.kind === t.name).length / ps.length;
         expect(Math.abs(share - t.share), `${z.name} ${t.name}`).toBeLessThan(0.1);
@@ -238,8 +242,8 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     expect(p.option.basis).toBe('draft_model');
     expect(p.option.apartmentUnits).toBe(935);
     const towers = p.buildings.filter((b) => b.typology === 'apartments');
-    expect(towers.reduce((s, b) => s + b.units, 0)).toBeGreaterThan(0.95 * 935);
+    // Owner 12 Oct: every flat of the model's 935 in a tower, none short.
+    expect(towers.reduce((s, b) => s + b.units, 0)).toBe(935);
     for (const t of towers) expect(t.topRl).toBeLessThanOrEqual(p.airport.capRl + 1e-6);
-    expect(m2ToAcres(p.zones.filter((z) => z.use === 'apartments').reduce((s, z) => s + z.areaM2, 0))).toBeCloseTo(12, 0);
   });
 });

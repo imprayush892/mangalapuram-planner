@@ -21,6 +21,9 @@ import { pick } from '../engine/data/config';
 import type { Pt } from '../engine/geom/types';
 import { useLayout } from '../state/layoutStore';
 import { useEditedSite } from '../state/useEditedSite';
+import { usePresent } from '../state/presentStore';
+import { draftZonesFor } from '../engine/pipeline/basis';
+import { hexOf } from './presentKit';
 
 export default function PlanView(): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -70,6 +73,19 @@ export default function PlanView(): React.ReactElement {
   const planningVisible = usePlanning((s) => s.visible);
   const pipelineResult = usePlanning((s) => s.plan);
   const planVisible = usePlanning((s) => s.planVisible);
+  // Presenting a plan on the draft model (owner 12 Oct): its own zoning, optimised, with its pockets or link,
+  // coloured by use, in place of the client's.
+  const presenting = usePresent((s) => s.active);
+  const presentPlan = usePresent((s) => s.plans[s.option]);
+  const { shownSite, shownColours } = useMemo(() => {
+    const o = (presentPlan ?? pipelineResult)?.option;
+    if (!presenting || !site || o?.basis !== 'draft_model') return { shownSite: undefined, shownColours: undefined };
+    const zones = draftZonesFor(site, o.zoning ?? 'model', o.roads);
+    return {
+      shownSite: { ...site, zones },
+      shownColours: Object.fromEntries(zones.map((z) => [z.id, z.water ? '#2f7fa3' : hexOf(z.use ?? 'park')])) as Record<string, string>,
+    };
+  }, [presenting, site, pipelineResult, presentPlan]);
   const pipelinePlan = useMemo(() => {
     if (!pipelineResult || !site) return undefined;
     const show = (l: string): boolean => planVisible.includes(l as never);
@@ -162,7 +178,7 @@ export default function PlanView(): React.ReactElement {
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawPlan(ctx, view, {
-      site,
+      site: shownSite ?? site,
       layers,
       raster,
       layouts,
@@ -172,7 +188,7 @@ export default function PlanView(): React.ReactElement {
       pipelinePlan,
       selectedZoneId,
       background: '#0f1518',
-      zoneColours,
+      zoneColours: shownColours ?? zoneColours,
       zoneLabels,
       editPending: editTool === 'none' ? undefined : editPending,
       editTool,
@@ -183,6 +199,8 @@ export default function PlanView(): React.ReactElement {
   }, [
     view,
     site,
+    shownSite,
+    shownColours,
     raster,
     layers,
     planning,

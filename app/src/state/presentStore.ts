@@ -18,7 +18,7 @@ import type { PresentOptionId } from '../engine/present/prebuilt';
 /**
  * Presentation mode: the planning pipeline revealed one step at a time on the
  * 2D plan and the 3D terrain, each step adding to the last. At the plots the
- * plan forks into the eight master plans; from there on any of them can be
+ * plan forks into the six master plans; from there on any of them can be
  * shown. Every step only switches what the views already draw.
  */
 
@@ -42,7 +42,7 @@ export interface PresentStep {
   uses: BuildingUse[] | 'all' | 'none';
   /** Villa masses on their plots. */
   villas: boolean;
-  /** The eight master plans part here. */
+  /** The six master plans part here. */
   fork?: boolean;
   /** The draft model's One-Page Summary figures shown over the plan (ui/PresentFigures.tsx). */
   card?: 'land' | 'tickets' | 'funding';
@@ -131,7 +131,7 @@ export const PRESENT_STEPS: PresentStep[] = [
   {
     key: 'zoning',
     num: '0',
-    title: "The client's zoning",
+    title: 'The zoning, optimised',
     layers: ['waterlogging'],
     raster: 'none',
     zones: 'filled',
@@ -153,7 +153,7 @@ export const PRESENT_STEPS: PresentStep[] = [
   {
     key: 'plots',
     num: '9',
-    title: 'Villa plots: eight master plans',
+    title: 'Villa plots: six master plans',
     layers: ['waterlogging'],
     raster: 'none',
     zones: 'off',
@@ -176,7 +176,7 @@ export const PRESENT_STEPS: PresentStep[] = [
   {
     key: 'typologies',
     num: '12',
-    title: 'Uses and golf',
+    title: 'Uses and the green',
     layers: ['waterlogging'],
     raster: 'none',
     zones: 'off',

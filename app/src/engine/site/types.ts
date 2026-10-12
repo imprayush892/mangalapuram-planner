@@ -38,6 +38,8 @@ export interface Zone {
   component?: string;
   /** An open-space zone that sits inside another use's land (a green pocket in the villas): its streets run on through it. */
   within?: string;
+  /** A lake kept as water (owner 12 Oct): open space, counted on its own. */
+  water?: boolean;
 }
 
 export interface SiteFeature {

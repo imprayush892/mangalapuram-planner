@@ -34,6 +34,12 @@ export function colourOf(use: string): string {
   return t ? rgb(TYPOLOGY_RGB[t]) : 'rgb(120,130,136)';
 }
 
+/** The same colour as #rrggbb, for the map overlays (they add their own alpha). */
+export function hexOf(use: string): string {
+  const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(colourOf(use))!;
+  return `#${[m[1], m[2], m[3]].map((v) => Number(v).toString(16).padStart(2, '0')).join('')}`;
+}
+
 export function Heading({ kicker, title, sub }: { kicker: string; title: string; sub?: string }): React.ReactElement {
   return (
     <div className="mb-4 pr-6">

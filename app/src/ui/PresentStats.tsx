@@ -114,6 +114,13 @@ function WaterloggingCard({ a }: { a: AnalysisResult }): React.ReactElement {
           [`Channels under ${c.ignoredChannels.widthM} m`, `${acs(c.ignoredChannels.areaM2, 2)} ac`, 'carried in the storm-water drains'],
           [`Patches under ${n0(c.ignoredPatches.underM2)} m²`, `${acs(c.ignoredPatches.areaM2, 2)} ac`, 'to the drains, so the land round them joins up'],
           ['Share of the site', `${Math.round(a.layers.waterlogging.share * 100)}%`],
+          ...(c.drained
+            ? ([
+                ['Kept as lakes', `${acs(c.drained.lakesM2, 2)} ac`, 'owner 12 Oct: water only in the three lakes'],
+                [`${c.drained.patches} patches drained`, `${acs(c.drained.areaM2, 2)} ac`, `${m3(c.drained.volumeM3)} of water, built on`],
+                ['Lakes dug deeper', `${c.drained.extraDepthM.toFixed(2)} m`, 'to hold the drained water at the peak'],
+              ] as [string, string, string][])
+            : []),
         ]}
       />
     </>
@@ -220,24 +227,39 @@ function PlotableCard({ a }: { a: AnalysisResult }): React.ReactElement {
   );
 }
 
-function ZoningCard(): React.ReactElement | null {
-  const zones = useSite((st) => st.site?.draftZones ?? []);
+function ZoningCard({ plan }: { plan: PlanResult | undefined }): React.ReactElement | null {
+  const site = useSite((st) => st.site?.draftZones ?? []);
+  // The option's own zoning, from its plan's land account (owner 12 Oct); the model's zones before a plan is there.
+  const zones = plan?.land
+    ? plan.land.zones.map((z) => ({ use: z.use as string, ac: z.areaM2 / AC, phase: z.phase }))
+    : site.map((z) => ({ use: z.use ?? 'other', ac: z.computedInScopeAc, phase: z.phase }));
   if (zones.length === 0) return null;
   const by = new Map<string, { ac: number; phases: Set<number> }>();
   for (const z of zones) {
-    const k = z.use ?? 'other';
+    const k = z.use;
     const e = by.get(k) ?? { ac: 0, phases: new Set<number>() };
-    e.ac += z.computedInScopeAc;
-    if (z.phase) e.phases.add(z.phase);
+    e.ac += z.ac;
+    if (z.phase && k !== 'park') e.phases.add(z.phase);
     by.set(k, e);
   }
+  if (plan?.land) {
+    // The open space net of the streets across it, with the strips no zone took and the edge: with the roads, the
+    // rows add up to the parcel.
+    by.set('park', { ac: plan.land.openSpaceM2 / AC, phases: new Set() });
+    by.set('roads', { ac: plan.land.roadsM2 / AC, phases: new Set() });
+  }
   const rows = [...by.entries()].sort((x, y) => y[1].ac - x[1].ac);
-  const total = rows.reduce((t, [, e]) => t + e.ac, 0);
-  const label = (u: string): string => (u === 'park' ? 'Open space (parks, green pockets)' : u.charAt(0).toUpperCase() + u.slice(1));
+  const total = plan?.land ? plan.land.parcelM2 / AC : rows.reduce((t, [, e]) => t + e.ac, 0);
+  const label = (u: string): string =>
+    u === 'park' ? 'Open space (parks, lakes, green in the villas, strips)' : u === 'roads' ? 'Trunk roads (outside the zones)' : u.charAt(0).toUpperCase() + u.slice(1);
   return (
     <>
-      <Heading kicker="The zoning · draft model" title="Where each use goes" sub="One zone per component of the model, at its land; phases run outward from the main gate" />
-      <Big value={total.toLocaleString('en-IN', { maximumFractionDigits: 1 })} unit="ac" label="zoned; the rest is trunk roads, ponds and verges" />
+      <Heading kicker="The zoning · optimised" title="Where each use goes" sub="Each use where it works best; phases run outward from the main gate" />
+      <Big
+        value={total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+        unit="ac"
+        label={plan?.land ? `the parcel, every acre once${plan.land.edgeM2 > 0 ? ` (with ${acs(plan.land.edgeM2, 2)} ac of unsurveyed edge, green)` : ''}` : 'zoned'}
+      />
       <div className="flex flex-col gap-1.5">
         {rows.map(([u, e]) => (
           <div key={u} className="grid grid-cols-[1fr_auto_70px] items-center gap-3">
@@ -263,6 +285,27 @@ function ZoningCard(): React.ReactElement | null {
   );
 }
 
+/** Owner 12 Oct: the green, by the owner's four kinds; nothing is left empty. */
+function GreenCard({ plan }: { plan: PlanResult }): React.ReactElement {
+  const g = plan.land.green;
+  const rows = [
+    { label: 'RC parks (large, public)', value: g.rcM2 / AC, colour: colourOf('park') },
+    { label: 'Lakes', value: g.lakesM2 / AC, colour: WATER },
+    { label: 'Green in the villas', value: g.zoneM2 / AC, colour: colourOf('park') },
+    { label: 'Clubhouse zones', value: g.clubM2 / AC, colour: colourOf('clubhouse') },
+    { label: 'Landscape strips, edge', value: g.landscapeM2 / AC, colour: colourOf('park') },
+    { label: 'Grounds round buildings', value: g.groundsM2 / AC, colour: colourOf('park') },
+  ].filter((r) => r.value > 0.005);
+  const open = (plan.land.openSpaceM2 + g.clubM2) / AC;
+  return (
+    <>
+      <Heading kicker="The green" title="No land left empty" sub="Open space by kind; the grounds round the buildings take their drives and parking too" />
+      <Big value={open.toFixed(2)} unit="ac" label={`open space with the clubhouses, ${Math.round(((plan.land.openSpaceM2 + g.clubM2) / plan.land.parcelM2) * 100)}% of the parcel`} />
+      <Bars unit="ac" rows={rows} />
+    </>
+  );
+}
+
 const USE_NAME: Record<string, string> = {
   hospital: 'Hospital',
   school: 'School',
@@ -280,10 +323,8 @@ function PhaseCard({ plan, n, last }: { plan: PlanResult; n: number; last: boole
     const bs = plan.buildings.filter((b) => ph.zone(b.zone) === k);
     const uses = new Map<string, number>();
     for (const b of bs) if (b.typology !== 'apartments' && b.typology !== 'senior') uses.set(b.typology, (uses.get(b.typology) ?? 0) + b.builtUpM2);
-    // Apartments: the model's units (owner 7 Oct), as each apartment zone reports them.
-    const apts = plan.zones
-      .filter((z) => z.use === 'apartments' && Math.max(1, z.phase ?? 1) === k)
-      .reduce((t, z) => t + Number(/(\d+) units/.exec(z.holds)?.[1] ?? 0), 0);
+    // Apartments: the flats the towers hold (owner 12 Oct: the plan's own figure).
+    const apts = bs.filter((b) => b.typology === 'apartments').reduce((t, b) => t + b.units, 0);
     return {
       villas: plots.length,
       apts,
@@ -343,7 +384,8 @@ export function stepStats(key: string, phase: number | undefined, a: AnalysisRes
     if (key === 'nonbuildable') return <NonBuildableCard a={a} />;
     if (key === 'plotable') return <PlotableCard a={a} />;
   }
-  if (key === 'zoning') return <ZoningCard />;
+  if (key === 'zoning') return <ZoningCard plan={plan} />;
+  if (key === 'typologies' && plan?.land) return <GreenCard plan={plan} />;
   if (plan && phased) {
     if (phase !== undefined) return <PhaseCard plan={plan} n={phase} last={false} />;
     if (key === 'masterplan') return <PhaseCard plan={plan} n={4} last />;

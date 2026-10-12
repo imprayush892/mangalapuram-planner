@@ -1,36 +1,36 @@
 # PROGRAMME — the owner's draft financial model ("Draft model.xlsx", owner 7 Oct 2026).
 # Read with options.basis: draft_model (planning_rules.yaml). Every figure cites its cell on the
 # model's Inputs sheet. One line per component; each is planned in the zone of the same id in
-# data/processed/zones_draft_model.geojson (tools/zoning/draft_model.py).
+# data/processed/zones_draft_model*.geojson (owner 12 Oct: tools/zoning/optimise.py and greens.py; the land is each
+# zone's own, read from the plan, not these lines: land_ac below is the model's, for reference only).
 # Areas: saleable sft (column J) and construction sft (column M = saleable x area factor, column L).
 version: 2026-10-07
 source: "Draft model.xlsx, Inputs rows 97-116 (section 10), 123-145 (section 11), 151-172 (section 12)"
-scope:
-  township_land_ac: 73               # Inputs C16
-  roads_infrastructure_ac: 10.76     # Inputs C36 = 73 x 12% + 2
-  open_space_ac: 8.3                 # Inputs C38 = 73 x 10% + 1
-  villa_land_ac: 19.94               # Inputs C40 (the balance)
-  villa_plot_efficiency: 0.85        # Inputs C41: share of villa land sold as plots
+# (Owner 12 Oct: the land account, roads, open space and villa land are the plan's own, plan.land; the model's
+# 73 / 10.76 / 8.3 / 19.94 ac no longer apply, and tools/finance/run_model.py puts the plan's into the model.)
 lines:
   - {id: C01, use: site_office, phase: 1, bua_sft: 12000, land_ac: 0, name: "Sales office, arch, road & bellmouth"}           # row 97
   - {id: C02, use: apartments, phase: 1, units: 93, saleable_sft: 149000, bua_sft: 171350, land_ac: 1.2}    # row 98
-  - {id: C03, use: villas, phase: 1, units: 48, saleable_sft: 114800, bua_sft: 114800, land_ac: 2.991}     # row 99
+  - {id: C03, use: villas, phase: 1, name: "Villas - phase 1"}   # row 99: villas as the land holds, up to villas.max_per_acre (owner 12 Oct)
   - {id: C08, use: club, phase: 1, bua_sft: 5000, land_ac: 0.5, name: "Villa clubhouse 1"}                    # row 100
   - {id: C04, use: senior, phase: 1, units: 32, plinth_sft: 1000, saleable_sft: 32000, bua_sft: 38400, land_ac: 1.0}   # row 101
   - {id: C05, use: school, phase: 2, bua_sft: 70000, land_ac: 2.5, name: "School stage A: primary & middle"}  # row 102
-  - {id: C06, use: hospital, phase: 2, bua_sft: 300000, land_ac: 5.0, name: "Hospital: core, shell & MEP", deferred: "on the 26 ac deferred land (owner 8 Oct); its 5 ac lobe here is Phase 2 villas"}    # row 103
+  - {id: C06, use: hospital, phase: 2, bua_sft: 300000, land_ac: 0, name: "Hospital: core, shell & MEP", deferred: "out of this plan (owner 12 Oct): no land on these 73 ac and no figure in the model run (its row 103 carries the office's Phase 1)"}    # row 103
   - {id: C15, use: club, phase: 2, bua_sft: 5000, land_ac: 0.3, name: "Senior-living clubhouse"}               # row 104
   - {id: C07, use: senior, phase: 2, units: 160, plinth_sft: 1000, saleable_sft: 160000, bua_sft: 192000, land_ac: 5.0}  # row 105
-  - {id: C09, use: villas, phase: 2, units: 80, saleable_sft: 191600, bua_sft: 191600, land_ac: 4.985}     # row 106
-  - {id: C17, use: villas, phase: 3, units: 96, saleable_sft: 230150, bua_sft: 230150, land_ac: 5.982}     # row 107
-  - {id: C18, use: villas, phase: 4, units: 96, saleable_sft: 230150, bua_sft: 230150, land_ac: 5.982}     # row 108
+  - {id: C09, use: villas, phase: 2, name: "Villas - phase 2"}   # row 106: villas as the land holds, up to villas.max_per_acre (owner 12 Oct)
+  - {id: C17, use: villas, phase: 3, name: "Villas - phase 3"}   # row 107: villas as the land holds, up to villas.max_per_acre (owner 12 Oct)
+  - {id: C18, use: villas, phase: 4, name: "Villas - phase 4"}   # row 108: villas as the land holds, up to villas.max_per_acre (owner 12 Oct)
   - {id: C10, use: club, phase: 3, bua_sft: 10000, land_ac: 1.2, name: "Villa clubhouse 2, with mini-golf"}    # row 109
   - {id: C13, use: school, phase: 3, bua_sft: 40000, land_ac: 1.5, name: "School stage B: senior wing"}        # row 110
   - {id: C11, use: apartments, phase: 2, units: 234, saleable_sft: 374600, bua_sft: 430790, land_ac: 3.0}   # row 111
   - {id: C19, use: apartments, phase: 3, units: 304, saleable_sft: 486600, bua_sft: 559590, land_ac: 3.9}   # row 112
   - {id: C20, use: apartments, phase: 4, units: 304, saleable_sft: 486600, bua_sft: 559590, land_ac: 3.9}   # row 113
-  - {id: C12, use: retail, phase: 3, saleable_sft: 75000, bua_sft: 90000, land_ac: 1.5, name: "Retail high street, mainly F&B (leased)"}   # row 114
-  - {id: C16, use: office, phase: 4, saleable_sft: 225000, bua_sft: 258750, land_ac: 2.5, name: "Commercial office (strata)"}               # row 115
+  # Owner 12 Oct: retail and office are split, 40% in Phase 1 and 60% in Phase 3, both on the client's 18 m road.
+  - {id: C12-1, use: retail, phase: 1, saleable_sft: 30000, bua_sft: 36000, land_ac: 0.41, name: "Retail high street, mainly F&B (leased) - Phase 1, 40%"}
+  - {id: C12, use: retail, phase: 3, saleable_sft: 45000, bua_sft: 54000, land_ac: 0.62, name: "Retail high street, mainly F&B (leased) - Phase 3, 60%"}   # row 114
+  - {id: C16-1, use: office, phase: 1, saleable_sft: 90000, bua_sft: 103500, land_ac: 0.79, name: "Commercial office (strata) - Phase 1, 40%"}   # row 103 (the hospital's, re-used)
+  - {id: C16, use: office, phase: 3, saleable_sft: 135000, bua_sft: 155250, land_ac: 1.19, name: "Commercial office (strata) - Phase 3, 60%"}               # row 115
   - {id: C14, use: club, phase: 4, bua_sft: 18000, land_ac: 1.0, name: "Apartment clubhouse"}                  # row 116
 # Villa plot types: mix of units, villa size (saleable = built up, area factor 1), plot (rows 130-133).
 villa_types:

@@ -144,11 +144,32 @@ export default function MetricsHud(): React.ReactElement {
       )}
       {draft && landByUse.length > 0 && (
         <div className="mb-2">
-          <div className="mb-1 text-[10px] uppercase tracking-wider text-muted">Land by use · draft model zones</div>
+          <div className="mb-1 text-[10px] uppercase tracking-wider text-muted">Land by use · the plan's zones</div>
           {landByUse.map((u) => (
             <div key={u.use} className="flex items-baseline justify-between gap-2 py-0.5">
               <span className="truncate text-[11px] capitalize text-muted">{u.use}</span>
               <span className="num shrink-0 text-[11px] text-fg">{u.ac.toFixed(2)} ac</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {draft && pipeline?.land && (
+        <div className="mb-2">
+          <div className="mb-1 text-[10px] uppercase tracking-wider text-muted">Green · by kind (owner 12 Oct)</div>
+          {(
+            [
+              ['RC parks', pipeline.land.green.rcM2],
+              ['Lakes', pipeline.land.green.lakesM2],
+              ['Green in the villas', pipeline.land.green.zoneM2],
+              ['Clubhouse zones', pipeline.land.green.clubM2],
+              ['Landscape strips and edge', pipeline.land.green.landscapeM2],
+              ['Grounds round buildings', pipeline.land.green.groundsM2],
+              ['Roads outside the zones', pipeline.land.roadsM2],
+            ] as [string, number][]
+          ).map(([k, m2]) => (
+            <div key={k} className="flex items-baseline justify-between gap-2 py-0.5">
+              <span className="truncate text-[11px] text-muted">{k}</span>
+              <span className="num shrink-0 text-[11px] text-fg">{(m2 / 4046.8564224).toFixed(2)} ac</span>
             </div>
           ))}
         </div>

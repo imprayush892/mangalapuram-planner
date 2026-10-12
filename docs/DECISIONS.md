@@ -516,3 +516,40 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - Re-plan order (each D3-D6 zoning is snapped to plots of a plan): D1/D2 on the base zoning; pockets from D1/D2, then
   from D3/D4's own plots; chain base (`CHAIN_HALF=-1 BEAD_R=-1 ... --chain`), then the chain on it; then
   `npm run build:deploy` and `python tools/finance/run_model.py`.
+
+## 12 Oct 2026 · optimised zoning, three lakes, the green by kind, every number the plan's own (owner; branch optimised-zoning)
+
+- No client zoning or area requirement now: the zones are allocated by tools/zoning/optimise.py on a 20 m grid
+  (tools/zoning/site_grid.py). Land per use from the model's built area at KMBR's free FSI (residential and office 3;
+  retail 2.0 and senior living 1.35, ASSUMPTIONS for low-rise; school 3 ac, ASSUMPTION). Retail and office are split
+  40% Phase 1 / 60% Phase 3, all on the client's 18 m road (main-road access, non-negotiable). Towers and senior
+  blocks go where they hide least of the villas' outlook (a viewshed: 72 directions, 300 m, from a first-floor eye)
+  and where the airport line leaves at least 12 floors; the villas take the land with the widest outlook, in a few
+  large pieces; the villa phases are bands outward from the gate; what is left is open space. No zone is a stray
+  piece: each grows from a seed with room for all of it, in one piece of land between the fixed roads.
+- Water is kept to three lakes (planning_rules hydrology.keep_lakes: the north pond, the south pond, the west lake);
+  the four small patches (2.84 ac, 3,900 m3 at the peak) are drained and built on, and the lakes are dug 0.40 m
+  deeper to hold that water. The lakes count as open space.
+- The options (prebuilt.ts): D1/D2 optimised zoning (roads to the ground / north-south), 350-370 villas, never more
+  than 15 an acre (planning_rules villas.max_per_acre, count_by_zoning). D3/D4 green pockets (tools/zoning/greens.py
+  pockets): whole plots of D1/D2 turned to gardens, placed where one brings the most villas within 100 m, until none
+  is further than 150 m walk from green (park, lake, clubhouse or pocket; the walk along the roads and through the
+  parks). D5/D6 green link (greens.py link): a 10 m green corridor through the villa land, a Steiner tree joining the
+  lakes, the villa clubs, the parks of 1 ac and more, and waypoints where the villa land is furthest from green; a
+  pocket where a villa is still over 150 m. `greens.py check` measures the walk on a finished plan.
+- The green, by the owner's kinds (plan.land.green): RC parks (from 0.25 ac, open_space.rc_min_m2, ASSUMPTION), the
+  lakes, the green in the villas, the clubhouse zones, landscape (small parks, strips no zone took, the parcel's
+  0.44 ac of unsurveyed edge), the grounds round the buildings (with their drives and parking). Every acre of the
+  73.54 is counted once (plan.land); roads are those outside the zones and across the parks.
+- Numbers: the hospital is out (no land, no figure; Excel row 103 carries the office's Phase 1); the villa rows ask
+  "up to 15 an acre" instead of the old model's 48/80/96/96; apartments report the flats the towers hold. The model
+  is run on each plan (tools/finance/run_model.py): C16 = 73.54 ac, every component's land from its zone, roads,
+  open space, villas by phase and the villa mix from the plan. LIMITATION: retail is one row in the model (its
+  Retail Lease sheet), so all of it is timed in Phase 3. The presentation's land, ticket and funding cards read the
+  run of the option on screen.
+- Result (villas; furthest walk to green; PAT, project IRR): D1 361, 213 m, ₹340.7 Cr, 20.6%; D2 351, 238 m,
+  ₹331.1 Cr, 20.2%; D3 340, 108 m, ₹322.6 Cr, 19.8%; D4 341, 90 m, ₹322.2 Cr, 19.8%; D5 308, 126 m, ₹293.5 Cr, 18.3%;
+  D6 300, 131 m, ₹286.0 Cr, 17.9%. The model as given: ₹380.6 Cr, 22.0% (with the hospital's ₹270 Cr sale, now out).
+  Every option: 935 flats and 192 senior homes placed in full; 73.54 ac counted once.
+- Re-plan order: `python tools/zoning/optimise.py`; plan D1/D2; `greens.py pockets|link <D1|D2 plan>` for D3-D6
+  (all in tools/zoning/replan_all.sh; it needs the untracked scratch test app/src/engine/__tests__/_draft.test.ts); `npm run plans`; `python tools/finance/run_model.py`; `npm run build:deploy`.

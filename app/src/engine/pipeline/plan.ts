@@ -221,7 +221,7 @@ export interface PlanResult {
   option: {
     /** The programme the plan is drawn to (planning_rules.yaml options.basis). */
     basis: 'draft_model' | 'client';
-    /** Apartment units reported: the model's units on the draft-model basis (owner 7 Oct), else those placed. */
+    /** Apartment units the towers hold (owner 12 Oct: the plan's own figure, not the model's). */
     apartmentUnits: number;
     villaSizing: VillaCategory;
     roads: 'terrain' | 'north_south';
@@ -250,10 +250,34 @@ export interface PlanResult {
   fillM3: number;
   programme: ProgrammeRow[];
   existingRoads: { lengthM: number; overLimitM: number; maxGrade: number; limit: number };
+  /** Owner 12 Oct: the land account (on the 2 m grid, so it adds up to the parcel exactly) and its green. */
+  land: LandAccount;
   /** Road corridors of every tier, as a mask. */
   roadMask: Mask;
   notes: string[];
   ms: number;
+}
+
+/**
+ * Owner 12 Oct: every acre of the parcel, once. A zone's land is gross (its own streets in it); the roads are those
+ * outside every zone (the client's fixed roads, the existing roads) and the streets drawn across the parks; what no
+ * zone and no road takes is green. The green, by the owner's four kinds: (1) the RC, the large public open space
+ * (parks from rc_min_m2, and the lakes, owner: water counts as open space); (2) the green within the zoning (pocket
+ * gardens and the green link in the villa land); (3) landscape: the small parks, the strips no zone took, and the
+ * grounds round the apartment, senior, school and commercial buildings (with their drives and parking); (4) the
+ * clubhouse zones, open space too.
+ */
+export interface LandAccount {
+  /** The parcel's outline (73.54 ac): the grid's cells plus the edge strip with no survey level. */
+  parcelM2: number;
+  /** The parcel's edge the survey does not cover (no level, so nothing is planned on it): counted as landscape. */
+  edgeM2: number;
+  /** Each zone's gross land, with its programme component. */
+  zones: { name: string; component?: string; use: Typology; phase?: number; areaM2: number }[];
+  roadsM2: number;
+  green: { rcM2: number; lakesM2: number; zoneM2: number; landscapeM2: number; groundsM2: number; clubM2: number };
+  /** RC + lakes + zone green + small parks, strips and the edge: the open space no component's land holds (the model's Inputs C38). */
+  openSpaceM2: number;
 }
 
 export interface PlanInput {
@@ -263,7 +287,7 @@ export interface PlanInput {
    * The zoning, clipped to the parcel: the client's plan, or the draft model's zones, which carry
    * their use, phase and programme component (programme line id).
    */
-  zones: { name: string; geom: MultiPoly; labelAc?: number; use?: string; phase?: number; component?: string; within?: string }[];
+  zones: { name: string; geom: MultiPoly; labelAc?: number; use?: string; phase?: number; component?: string; within?: string; water?: boolean }[];
   kmbr: YamlDoc;
   client: YamlDoc;
   assumptions: YamlDoc;
@@ -2877,7 +2901,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
             }
           }
           // A set number of towers: where staggering leaves no room, the view rule gives way.
-          if (!best && zoneTowers && fallback) {
+          // (Owner 12 Oct: so too where a draft-model zone still has flats to place.)
+          if (!best && (zoneTowers || (zp && unitsLeft > 0)) && fallback) {
             best = fallback;
             relaxed += 1;
           }
@@ -3709,9 +3734,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     else if (z.use === 'clubhouse') holds = `${bs.length} clubhouse wings; golf ${ac(inZ(golf))} in the zone`;
     else if (bs.length === 0) holds = z.cells.length === 0 ? 'outside the parcel' : 'nothing placed';
     else {
-      // Draft model: an apartment zone holds the model's units (owner 7 Oct; the airport limit is not the plan's to fix).
-      const model = z.use === 'apartments' ? progOf(z)?.units : undefined;
-      const u = model ?? bs.reduce((s, b) => s + b.units, 0);
+      // Owner 12 Oct: every figure is the plan's own: the flats the towers hold, not the model's count.
+      const u = bs.reduce((s, b) => s + b.units, 0);
       holds = `${bs.length} buildings${u > 0 ? `, ${u} units` : ''}, ${sft(bs.reduce((s, b) => s + b.builtUpM2, 0))} sq ft built up`;
     }
     return {
@@ -3734,7 +3758,54 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     };
   });
 
+  /* ------------------------------------------------- land account (owner 12 Oct) */
+  const rcMin = num(planning, 'open_space.rc_min_m2');
+  let outRoad = 0;
+  let outGreen = 0;
+  let parcelCells = 0;
+  for (let k = 0; k < n; k += 1) {
+    if (!terrain[k]) continue;
+    parcelCells += 1;
+    if (zoneOf[k]! >= 0) continue;
+    if (network[k]) outRoad += 1;
+    else outGreen += 1;
+  }
+  const green = { rcM2: 0, lakesM2: 0, zoneM2: 0, landscapeM2: outGreen * cellArea, groundsM2: 0, clubM2: 0 };
+  let parkRoads = 0;
+  const buildsOn = new Set<Typology>(['apartments', 'senior', 'school', 'retail', 'office', 'commercial', 'hospital']);
+  for (const [zi, z] of zones.entries()) {
+    const iz = input.zones[zi]!;
+    if (z.use === 'park' || z.use === 'open') {
+      const rep = zoneReports.find((r) => r.name === z.name);
+      const net = rep?.openNetM2 ?? z.areaM2;
+      parkRoads += z.areaM2 - net;
+      if (iz.water) green.lakesM2 += net;
+      else if (iz.within) green.zoneM2 += net;
+      else if (net >= rcMin) green.rcM2 += net;
+      else green.landscapeM2 += net;
+    } else if (z.use === 'clubhouse') green.clubM2 += z.areaM2;
+    else if (buildsOn.has(z.use)) {
+      const foot = buildings.filter((b) => b.zone === z.name).reduce((a, b) => a + b.footprintM2, 0);
+      let rd = 0;
+      for (const k of z.cells) if (network[k]) rd += 1;
+      green.groundsM2 += Math.max(0, z.areaM2 - foot - rd * cellArea);
+    }
+  }
+  const edgeM2 = Math.max(0, (analysis.parcelPolyM2 ?? 0) - parcelCells * cellArea);
+  green.landscapeM2 += edgeM2;
+  const land: LandAccount = {
+    parcelM2: parcelCells * cellArea + edgeM2,
+    edgeM2,
+    zones: zones
+      .filter((z) => z.cells.length > 0)
+      .map((z) => ({ name: z.name, ...(z.component ? { component: z.component } : {}), use: z.use, ...(z.phase !== undefined ? { phase: z.phase } : {}), areaM2: z.areaM2 })),
+    roadsM2: outRoad * cellArea + parkRoads,
+    green,
+    openSpaceM2: green.rcM2 + green.lakesM2 + green.zoneM2 + green.landscapeM2,
+  };
+
   /* ------------------------------------------------------ programme */
+  const maxPerAcre = num(planning, 'villas.max_per_acre');
   const villaBua = plots.reduce((s, p) => s + p.builtUpM2, 0);
   const plottedShare = grossLandM2 > 0 ? plots.reduce((s, p) => s + p.areaM2, 0) / grossLandM2 : 0;
   const split = pick<{ plots: number; tolerance: number }>(planning, 'villas.land_split', { plots: 0.8, tolerance: 0.05 });
@@ -3829,22 +3900,26 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       const label = `${l.id} · ${z.name.charAt(0)}${z.name.slice(1).toLowerCase()}`;
       if (z.use === 'villas') {
         const bua = ps.reduce((a, p) => a + p.builtUpM2, 0);
+        // Owner 12 Oct: as many as the land holds, up to villas.max_per_acre on the zone's land (the model's
+        // counts no longer apply); a count of the model's, where a line still has one, is the ask.
+        const zac = z.areaM2 / 4046.8564224;
+        const cap = Math.floor(zac * maxPerAcre);
         programme.push({
           use: label,
-          asked: `${l.units} villas`,
+          asked: l.units ? `${l.units} villas` : `up to ${cap} villas (${maxPerAcre} an acre on ${zac.toFixed(2)} ac)`,
           placed: `${ps.length} plots, ${sft(bua)} sq ft BUA`,
-          met: ps.length >= (l.units ?? 0),
-          note: cat.types.map((t) => `${ps.filter((p) => p.kind === t.name).length} x ${t.name}`).join(', '),
+          met: l.units ? ps.length >= l.units : ps.length <= cap,
+          note: `${(ps.length / Math.max(zac, 1e-9)).toFixed(1)} an acre; ${cat.types.map((t) => `${ps.filter((p) => p.kind === t.name).length} x ${t.name}`).join(', ')}`,
         });
       } else if (l.units && z.use === 'apartments') {
-        // Owner 7 Oct: the apartments are the model's units; the airport limit on the towers is not the plan's to
-        // fix, so the line reports the model's units as met. The massing shows the towers held under the limit.
+        // Owner 12 Oct: the flats the towers hold, against the model's; a shortfall shows.
+        const u = bs.reduce((a, b) => a + b.units, 0);
         programme.push({
           use: label,
           asked: `${l.units} units`,
-          placed: `${l.units} units in ${bs.length} buildings`,
-          met: true,
-          note: `the model's units (owner 7 Oct); tallest ${bs.reduce((m, b) => Math.max(m, b.floors), 0)} floors, massed under the airport limit of ${air.amsl} m AMSL`,
+          placed: `${u} units in ${bs.length} buildings`,
+          met: u >= l.units,
+          note: `tallest ${bs.reduce((m, b) => Math.max(m, b.floors), 0)} floors, under the airport limit of ${air.amsl} m AMSL${u < l.units ? `; ${l.units - u} short` : ''}`,
         });
       } else if (l.units) {
         const u = bs.reduce((a, b) => a + b.units, 0);
@@ -3879,6 +3954,19 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         note: l.deferred,
       });
     }
+  }
+  if (compZones.some((z) => z.use === 'villas')) {
+    // Owner 12 Oct: the count each zoning aims for (planning_rules.yaml villas.count_by_zoning).
+    const zoningKey = ((x) => (x === 'green_pockets' || x === 'green_chain' ? x : 'model'))(pick<string>(planning, 'options.draft_zoning', 'model'));
+    const [lo, hi] = pick<[number, number]>(planning, `villas.count_by_zoning.${zoningKey}`, [0, Infinity]);
+    const vac = compZones.filter((z) => z.use === 'villas').reduce((a, z) => a + z.areaM2, 0) / 4046.8564224;
+    programme.push({
+      use: 'Villas · all phases',
+      asked: `${lo}–${hi} villas`,
+      placed: `${plots.length} villas on ${vac.toFixed(2)} ac, ${(plots.length / Math.max(vac, 1e-9)).toFixed(1)} an acre`,
+      met: plots.length >= lo && plots.length <= hi,
+      note: `owner 12 Oct; at most ${maxPerAcre} an acre`,
+    });
   }
   const unzoned = compZones.length > 0 ? [] : ['hotel', 'office'].filter((u) => byUse(u).length > 0);
   if (unzoned.length > 0) {
@@ -3929,9 +4017,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     airport: { capAmslM: air.amsl, capRl, tbmAmslM: air.tbmAmsl, rooftopM: air.roof },
     option: {
       basis: pick<string>(planning, 'options.basis', 'client') === 'draft_model' ? 'draft_model' : 'client',
-      apartmentUnits: zones.some((z) => z.use === 'apartments' && progOf(z)?.units)
-        ? zones.filter((z) => z.use === 'apartments').reduce((a, z) => a + (progOf(z)?.units ?? 0), 0)
-        : buildings.filter((b) => b.typology === 'apartments').reduce((a, b) => a + b.units, 0),
+      apartmentUnits: buildings.filter((b) => b.typology === 'apartments').reduce((a, b) => a + b.units, 0),
       villaSizing,
       roads: roadMode,
       zoning: ((z) => (z === 'green_pockets' || z === 'green_chain' ? z : 'model'))(pick<string>(planning, 'options.draft_zoning', 'model')),
@@ -3956,6 +4042,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     cutM3: cut,
     fillM3: fill,
     programme,
+    land,
     existingRoads: { lengthM: exLen, overLimitM: exOver, maxGrade: exMax, limit: exLimit },
     roadMask: network,
     notes,

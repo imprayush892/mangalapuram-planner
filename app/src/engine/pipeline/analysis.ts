@@ -4,11 +4,12 @@ import type { SiteFeature } from '../site/types';
 import type { YamlDoc } from '../data/config';
 import { pick } from '../data/config';
 import { roadFromEdge } from '../geom/offset';
+import { multiPolyArea } from '../geom/planar';
 import { hydrologyParams, stormFor, stormRunoffCoeff, waterModelFor } from '../terrain/hydrology';
 import type { StormResult } from '../terrain/hydrology';
 import { unbuildableSlopeDeg } from '../rules/kmbr';
 import type { Mask } from './mask';
-import { and, areaM2, dilate, dropSmall, maskFrom, minus, openToWidth, or, patches, rasterise, toMulti } from './mask';
+import { and, areaM2, dilate, dropSmall, emptyMask, maskFrom, minus, openToWidth, or, patches, rasterise, toMulti } from './mask';
 
 /**
  * Planning steps 1-7: from the terrain to the land that can take plots.
@@ -80,6 +81,8 @@ export interface AnalysisResult {
   /** Display order, earliest step first. */
   order: LayerId[];
   parcelAreaM2: number;
+  /** The parcel's own outline's area (the grid's parcelAreaM2 leaves out its edge cells with no level). */
+  parcelPolyM2: number;
   storm: StormResult;
   stormMm: number;
   /** Slope per cell as rise/run (0.25 = 1:4); NaN off the DEM. */
@@ -92,6 +95,11 @@ export interface AnalysisResult {
     counted: { areaM2: number; volumeM3: number; meanDepthM: number };
     ignoredChannels: { areaM2: number; volumeM3: number; widthM: number };
     ignoredPatches: { areaM2: number; volumeM3: number; underM2: number };
+    /**
+     * Owner 12 Oct: water is kept to a few lakes (planning_rules.yaml hydrology.keep_lakes); the other waterlogged
+     * patches are drained and built on, and the lakes are dug deeper to hold their water. Absent when no lakes are set.
+     */
+    drained?: { areaM2: number; volumeM3: number; patches: number; lakesM2: number; extraDepthM: number };
   };
   ms: number;
 }
@@ -143,7 +151,29 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
   // land either side joins up into one usable piece. The ponds stay.
   const wetRaw = and(parcel, maskFrom(dem, (k) => storm.peakDepthM[k]! >= minDepth));
   const wetOpen = narrowChannel > 0 ? openToWidth(dem, wetRaw, narrowChannel) : wetRaw;
-  const wet = dropSmall(dem, wetOpen, minWaterPatch);
+  const wetAll = dropSmall(dem, wetOpen, minWaterPatch);
+  // Owner 12 Oct: only the lakes named in the rules stay water (a lake is the waterlogged patch at or within 20 m of
+  // its point); the rest is drained, and its water at the peak goes into the lakes, dug that much deeper.
+  const lakePts = pick<[number, number][]>(planning, 'hydrology.keep_lakes', []);
+  let wet = wetAll;
+  let drainedInfo: { mask: Mask; patches: number } | null = null;
+  if (lakePts.length > 0) {
+    const keep = emptyMask(dem);
+    let dropped = 0;
+    for (const piece of patches(dem, wetAll)) {
+      const near = lakePts.some(([x, y]) =>
+        piece.some((k) => {
+          const i = k % dem.meta.nx;
+          const j = (k - i) / dem.meta.nx;
+          return Math.hypot(dem.meta.x0 + dem.cell * (i + 0.5) - x, dem.meta.y0 + dem.cell * (j + 0.5) - y) <= 20;
+        }),
+      );
+      if (near) for (const k of piece) keep[k] = 1;
+      else dropped += 1;
+    }
+    drainedInfo = { mask: minus(wetAll, keep), patches: dropped };
+    wet = keep;
+  }
   const vol = (m: Mask): number => {
     let v = 0;
     for (let k = 0; k < m.length; k += 1) if (m[k]) v += storm.peakDepthM[k]! * dem.cell * dem.cell;
@@ -335,6 +365,7 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
       'plotable',
     ],
     parcelAreaM2: parcelArea,
+    parcelPolyM2: multiPolyArea(input.parcel),
     storm,
     stormMm,
     gradient,
@@ -342,7 +373,18 @@ export function runAnalysis(input: AnalysisInput): AnalysisResult {
     water: {
       counted: { areaM2: areaM2(dem, wet), volumeM3: vol(wet), meanDepthM: areaM2(dem, wet) > 0 ? vol(wet) / areaM2(dem, wet) : 0 },
       ignoredChannels: { areaM2: areaM2(dem, minus(wetRaw, wetOpen)), volumeM3: vol(minus(wetRaw, wetOpen)), widthM: narrowChannel },
-      ignoredPatches: { areaM2: areaM2(dem, minus(wetOpen, wet)), volumeM3: vol(minus(wetOpen, wet)), underM2: minWaterPatch },
+      ignoredPatches: { areaM2: areaM2(dem, minus(wetOpen, wetAll)), volumeM3: vol(minus(wetOpen, wetAll)), underM2: minWaterPatch },
+      ...(drainedInfo
+        ? {
+            drained: {
+              areaM2: areaM2(dem, drainedInfo.mask),
+              volumeM3: vol(drainedInfo.mask),
+              patches: drainedInfo.patches,
+              lakesM2: areaM2(dem, wet),
+              extraDepthM: areaM2(dem, wet) > 0 ? vol(drainedInfo.mask) / areaM2(dem, wet) : 0,
+            },
+          }
+        : {}),
     },
     rule22: [
       {

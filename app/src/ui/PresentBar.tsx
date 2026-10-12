@@ -14,6 +14,27 @@ const AC = 4046.8564224;
 const ac = (m2: number): string => (m2 / AC).toFixed(1);
 const n0 = (v: number): string => Math.round(v).toLocaleString('en-IN');
 
+/** What a phase adds, from the plan's own zones, plots and buildings (owner 12 Oct: no figure of the model's). */
+function phaseAdds(plan: PlanResult, n: number): string {
+  const inPhase = new Set(plan.zones.filter((z) => z.phase === n && z.use !== 'park' && z.use !== 'open').map((z) => z.name));
+  const villas = plan.plots.filter((p) => inPhase.has(p.zone)).length;
+  const bs = plan.buildings.filter((b) => b.zone && inPhase.has(b.zone));
+  const flats = bs.filter((b) => b.typology === 'apartments').reduce((t, b) => t + b.units, 0);
+  const towers = bs.filter((b) => b.typology === 'apartments').length;
+  const senior = bs.filter((b) => b.typology === 'senior').reduce((t, b) => t + b.units, 0);
+  const parts: string[] = [];
+  if (villas > 0) parts.push(`${villas} villas`);
+  if (flats > 0) parts.push(`${flats} flats in ${towers} tower${towers === 1 ? '' : 's'}`);
+  if (senior > 0) parts.push(`${senior} senior homes`);
+  const has = (u: string): boolean => bs.some((b) => b.typology === u);
+  if (has('school')) parts.push('a school stage');
+  if (has('retail')) parts.push('retail on the 18 m road');
+  if (has('office')) parts.push('offices on the 18 m road');
+  if (has('clubhouse')) parts.push(`${bs.filter((b) => b.typology === 'clubhouse').length > 1 ? 'clubhouses' : 'a clubhouse'}`);
+  if (parts.length === 0) return '';
+  return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
 /** One sentence per step, with the number the step turns on. */
 function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: PlanResult | undefined, stormMm: number): string {
   const L = a?.layers;
@@ -34,8 +55,13 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
     }
     case 'water':
       return `A ${stormMm} mm day falls on the site. The flow paths show where it runs off the crown.`;
-    case 'waterlogging':
-      return L ? `${ac(L.waterlogging.areaM2)} ac stands under water at the storm's peak. It becomes open space, never plots.` : '';
+    case 'waterlogging': {
+      if (!L) return '';
+      const d = a?.water.drained;
+      return d
+        ? `Water is kept to ${ac(L.waterlogging.areaM2)} ac of lakes, open space. ${d.patches} small patches (${ac(d.areaM2)} ac) are drained and built on; the lakes are dug ${d.extraDepthM.toFixed(2)} m deeper to hold their ${n0(d.volumeM3)} m³.`
+        : `${ac(L.waterlogging.areaM2)} ac stands under water at the storm's peak. It becomes open space, never plots.`;
+    }
     case 'public':
       return L ? `${ac(L.publicSpace.areaM2)} ac is public space: the water, the steep ground, the drains, and slivers too narrow to plot.` : '';
     case 'slope':
@@ -47,7 +73,9 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
     case 'plotable':
       return L ? `${ac(L.plotable.areaM2)} ac is left that can take plots, ${Math.round(L.plotable.share * 100)}% of the site.` : '';
     case 'zoning':
-      return "The client's zoning sets where each use goes. The plan leaves it only where water or slope demand.";
+      return plan?.option.basis === 'draft_model'
+        ? 'Each use where it works best: retail and offices on the 18 m road, the towers and senior blocks where they hide least of the villas’ views, the villas on the best outlook; the rest is green.'
+        : "The client's zoning sets where each use goes. The plan leaves it only where water or slope demand.";
     case 'roads': {
       if (!plan) return 'Laying the roads…';
       const km = plan.roads.reduce((s, r) => s + r.lengthM, 0) / 1000;
@@ -66,24 +94,29 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
       if (!plan) return '';
       const t = plan.buildings.filter((b) => b.typology === 'apartments');
       const floors = t.map((b) => b.floors);
-      return `${t.length} towers of 16,500 sq ft, ${Math.min(...floors)}–${Math.max(...floors)} floors, on the lower ground. Every top stays under the airport's ${plan.airport.capAmslM} m AMSL line.`;
+      const plate = t.reduce((m, b) => m + b.footprintM2, 0) / Math.max(1, t.length);
+      return `${t.length} towers, ${t.reduce((m, b) => m + b.units, 0)} flats, plates of about ${n0(plate * 10.7639)} sq ft, ${Math.min(...floors)}–${Math.max(...floors)} floors. Every top stays under the airport's ${plan.airport.capAmslM} m AMSL line.`;
     }
     case 'placement':
-      return 'The school, the clubhouse, senior living, commercial and the batching plant, each as one compact group in its zone.';
+      return plan?.option.basis === 'draft_model'
+        ? `The school, the clubhouses, senior living, retail and offices, each as one compact group in its zone, with ${ac(plan.land.green.groundsM2)} ac of landscaped grounds round them.`
+        : 'The school, the clubhouse, senior living, commercial and the batching plant, each as one compact group in its zone.';
     case 'massing':
       return plan ? `${plan.plots.length} villas, ground and first floor, each on its own platform.` : '';
     case 'phase-1':
-      return 'The township is built outward from the main gate: Phase 1 first, beside it, with the trunk roads.';
+      return plan ? `Built outward from the main gate. Phase 1, beside it, with the trunk roads: ${phaseAdds(plan, 1)}.` : '';
     case 'phase-2':
-      return 'Phase 2 adds the next ring: more villas (on the hospital lobe too: the hospital goes to the deferred land), apartments, the senior enclave and the first school stage.';
+      return plan ? `Phase 2 adds ${phaseAdds(plan, 2)}.` : '';
     case 'phase-3':
-      return 'Phase 3 reaches the middle of the site, with the retail street, the second clubhouse and the senior school wing.';
+      return plan ? `Phase 3 adds ${phaseAdds(plan, 3)}.` : '';
     case 'masterplan':
       return plan
-        ? `Phase 4 completes it: ${plan.plots.length} villas, ${plan.buildings.filter((b) => b.typology === 'apartments').length} towers, ${(plan.roads.reduce((s, r) => s + r.lengthM, 0) / 1000).toFixed(1)} km of new roads.`
+        ? `Phase 4 adds ${phaseAdds(plan, 4)}. In all: ${plan.plots.length} villas, ${plan.buildings.filter((b) => b.typology === 'apartments').reduce((t, b) => t + b.units, 0)} flats, ${(plan.roads.reduce((s, r) => s + r.lengthM, 0) / 1000).toFixed(1)} km of new roads.`
         : '';
     case 'figures-land':
-      return "The 73 acres as the draft model allocates them: what each product type takes, and in which phases.";
+      return plan?.land
+        ? `This plan's ${(plan.land.parcelM2 / AC).toFixed(2)} acres in the draft model: what each product type takes, and in which phases.`
+        : 'The acres as the draft model allocates them: what each product type takes, and in which phases.';
     case 'figures-tickets':
       return 'Every home in the model, by typology: its size, its rate and what it sells for.';
     case 'figures-funding':
@@ -95,8 +128,8 @@ function caption(key: string, a: AnalysisResult | null, dem: Dem | null, plan: P
 
 /**
  * The presenter's bar: where the reveal has got to, what the step shows, the
- * eight master plans once the plots are laid, and Back / Next. Arrow keys,
- * Page Up / Down (a clicker) and the space bar step; 1-8 pick a plan; Esc ends.
+ * master plans (PRESENT_OPTIONS) once the plots are laid, and Back / Next. Arrow keys,
+ * Page Up / Down (a clicker) and the space bar step; 1-6 pick a plan; Esc ends.
  */
 export default function PresentBar(): React.ReactElement {
   const { step, option, plans, prep, errors, next, back, go, choose, stop, cards, toggleCards } = usePresent();

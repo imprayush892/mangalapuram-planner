@@ -19,14 +19,14 @@ export type PresentZoning = 'model' | 'green_pockets' | 'green_chain';
  * options A1-C2 of 28 Sep run with options.basis: client.)
  */
 export const PRESENT_PLAN_OPTIONS: { id: PresentOptionId; sizing: 'A' | 'B' | 'B_count' | 'C' | 'MIX'; roads: 'terrain' | 'north_south'; zoning: PresentZoning; label: string }[] = [
-  { id: 'D1', sizing: 'MIX', roads: 'terrain', zoning: 'model', label: 'Draft model · roads to the ground' },
-  { id: 'D2', sizing: 'MIX', roads: 'north_south', zoning: 'model', label: 'Draft model · north–south roads (Vastu)' },
-  // Owner 9 Oct: part of two parks is villas, the same open space is pocket gardens among the villas.
+  { id: 'D1', sizing: 'MIX', roads: 'terrain', zoning: 'model', label: 'Optimised zoning · roads to the ground' },
+  { id: 'D2', sizing: 'MIX', roads: 'north_south', zoning: 'model', label: 'Optimised zoning · north–south roads (Vastu)' },
+  // Owner 12 Oct: pocket gardens spread through the villas, none further than 150 m walk from green.
   { id: 'D3', sizing: 'MIX', roads: 'terrain', zoning: 'green_pockets', label: 'Green pockets · roads to the ground' },
   { id: 'D4', sizing: 'MIX', roads: 'north_south', zoning: 'green_pockets', label: 'Green pockets · north–south roads (Vastu)' },
-  // Owner 9 Oct: the gardens one continuous chain, lake to lake: leave one, cross the street, enter the next.
-  { id: 'D5', sizing: 'MIX', roads: 'terrain', zoning: 'green_chain', label: 'Green chain · roads to the ground' },
-  { id: 'D6', sizing: 'MIX', roads: 'north_south', zoning: 'green_chain', label: 'Green chain · north–south roads (Vastu)' },
+  // Owner 12 Oct: a green link through the villas, joining the parks, lakes and clubs (11-12 villas an acre).
+  { id: 'D5', sizing: 'MIX', roads: 'terrain', zoning: 'green_chain', label: 'Green link · roads to the ground' },
+  { id: 'D6', sizing: 'MIX', roads: 'north_south', zoning: 'green_chain', label: 'Green link · north–south roads (Vastu)' },
 ];
 
 /** The planning overrides that select an option. */
