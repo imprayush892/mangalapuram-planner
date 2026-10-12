@@ -230,6 +230,12 @@ export function cellAddress(hf: HyperFormula, sheet: string, a1: string): Simple
   return { sheet: sheetId(hf, sheet), row: r, col: c };
 }
 
+/** An input's address: "C33" on the Inputs sheet, or "One-Page Summary!C15". */
+export function inputAddress(hf: HyperFormula, key: string): SimpleCellAddress {
+  const k = key.lastIndexOf('!');
+  return k < 0 ? cellAddress(hf, 'Inputs', key) : cellAddress(hf, key.slice(0, k), key.slice(k + 1));
+}
+
 export function valueAt(hf: HyperFormula, sheet: string, a1: string): unknown {
   return hf.getCellValue(cellAddress(hf, sheet, a1));
 }

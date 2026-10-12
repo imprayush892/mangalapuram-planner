@@ -81,7 +81,7 @@ interface ModelState {
   edit: (key: string, value: RawCellContent | null) => Promise<void>;
   resetEdits: () => Promise<void>;
   view: (sheet: string, option: string | null) => Promise<SheetView>;
-  download: () => Promise<void>;
+  download: (option: string | null) => Promise<void>;
 }
 
 let call: Call | null = null;
@@ -162,13 +162,14 @@ export const useModel = create<ModelState>((set, get) => ({
     const inputs = option ? (get().cases[option]?.inputs as Record<string, RawCellContent> | undefined) : undefined;
     return (await call!<SheetView>('view', sheet, inputs)) as SheetView;
   },
-  download: async () => {
+  download: async (option) => {
     if (!workbookBuf || !call) return;
-    const out = await call<ArrayBuffer>('exportXlsx', workbookBuf.slice(0));
-    const url = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const inputs = option ? (get().cases[option]?.inputs as Record<string, RawCellContent> | undefined) : undefined;
+    const out = await call<Uint8Array>('exportXlsx', workbookBuf.slice(0), inputs);
+    const url = URL.createObjectURL(new Blob([out as Uint8Array<ArrayBuffer>], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Draft model (edited).xlsx';
+    a.download = `Draft model${option ? ` - ${option} masterplan` : ''}${Object.keys(get().edits).length ? ' (edited)' : ''}.xlsx`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   },

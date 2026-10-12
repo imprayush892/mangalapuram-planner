@@ -55,6 +55,10 @@ OFFICE_P1 = {"C103": "Commercial office (strata) - Phase 1, 40%", "D103": 1, "E1
 # Row 115 as the office's Phase 3, 60%: built from quarter 10 with the Phase 3 villas, sold over 8 quarters (60% of 14).
 OFFICE_P3 = {"C115": "Commercial office (strata) - Phase 3, 60%", "D115": 3, "I115": 135000, "P115": 10, "V115": 10, "X115": 8}
 TYPES = ["1,800 sq ft plot", "2,250 sq ft plot", "2,500 sq ft plot", "2,800 sq ft plot"]
+APT_ROWS = {"C02": "E154", "C11": "E155", "C19": "E156", "C20": "E157"}
+PHRASE = {"C08": "villa clubhouse 1", "C10": "villa clubhouse 2 (mini-golf)", "C04": "32 senior-living units", "C07": "senior enclave (160 units)",
+          "C15": "senior clubhouse", "C05": "school stage A", "C13": "school stage B", "C12-1": "retail / F&B high street (40%)",
+          "C12": "retail / F&B high street (60%)", "C16-1": "offices (40%)", "C16": "offices (60%)", "C14": "apartment clubhouse"}
 
 cases = [{"id": "model", "inputs": {}}]
 meta = {}
@@ -86,10 +90,34 @@ for oid, label in OPTIONS:
     inputs = {"C16": parcel, "C33": roads_ac / parcel, "C35": 0, "C37": open_ac - 0.10 * parcel, "C41": plan["option"]["plottedShare"],
               "D123": vland[1] / villa_ac, "D124": vland[2] / villa_ac, "D125": vland[3] / villa_ac,
               "D126": 1 - (vland[1] + vland[2] + vland[3]) / villa_ac,
-              "H99": villas[1], "H106": villas[2], "H107": villas[3], "H108": villas[4],
-              "D130": mix[0], "D131": mix[1], "D132": mix[2], "D133": mix[3]}
+              "H99": villas[1], "H106": villas[2], "H107": villas[3], "H108": villas[4]}
     for c, r in ROW.items():
         inputs[f"G{r}"] = comp.get(c, 0.0)
+    # (as app/src/engine/finance/optionRun.ts) the apartments' land by phase, the plots as cut, the phases in words
+    for c, a in APT_ROWS.items():
+        inputs[a] = comp.get(c, 0.0)
+    inputs["C151"] = sum(comp.get(c, 0.0) for c in APT_ROWS)
+    for ph in (1, 2, 3, 4):
+        in_ph = [q for q in plan["plots"] if phase_of.get(q["zone"], 1) == ph]
+        for i, t in enumerate(TYPES):
+            row = 130 + 4 * (ph - 1) + i
+            ps = [q for q in in_ph if q["kind"] == t]
+            inputs[f"D{row}"] = len(ps) / len(in_ph) if in_ph else mix[i]
+            if ps:
+                inputs[f"F{row}"] = round(sum(q["areaM2"] for q in ps) / len(ps) * 10.7639)
+    by_phase = {1: [], 2: [], 3: [], 4: []}
+    for z in L["zones"]:
+        ph = z.get("phase") or 1
+        if z["use"] == "apartments":
+            by_phase[ph].append(f"apartments (phase {ph})")
+        elif z["use"] == "villas":
+            by_phase[ph].append(f"villas (phase {ph})")
+        elif z.get("component") in PHRASE:
+            by_phase[ph].append(PHRASE[z["component"]])
+    by_phase[1].append("sales office")
+    for ph in (1, 2, 3, 4):
+        items = list(dict.fromkeys(by_phase[ph]))
+        inputs[f"C{89 + ph}"] = ("Launch: " if ph == 1 else "") + ", ".join(items)
     inputs.update(OFFICE_P1)
     inputs.update(OFFICE_P3)
     cases.append({"id": oid, "inputs": inputs})

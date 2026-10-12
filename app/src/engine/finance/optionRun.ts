@@ -1,7 +1,7 @@
 import type { HyperFormula, RawCellContent } from 'hyperformula';
 import type { PlanResult } from '../pipeline/plan';
 import type { ModelSheet } from './workbook';
-import { cellAddress, formatValue } from './workbook';
+import { cellAddress, formatValue, inputAddress } from './workbook';
 
 /**
  * The draft model run on a master plan, in the app (owner 12 Oct): the plan's land, villas and the office split go into
@@ -21,6 +21,13 @@ const OFFICE_P1: Record<string, RawCellContent> = {
 };
 const OFFICE_P3: Record<string, RawCellContent> = { C115: 'Commercial office (strata) - Phase 3, 60%', D115: 3, I115: 135000, P115: 10, V115: 10, X115: 8 };
 const TYPES = ['1,800 sq ft plot', '2,250 sq ft plot', '2,500 sq ft plot', '2,800 sq ft plot'];
+const APT_ROWS: Record<string, string> = { C02: 'E154', C11: 'E155', C19: 'E156', C20: 'E157' };
+/** What each component is called in the phase descriptions (Inputs C90-C93). */
+const PHRASE: Record<string, string> = {
+  C08: 'villa clubhouse 1', C10: 'villa clubhouse 2 (mini-golf)', C04: '32 senior-living units', C07: 'senior enclave (160 units)',
+  C15: 'senior clubhouse', C05: 'school stage A', C13: 'school stage B', 'C12-1': 'retail / F&B high street (40%)',
+  C12: 'retail / F&B high street (60%)', 'C16-1': 'offices (40%)', C16: 'offices (60%)', C14: 'apartment clubhouse',
+};
 
 export const KEYS: [string, string, string, string, 'up' | 'down'][] = [
   ['units', 'Residential units', 'D5', 'count', 'up'],
@@ -66,9 +73,37 @@ export function optionInputs(plan: PlanResult): { inputs: Record<string, RawCell
     C16: parcel, C33: roadsAc / parcel, C35: 0, C37: openAc - 0.1 * parcel, C41: plan.option.plottedShare,
     D123: vland[1]! / villaAc, D124: vland[2]! / villaAc, D125: vland[3]! / villaAc, D126: 1 - (vland[1]! + vland[2]! + vland[3]!) / villaAc,
     H99: villas[1]!, H106: villas[2]!, H107: villas[3]!, H108: villas[4]!,
-    D130: mix[0]!, D131: mix[1]!, D132: mix[2]!, D133: mix[3]!,
   };
   for (const [c, r] of Object.entries(ROW)) inputs[`G${r}`] = comp[c] ?? 0;
+  // The apartments' land as the plan has it, phase by phase, where the model splits its own (C151 x D154-D157; G98,
+  // G111-G113 read it): the units stay the model's (its envelope), as the plan places them.
+  for (const [c, a] of Object.entries(APT_ROWS)) inputs[a] = comp[c] ?? 0;
+  inputs.C151 = Object.keys(APT_ROWS).reduce((t, c) => t + (comp[c] ?? 0), 0);
+  // The villa mix and plots phase by phase as the plan cuts them (rows 130-145, four types a phase: the model copies
+  // Phase 1's mix to every phase, and its plots are the types' nominal sizes)
+  for (const ph of [1, 2, 3, 4]) {
+    const inPh = plan.plots.filter((q) => (phaseOf.get(q.zone) ?? 1) === ph);
+    TYPES.forEach((t, i) => {
+      const row = 130 + 4 * (ph - 1) + i;
+      const ps = inPh.filter((q) => q.kind === t);
+      inputs[`D${row}`] = inPh.length ? ps.length / inPh.length : mix[i]!;
+      if (ps.length) inputs[`F${row}`] = Math.round((ps.reduce((a, q) => a + q.areaM2, 0) / ps.length) * 10.7639);
+    });
+  }
+  // The phases in words, from the plan (the model's still had the hospital in Phase 2, the offices in Phase 4)
+  const byPhase: Record<number, string[]> = { 1: [], 2: [], 3: [], 4: [] };
+  for (const z of L.zones) {
+    const ph = z.phase ?? 1;
+    if (z.use === 'apartments') byPhase[ph]!.push(`apartments (phase ${ph})`);
+    else if (z.use === 'villas') byPhase[ph]!.push(`villas (phase ${ph})`);
+    else if (z.component && PHRASE[z.component]) byPhase[ph]!.push(PHRASE[z.component]!);
+  }
+  byPhase[1]!.push('sales office');
+  for (const ph of [1, 2, 3, 4]) {
+    const items = [...new Set(byPhase[ph])];
+    inputs[`C${89 + ph}`] = `${ph === 1 ? 'Launch: ' : ''}${items.join(', ')}`;
+  }
+  inputs['One-Page Summary!C15'] = 'Hospital (not in this plan)';
   Object.assign(inputs, OFFICE_P1, OFFICE_P3);
   const g = L.green;
   const meta = {
@@ -87,7 +122,7 @@ export interface CaseResult {
 
 /** Sets the inputs, reads the summary, puts the inputs back. */
 export function runCase(hf: HyperFormula, sheets: ModelSheet[], inputs: Record<string, RawCellContent>): CaseResult {
-  const set = Object.entries(inputs).map(([a, v]) => [cellAddress(hf, 'Inputs', a), v] as const);
+  const set = Object.entries(inputs).map(([a, v]) => [inputAddress(hf, a), v] as const);
   const before = set.map(([at]) => [at, hf.getCellSerialized(at) as RawCellContent] as const);
   hf.batch(() => {
     for (const [at, v] of set) hf.setCellContents(at, [[v]]);

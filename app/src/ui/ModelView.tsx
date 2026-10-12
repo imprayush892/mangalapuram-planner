@@ -4,6 +4,7 @@ import type { RawCellContent } from 'hyperformula';
 import { useModel } from '../state/modelStore';
 import type { SheetView } from '../engine/finance/modelCore';
 import { PRESENT_PLAN_OPTIONS } from '../engine/present/prebuilt';
+import { usePresent } from '../state/presentStore';
 
 /**
  * The Model tab (owner 12 Oct): the owner's draft financial model, every sheet, live. Any cell can be changed (a value,
@@ -41,7 +42,12 @@ export default function ModelView(): React.ReactElement | null {
   const download = useModel((s) => s.download);
 
   const [sheet, setSheet] = useState('Inputs');
-  const [option, setOption] = useState<string>('');
+  // Owner 12 Oct: the model opens with the masterplan on screen in it (the option being presented)
+  const presented = usePresent((s) => s.option);
+  const [option, setOption] = useState<string>(presented);
+  useEffect(() => {
+    if (open) setOption(presented);
+  }, [open, presented]);
   const [data, setData] = useState<SheetView | null>(null);
   const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
   const [draft, setDraft] = useState<string | null>(null);
@@ -82,7 +88,17 @@ export default function ModelView(): React.ReactElement | null {
     return out;
   }, [widths]);
   const totalW = widths.reduce((a, b) => a + b, 0);
-  const overlay = useMemo(() => new Set(option && sheet === 'Inputs' ? Object.keys((cases[option]?.inputs as object) ?? {}) : []), [option, sheet, cases]);
+  // the cells the masterplan sets, on the sheet shown ("C33" is on Inputs, else "Sheet!A1")
+  const overlay = useMemo(
+    () =>
+      new Set(
+        Object.keys(option ? ((cases[option]?.inputs as object) ?? {}) : {})
+          .map((k) => (k.includes('!') ? k : `Inputs!${k}`))
+          .filter((k) => k.startsWith(`${sheet}!`))
+          .map((k) => k.slice(sheet.length + 1)),
+      ),
+    [option, sheet, cases],
+  );
 
   if (!open) return null;
   const key = (r: number, c: number): string => `${sheet}!${XLSX.utils.encode_cell({ r, c })}`;
@@ -111,7 +127,7 @@ export default function ModelView(): React.ReactElement | null {
           <label className="text-muted">
             Show with{' '}
             <select value={option} onChange={(e) => setOption(e.target.value)} className="rounded border border-line bg-panel px-1 py-0.5 text-fg">
-              <option value="">the model as given</option>
+              <option value="">the owner's file as given (before the masterplan)</option>
               {PRESENT_PLAN_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.id} · {o.label}
@@ -122,13 +138,18 @@ export default function ModelView(): React.ReactElement | null {
           <button type="button" onClick={() => void resetEdits()} disabled={nEdits === 0} className="rounded border border-line px-2 py-0.5 text-muted hover:text-fg disabled:opacity-40">
             Undo all edits ({nEdits})
           </button>
-          <button type="button" onClick={() => void download()} disabled={status !== 'ready'} className="rounded border border-line px-2 py-0.5 text-muted hover:text-fg disabled:opacity-40">
+          <button type="button" onClick={() => void download(option || null)} disabled={status !== 'ready'} className="rounded border border-line px-2 py-0.5 text-muted hover:text-fg disabled:opacity-40">
             Download .xlsx
           </button>
           <button type="button" onClick={() => setOpen(false)} className="rounded border border-accent/70 px-2 py-0.5 text-accent hover:bg-accent/10">
             Back to the plan
           </button>
         </span>
+      </div>
+      <div className={`border-b border-line px-3 py-1 text-[11px] ${option ? 'bg-accent/10 text-fg' : 'bg-amber-400/10 text-fg'}`}>
+        {option
+          ? `${option}'s masterplan is in the model: its land (73.54 ac, every component's zone, the roads and open space), its villas by phase and their mix and plot sizes, the apartments' land, the office split 40% / 60% (the hospital's row carries the Phase 1 offices) and the phases in words (tinted cells). Retail stays one Phase 3 line: the model has a single retail row.`
+          : "The owner's file exactly as given, before the masterplan (its hospital, its 19.94 ac of villas, its roads and open space). Pick an option to see the model with the masterplan in it."}
       </div>
       <div className="flex items-center gap-2 border-b border-line px-3 py-1">
         <span className="num w-16 text-[11px] text-muted">{XLSX.utils.encode_cell(sel)}</span>

@@ -617,3 +617,13 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - The workbook is the owner's: it is not in the repository (which is public). sync-data copies it in from MODEL_XLSX
   or ~/Downloads/Draft model.xlsx, as base64 text (data/model/draft_model.xlsx.txt).
 - No component codes are shown (C03, C16-1, OS-P12 ...): names only.
+- (Same day, owner: "the hospital still shows 5 ac in Excel") The Model tab opened on the owner's file as given; it now
+  opens with the masterplan on screen in it, and the file as given is labelled as before the masterplan. The plan now
+  also sets the phases in words (Inputs C90-C93), the apartments' land by phase (C151, E154-E157), the villa mix and
+  plot sizes phase by phase (D130-D145, F130-F145), and the summary's hospital row reads "not in this plan" (0 ac);
+  tools/finance/run_model.py sets the same. Download writes the owner's own file with the option's masterplan and the
+  edits in it (only those cells change; every style stays; Excel recalculates on opening): D1 opened in Excel gives
+  PAT ₹338.9 Cr, project IRR 20.5%, 358 villas, 73.54 ac, as in the app.
+- Retail stays one Phase 3 line (the workbook's Retail Lease and Costs sheets run off its one row). Bound: all of it in
+  Phase 1 would add ₹5.0 Cr PAT and ₹46 Cr peak funding to D1 (project IRR -0.1 pt); the 40% the plan builds in Phase 1
+  is about ₹2 Cr PAT and ₹18 Cr peak funding.

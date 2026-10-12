@@ -1,8 +1,9 @@
 import type { HyperFormula, RawCellContent } from 'hyperformula';
 import * as XLSX from 'xlsx';
-import { buildEngine, cellAddress, formatValue, readWorkbook } from './workbook';
+import { buildEngine, cellAddress, formatValue, inputAddress, readWorkbook } from './workbook';
 import type { ModelSheet } from './workbook';
 import { runCase } from './optionRun';
+import { patchXlsx } from './xlsxPatch';
 import type { CaseResult } from './optionRun';
 
 /**
@@ -65,7 +66,7 @@ export class ModelCore {
     const hf = this.hf!;
     const s = this.sheets.find((q) => q.name === name)!;
     const sid = hf.getSheetId(name)!;
-    const all = inputs ? Object.entries(inputs).map(([a, v]) => [cellAddress(hf, 'Inputs', a), v] as const) : [];
+    const all = inputs ? Object.entries(inputs).map(([a, v]) => [inputAddress(hf, a), v] as const) : [];
     const before = all.map(([at]) => [at, hf.getCellSerialized(at) as RawCellContent] as const);
     if (all.length) hf.batch(() => all.forEach(([at, v]) => hf.setCellContents(at, [[v]])));
     const values = hf.getSheetValues(sid);
@@ -88,19 +89,14 @@ export class ModelCore {
     return { name, text, input };
   }
 
-  /** The workbook with the edits in it, as .xlsx. */
-  exportXlsx(buf: ArrayBuffer): ArrayBuffer {
-    const wb = XLSX.read(buf, { type: 'array', cellFormula: true, cellNF: true, cellStyles: true });
-    for (const [key, v] of Object.entries(this.applied)) {
-      const k = key.lastIndexOf('!');
-      const ws = wb.Sheets[key.slice(0, k)];
-      if (!ws) continue;
-      const a = key.slice(k + 1);
-      const cell: XLSX.CellObject =
-        typeof v === 'string' && v.startsWith('=') ? { t: 'n', f: v.slice(1) } : typeof v === 'number' ? { t: 'n', v } : { t: 's', v: String(v ?? '') };
-      ws[a] = { ...(ws[a] ?? {}), ...cell } as XLSX.CellObject;
-      if (!(typeof v === 'string' && v.startsWith('='))) delete (ws[a] as { f?: string }).f;
-    }
-    return XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+  /**
+   * The owner's workbook as .xlsx with an option's masterplan in it (when given) and the edits: only those cells
+   * change, every style and note stays, and Excel recalculates the whole model when it opens the file.
+   */
+  exportXlsx(buf: ArrayBuffer, inputs?: Record<string, RawCellContent>): Uint8Array {
+    const cells: Record<string, RawCellContent> = {};
+    for (const [a, v] of Object.entries(inputs ?? {})) cells[a.includes('!') ? a : `Inputs!${a}`] = v;
+    for (const [key, v] of Object.entries(this.applied)) cells[key] = v;
+    return patchXlsx(buf, cells);
   }
 }

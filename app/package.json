@@ -21,6 +21,7 @@
     "@react-three/fiber": "^9.7.0",
     "@tarikjabiri/dxf": "^2.9.0",
     "clipper2-js": "^1.2.4",
+    "fflate": "^0.8.2",
     "hyperformula": "^2.7.1",
     "polygon-clipping": "^0.15.7",
     "react": "^19.3.0",
