@@ -33,8 +33,10 @@ options:
   # chain through the villa blocks, lake to lake, open space on top of the 8.3 ac (at least 300 villas).
   draft_zoning: model
   # Owner 12 Oct (D7): the plan with the least cut, fill and retaining wall. least_earthwork (draft_zoning) =
-  # zones_draft_model_d7.geojson: the villas on the gentle land, the steep land green. earthwork_mode min: each plot
-  # graded in bands with a split-level house taking its fall (least_earthwork below); standard: one plane a plot.
+  # zones_draft_model_d7.geojson (optimise.py D7=1, then greens.py pockets, POCKET_FACTOR 1): the villas off the costliest land.
+  # standard (D1-D6) as before; min: the least_earthwork rules below (low garden steps as batters, road cuts and fills
+  # onto the parks as banks, the road's own level in its corridor). D7 = draft_zoning least_earthwork + earthwork_mode
+  # min + roads.profile_mode least_earthwork, terrain roads.
   earthwork_mode: standard
 
 # Rules that replace the client-basis values on the draft-model basis (dotted path: value).
@@ -436,8 +438,10 @@ least_earthwork:
   road_banks_on_green: true
   # Owner to decide (12 Oct): the plots' platforms held to this instead of slope.plot_max (1:5), e.g. "1:4"; null: 1:5.
   plot_max: null
-  # Tried on D3 (12 Oct): each plot's plane through its street's level at the gate: more earth, more banks over 6 m. Off.
+  # Tried on D3 and D7 (12 Oct): each plot's plane through its street's level at the gate: twice the earth. Off.
   plot_front_at_road_level: false
+  # Inside a road's corridor the road's own level stands, not a plot platform's larger cut or fill beside it.
+  road_level_wins: true
   garden_at_road_level: true       # the garden starts at the road's finished level at the gate (no wall along the road)
   house_levels_max: 2              # a split-level house: two floor levels a storey (ASSUMPTION)
   house_level_min_depth_m: 4       # each level at least this deep (ASSUMPTION)

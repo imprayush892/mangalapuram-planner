@@ -249,5 +249,6 @@ if __name__ == "__main__":
     label = os.path.basename(sys.argv[1]).replace(".json", "")
     r = report(S, rows, label)
     if len(sys.argv) > 6:
-        draw(S, rows, sys.argv[6], f"{label}: cut/fill and retaining walls - Rs {r['rs'] / 1e7:.1f} Cr "
+        tot = S["plan"]["earthworkCost"]["rs"]["total"]   # the engine's (D7: with its batters and road banks)
+        draw(S, rows, sys.argv[6], f"{label}: cut/fill and retaining walls - Rs {tot / 1e7:.1f} Cr "
                                      f"({r['wall_m'] / 1000:.1f} km of wall, {r['wall_m3']:,.0f} m3 RCC; cut {r['cut']:,.0f} m3, fill {r['fill']:,.0f} m3)")

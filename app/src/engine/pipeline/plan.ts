@@ -787,6 +787,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     batterMax: pick<number>(planning, 'least_earthwork.batter_max_step_m', 0),
     roadBanks: pick<boolean>(planning, 'least_earthwork.road_banks_on_green', false),
     frontAtRoad: pick<boolean>(planning, 'least_earthwork.plot_front_at_road_level', false),
+    roadWins: pick<boolean>(planning, 'least_earthwork.road_level_wins', false),
   };
   // D7 variant (owner to decide, 12 Oct): the plots' platforms held to least_earthwork.plot_max (e.g. "1:4") instead of
   // slope.plot_max; null keeps slope.plot_max.
@@ -3819,6 +3820,11 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   // Roads: ids in order, their earthwork into the total where it is the larger.
   const keptRoads = roads.filter((r) => r.kept);
   const tierCount: Record<string, number> = {};
+  // D7 (least_earthwork.road_level_wins): inside a road's corridor the road's own level stands, not a platform's
+  // larger cut or fill beside it (where roads overlap, the larger of theirs).
+  const roadWins = ewMin && le.roadWins;
+  const roadD = roadWins ? new Float32Array(n) : null;
+  const roadOwn = roadWins ? new Uint8Array(n) : null;
   for (const r of keptRoads) {
     tierCount[r.tier] = (tierCount[r.tier] ?? 0) + 1;
     r.id = `${r.tier}-${tierCount[r.tier]}`;
@@ -3826,8 +3832,11 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       const k = r.dzCells[q]!;
       const d = r.dz[q]!;
       if (Math.abs(d) > Math.abs(delta[k]!)) delta[k] = d;
+      if (roadD && Math.abs(d) > Math.abs(roadD[k]!)) roadD[k] = d;
     }
+    if (roadOwn) for (const k of r.cells) roadOwn[k] = 1;
   }
+  if (roadD && roadOwn) for (let k = 0; k < n; k += 1) if (roadOwn[k]) delta[k] = roadD[k]!;
   keptDrafts.forEach((d, i) => {
     plots[i]!.roadId = d.road?.id ?? 'existing';
   });
