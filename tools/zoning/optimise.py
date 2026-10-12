@@ -118,6 +118,31 @@ COMPONENTS = [
     ("C14", "clubhouse", 4, "APARTMENT CLUBHOUSE", 1.0, "the draft model's 1.0 ac"),
 ]
 VILLA_TARGET_AC = float(os.environ.get("VILLA_AC", 34.5))   # gross villa land: ~360 villas at the plans' yield
+# D7=1 (owner 12 Oct, least earthwork): the villas on the gentle land, the steep hill green; pins and areas as they are
+D7 = os.environ.get("D7") == "1"
+# D7 master 12 Oct, measured on zones_d7_26 end to end: earthwork + walls, Rs lakh an acre of villa land by its natural
+# slope (2 m): <1:8, 1:8-1:5, 1:5-1:4, 1:4-1:3, 1:3-1:2, >1:2
+D7_SLOPE_EDGES = [1 / 8, 1 / 5, 1 / 4, 1 / 3, 1 / 2]
+D7_RS_LAKH_AC = [11, 35, 38, 91, 159, 221]
+# the villas' cost is the premium as before plus D7_W x the cell's Rs; cells over D7_MAX_RS never villas (VILLA_AC then
+# only an upper bound: the villa land is the gentle land the other uses leave); the towers' cost adds D7_WT on gentle land
+D7_W = float(os.environ.get("D7_W", 1 / 15))                # villa cost per Rs lakh an acre (1:4-1:3 = 6, the premium <= 3.5)
+D7_TOWERS = D7 and os.environ.get("D7_TOWERS", "1") == "1"   # the towers off the gentle land too (below)
+D7_WT = float(os.environ.get("D7_WT", 8.0))
+D7_MAX_RS = float(os.environ.get("D7_MAX_RS", 150))      # no villa on a cell dearer than this, Rs lakh an acre (150: ~24 ac, 300 villas)
+D7_BLOCK_AC = float(os.environ.get("D7_BLOCK_AC", 0.5))  # the smallest villa block grown (1.0 before: the gentle patches are small)
+
+
+def d7_rs_lakh_ac():
+    """Per 20 m cell: the villas' earthwork and walls, Rs lakh an acre, from its 2 m slopes and the curve above."""
+    g = np.where(TERRAIN & np.isfinite(GRAD), GRAD, np.nan)
+    rs = np.where(np.isfinite(g), D7_RS_LAKH_AC[0], np.nan)
+    for e, r in zip(D7_SLOPE_EDGES, D7_RS_LAKH_AC[1:]):
+        rs = np.where(g > e, r, rs)
+    return np.nan_to_num(coarse(rs), nan=D7_RS_LAKH_AC[-1])
+
+
+D7_RS = d7_rs_lakh_ac() if D7 else None
 VILLA_PHASE_SHARE = [0.15, 0.25, 0.30, 0.30]                 # the draft model's villa land by phase (Inputs D123-D126)
 OPEN_MIN_AC = 0.10 * 73.0                                     # KMBR Rule 31(v): 10% of the layout as public open space
 
@@ -379,6 +404,10 @@ for comp in ("C19", "C02", "C20", "C11"):                  # the owner's mark fi
     _, use, ph, name, ac_, why = sizes[comp]
     # at the edge of the site, never among the villas (owner 12 Oct: the towers must not block the villas' views)
     cost = inf + 2.5 * TALLn + 0.8 * VPn + 2.5 * INTERIORn + 0.6 * SLOPEn + (3.0 if ph == 1 else 0.7) * phase_cost(ph) + APT_FIT
+    if D7_TOWERS:
+        # D7: a tower zone grades its footprints only (D3: Rs 0.4 Cr of walls on 9.8 ac, the villas Rs 24.8 Cr on 30):
+        # the towers leave the gentle land to the villas, a stepped podium takes the slope
+        cost = cost + D7_WT * (1.0 - np.clip((D7_RS - 38.0) / (159.0 - 38.0), 0, 1)) - 0.6 * SLOPEn
     # towers need land at least 60 m across (a plate, its podium and setbacks): the free land 30 m in from its edge
     _freem = np.vectorize(lambda j, i: free(j, i))(*np.indices((GNY, GNX)))
     thick = ndimage.distance_transform_edt(_freem) * G >= 30
@@ -418,17 +447,22 @@ for comp in ("C19", "C02", "C20", "C11"):                  # the owner's mark fi
 # holes); the clubhouses come out of them next, so the villas are grown that much larger
 CLUB_AC = sizes["C08"][4] + sizes["C10"][4]
 villa_cost = inf - 1.5 * VPn - 1.0 * LAKEFRONT - 1.0 * LEVELn + 0.6 * SLOPEn
+if D7:
+    # D7: a cell costs its earthwork (D7_RS) over the premium, so the steep flanks are left to green (nothing graded)
+    villa_cost = villa_cost + D7_W * D7_RS
+    villa_cost = np.where(D7_RS > D7_MAX_RS, np.inf, villa_cost)       # near-prohibitive: never a cell this steep
 for _e in (KEEP_GREEN, KEEP_GREEN_2):
     villa_cost = np.where(in_ellipse(_e), np.inf, villa_cost)
 acc, k, chunk = LAKE_VILLA_AC, 0, 14.0
-while acc < VILLA_TARGET_AC + CLUB_AC - 0.3 and chunk >= 1.0:
+_blk = D7_BLOCK_AC if D7 else 1.0
+while acc < VILLA_TARGET_AC + CLUB_AC - 0.3 and chunk >= _blk:
     k += 1
     try:
         got, area = grow(f"VG{k}", min(VILLA_TARGET_AC + CLUB_AC - acc, chunk), villa_cost, compact=0.5)
     except SystemExit:                               # no free piece that big: a smaller one
         chunk = 0.7 * min(chunk, VILLA_TARGET_AC + CLUB_AC - acc)
         continue
-    if area < 1.0:                                   # too small to be a villa block (12 villas or so): open space
+    if area < _blk:                                  # too small to be a villa block (12 villas or so): open space
         for (j, i) in got:
             OWNER[j, i] = ""
         chunk = 0.7 * min(chunk, VILLA_TARGET_AC + CLUB_AC - acc)
@@ -463,7 +497,7 @@ for _c, q in _pieces:
     if acc >= VILLA_TARGET_AC + CLUB_AC - 0.1:
         break
     _a = float(CELL_AC[_lab == q].sum())
-    if _a >= 0.8:
+    if _a >= min(0.8, _blk):
         OWNER[_lab == q] = "VILLA"
         acc += _a
 # 6 the villa clubhouses at the middle of the villas: club 1 (Phase 1) among the nearest villas to the gate, club 2
@@ -474,7 +508,7 @@ for comp, sel in (("C08", villa & (np.nan_to_num(vr, nan=9) <= np.nanquantile(vr
     ys, xs = np.nonzero(sel)
     cy, cx = ys.mean(), xs.mean()
     dist = np.hypot(np.arange(GNY)[:, None] - cy, np.arange(GNX)[None, :] - cx)
-    cost = np.where(OWNER == "VILLA", 0.15 * dist + 0.8 * VPn, np.inf)
+    cost = np.where(OWNER == "VILLA", 0.15 * dist + 0.8 * VPn - (D7_W * D7_RS if D7 else 0.0), np.inf)   # D7: on the villas' steepest land
     OWNER[OWNER == "VILLA"] = ""                       # grow on villa land
     # never across a fixed road (a clubhouse in one piece)
     got, area = grow(comp, sizes[comp][4], np.where(villa & ~ON_ROAD, cost, np.inf), compact=0.8)
