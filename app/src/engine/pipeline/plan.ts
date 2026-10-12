@@ -260,9 +260,12 @@ export interface PlanResult {
     surplusCutM3: number;
     importFillM3: number;
     wall: { lengthM: number; volumeM3: number; maxHeightM: number; minStepM: number; maxWallM: number; bankLengthM: number };
-    rs: { excavation: number; backfill: number; walls: number; total: number; plinth?: number };
+    rs: { excavation: number; backfill: number; walls: number; total: number; plinth?: number; batters?: number; banks?: number };
     /** D7 (least earthwork): the split-level houses' plinth steps (RCC, in rs.total); absent on the other options. */
     plinth?: { lengthM: number; volumeM3: number; maxHeightM: number; houses: number };
+    /** D7: low steps between gardens as planted batters; road cuts and fills against the green as banks. */
+    batters?: { lengthM: number; maxStepM: number };
+    banks?: { lengthM: number; landM2: number };
   };
   /** Road corridors of every tier, as a mask. */
   roadMask: Mask;
@@ -780,6 +783,9 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     gardenToRoad: pick<boolean>(planning, 'least_earthwork.garden_at_road_level', true),
     houseLevels: pick<number>(planning, 'least_earthwork.house_levels_max', 2),
     levelMinDepth: pick<number>(planning, 'least_earthwork.house_level_min_depth_m', 4),
+    terraced: pick<boolean>(planning, 'least_earthwork.terraced_plots', false),
+    batterMax: pick<number>(planning, 'least_earthwork.batter_max_step_m', 0),
+    roadBanks: pick<boolean>(planning, 'least_earthwork.road_banks_on_green', false),
   };
   const penalty = num(planning, 'roads.routing.over_grade_penalty');
   const roadMode = (pick<string>(planning, 'options.road_orientation', 'terrain') === 'north_south' ? 'north_south' : 'terrain') as 'terrain' | 'north_south';
@@ -3659,7 +3665,13 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   };
   const plots: PlanPlot[] = keptDrafts.map((d, i) => {
     const smp = rectSamples(d.f, d.a0, d.a0 + d.w, d.b0, d.b0 + d.d, 1);
-    const pf0 = ewMin ? null : platformFor(dem, smp, plotLimit, delta);
+    const pf0 = ewMin && le.terraced ? null : platformFor(dem, smp, plotLimit, delta);
+    if (ewMin && !le.terraced) {
+      for (const sp of smp) {
+        const c = dem.cellAt(sp.p);
+        if (c) plotOfCell[c.j * nx + c.i] = i;
+      }
+    }
     const area = d.area ?? d.w * d.d;
     const centre = toWorld(d.f, d.a0 + d.w / 2, d.b0 + d.d / 2);
     const cc = dem.cellAt(centre);
@@ -4151,6 +4163,22 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   let plinthLen = 0;
   let plinthVol = 0;
   let plinthMax = 0;
+  // D7: a low step (to batter_max_step_m) between gardens, or a garden and the green, not at a house: a planted earth
+  // batter in the yard (1:1.5), not RCC; a road's cut or fill against the green, clear of every plot and building for
+  // the bank's width: a bank (cut 1:1.5, fill 1:2), its extra earth and turf priced (earthwork_costs batter_*, bank_*).
+  const built = ewMin ? or(rasterise(dem, plots.map((p) => [p.ring])), rasterise(dem, buildings.map((b) => [b.podium?.ring ?? b.ring]))) : null;
+  const builtDist = built ? distanceTo(dem, built) : null;
+  const isRoad = (k: number): boolean => network[k] === 1;
+  const isGreen = (k: number): boolean => !!built && !built[k] && !isRoad(k) && plotOfCell[k]! < 0;
+  /** A garden (a plot's cell off its house) or the green: room for a batter. */
+  const yard = (k: number): boolean => !isRoad(k) && !houseCells![k] && (plotOfCell[k]! >= 0 || isGreen(k));
+  const batterRate = ewc('batter_rs_per_m_per_m_height', 1500);
+  const bankRate = { earth: ewc('excavation_rs_per_m3', 350), m3: ewc('bank_extra_earth_m3_per_m_per_h2', 0.9), turf: ewc('bank_turf_rs_per_m2', 250), face: ewc('bank_face_m_per_m_height', 2.0), land: ewc('bank_width_m_per_m_height', 1.75) };
+  let batterLen = 0;
+  let batterRs = 0;
+  let bankLenG = 0;
+  let bankRsG = 0;
+  let bankLandM2 = 0;
   for (let j = 0; j < ny; j += 1) {
     for (let i = 0; i < nx; i += 1) {
       const k = j * nx + i;
@@ -4162,7 +4190,18 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         if (!Number.isFinite(za) || !Number.isFinite(zb)) continue;
         const h = Math.abs(za - zb);
         if (h <= minStep) continue;
-        if (houseCells && plotOfCell[k]! >= 0 && plotOfCell[k] === plotOfCell[k2] && (houseCells[k] || houseCells[k2])) {
+        if (houseCells && h <= le.batterMax && yard(k) && yard(k2) && (plotOfCell[k]! >= 0 || plotOfCell[k2]! >= 0)) {
+          batterLen += dem.cell;
+          batterRs += dem.cell * h * batterRate;
+          continue;
+        }
+        if (houseCells && le.roadBanks && h <= maxWall && ((isRoad(k) && isGreen(k2)) || (isRoad(k2) && isGreen(k))) && builtDist![isRoad(k) ? k2 : k]! >= bankRate.land * h) {
+          bankLenG += dem.cell;
+          bankRsG += dem.cell * (bankRate.m3 * h * h * bankRate.earth + bankRate.face * h * bankRate.turf);
+          bankLandM2 += dem.cell * bankRate.land * h;
+          continue;
+        }
+        if (houseCells && le.terraced && plotOfCell[k]! >= 0 && plotOfCell[k] === plotOfCell[k2] && (houseCells[k] || houseCells[k2])) {
           plinthLen += dem.cell;
           plinthVol += dem.cell * (wa * h + wb * h * h);
           plinthMax = Math.max(plinthMax, h);
@@ -4189,8 +4228,14 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     surplusCutM3: Math.max(0, cut - fill),
     importFillM3: Math.max(0, fill - cut),
     wall: { lengthM: wallLen, volumeM3: wallVol, maxHeightM: wallMax, minStepM: minStep, maxWallM: maxWall, bankLengthM: bankLen },
-    rs: { excavation: rsExc, backfill: rsFill, walls: rsWall, total: rsExc + rsFill + rsWall + rsPlinth, ...(ewMin ? { plinth: rsPlinth } : {}) },
-    ...(ewMin ? { plinth: { lengthM: plinthLen, volumeM3: plinthVol, maxHeightM: plinthMax, houses: plots.length } } : {}),
+    rs: { excavation: rsExc, backfill: rsFill, walls: rsWall, total: rsExc + rsFill + rsWall + rsPlinth + batterRs + bankRsG, ...(ewMin ? { plinth: rsPlinth, batters: batterRs, banks: bankRsG } : {}) },
+    ...(ewMin
+      ? {
+          plinth: { lengthM: plinthLen, volumeM3: plinthVol, maxHeightM: plinthMax, houses: plots.length },
+          batters: { lengthM: batterLen, maxStepM: le.batterMax },
+          banks: { lengthM: bankLenG, landM2: bankLandM2 },
+        }
+      : {}),
   };
 
   const ms = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;

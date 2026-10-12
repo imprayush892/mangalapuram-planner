@@ -422,6 +422,14 @@ amenities:                                 # school and clubhouse buildings
 # graded in bands, each at most slope.plot_max: the front garden, the house in levels, the rear yard; the steps
 # between them fall on the house's walls (its plinth, priced as RCC: assumptions earthwork_costs.plinth_rs_per_m3).
 least_earthwork:
+  # Measured on D3 (12 Oct): the bands cost more than one plane a plot (the step under the house is no smaller than the
+  # wall it replaces, and the bands add steps): off by default; D7 grades a plot as one plane, as D1-D6.
+  terraced_plots: false
+  # A step between two gardens, or a garden and the green, up to this, away from the houses: a planted earth batter
+  # (1:1.5) in the yards, not an RCC wall (assumptions earthwork_costs.batter_rs_per_m_per_m_height). 0: none.
+  batter_max_step_m: 1.0
+  # A road's cut or fill against the green, with room for it clear of every plot and building: a bank, not a wall.
+  road_banks_on_green: true
   garden_at_road_level: true       # the garden starts at the road's finished level at the gate (no wall along the road)
   house_levels_max: 2              # a split-level house: two floor levels a storey (ASSUMPTION)
   house_level_min_depth_m: 4       # each level at least this deep (ASSUMPTION)
