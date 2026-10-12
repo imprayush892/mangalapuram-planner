@@ -178,6 +178,18 @@ for oid, label in OPTIONS:
                  "earthwork": plan.get("earthworkCost"),
                  "green_ac": {k: round(v / AC, 3) for k, v in g.items()}}
 
+# SAVE_DIR=<folder> [ONLY=D2,D6]: save the model updated for each case as its own workbook (save_model.ps1), then stop
+if os.environ.get("SAVE_DIR"):
+    only = [x for x in os.environ.get("ONLY", "").split(",") if x]
+    sel = [c for c in cases if not only or c["id"] in only]
+    names = {c["id"]: f"Draft model - planning update {c['id']} (12 Oct 2026).xlsx" for c in sel}
+    tmp = os.path.join(HERE, "_save.json")
+    json.dump({"model": os.path.abspath(MODEL), "cases": sel, "dir": os.path.abspath(os.environ["SAVE_DIR"]), "names": names}, open(tmp, "w", encoding="utf-8"))
+    r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(HERE, "save_model.ps1"), "-in", tmp],
+                       capture_output=True, text=True)
+    print(r.stdout.strip(), r.stderr.strip()[-2000:])
+    os.remove(tmp)
+    sys.exit(0 if "ERROR" not in r.stdout else 1)
 tmp = os.path.join(HERE, "_cases.json")
 out = os.path.join(HERE, "_results.json")
 json.dump({"model": os.path.abspath(MODEL), "cases": cases}, open(tmp, "w", encoding="utf-8"))
