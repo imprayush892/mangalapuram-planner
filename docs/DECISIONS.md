@@ -673,3 +673,16 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - DXF (tools/export/clean_dxf.py, after the owner's D6-revised.dxf): road edges once, as the blocks' outlines with
   3 m fillets as arcs; green (ACI 64) and water (ACI 5) solid fills; plots grey, houses white, buildings by use; zone
   outlines and labels on layers that start off; R2000, ASCII.
+
+## 12 Oct 2026 (owner): D7, least earthwork, replaces D3 in the deck
+- D7 = draft_zoning least_earthwork (zones_draft_model_d7.geojson: every mark kept, villas in two compact blocks off
+  the costliest land, pockets for the 50 m walk at factor 1.0) + earthwork_mode min (steps up to 1 m between gardens or
+  garden and green as planted 1:1.5 batters; road cuts and fills facing parks as banks; the road's own level inside its
+  corridor) + roads.profile_mode least_earthwork, terrain roads. 324 villas, 935 flats, open space 20.7 ac.
+- Earthwork ₹28.8 Cr against ₹37.2 Cr for the same programme laid conventionally (D3): zoning −4.3, banks −2.3,
+  batters −1.3, road levels −0.6. PAT ₹278.4 Cr, project IRR 17.4% (D3 ₹273.6 Cr, 16.8%).
+- Tested and rejected: split-level plots (the step moves under the house as plinth, dearer), plot fronts at street level,
+  shared back-to-back platforms. Owner decisions that would cut more: plots at 1:4 (−₹2.5 Cr), gentle land freed from
+  the marks (~₹1.2–1.4 Cr an acre). The owner keeps all marks (12 Oct).
+- Assumed rates: planted batter ₹1,500 per m run per m height; road bank 0.9H² m³/m at ₹350 + turf ₹250/m².
+- Deck: D2, D6, D7 (no D3); the web app keeps D1-D6.
