@@ -7,7 +7,7 @@ import { createServer } from 'vite';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.resolve(process.argv[2] ?? path.join(appDir, 'prebuilt', 'dxf'));
-const vite = await createServer({ root: appDir, server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
+const vite = await createServer({ root: appDir, server: { middlewareMode: true, watch: null }, appType: 'custom', logLevel: 'error' });
 try {
   const { nodeSource } = await vite.ssrLoadModule('/src/engine/data/nodeSource.ts');
   const { loadSite } = await vite.ssrLoadModule('/src/engine/site/loadSite.ts');

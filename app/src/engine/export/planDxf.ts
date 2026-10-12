@@ -79,7 +79,7 @@ export function exportPlanDxf(opts: PlanDxfOptions): string {
     const use = z.use ?? 'park';
     const layer = use === 'park' ? GREEN_LAYER(z) : `ZONE-${use.toUpperCase()}`;
     multi(z.geom, layer);
-    text(multiCentroid(z.geom), 3, `${z.component ? `${z.component} ` : ''}${z.name} ${m2ToAcres(multiPolyArea(z.geom)).toFixed(2)} ac`, 'TEXT-ZONE');
+    text(multiCentroid(z.geom), 3, `${z.name} ${m2ToAcres(multiPolyArea(z.geom)).toFixed(2)} ac`, 'TEXT-ZONE');
   }
   for (const r of opts.plan.roads) multi(r.geom, `ROAD-${r.tier.toUpperCase()}`);
   for (const q of opts.plan.plots) {

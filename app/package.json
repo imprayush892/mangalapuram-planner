@@ -13,14 +13,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --force",
-    "plans": "node scripts/sync-data.mjs && node scripts/present-plans.mjs",
-    "build:deploy": "npm run build && node scripts/base64-assets.mjs && node scripts/present-plans.mjs"
+    "plans": "node scripts/sync-data.mjs && node scripts/present-plans.mjs && node scripts/plan-dxf.mjs public/data/dxf",
+    "build:deploy": "npm run build && node scripts/base64-assets.mjs && node scripts/present-plans.mjs && node scripts/plan-dxf.mjs dist/data/dxf"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
     "@tarikjabiri/dxf": "^2.9.0",
     "clipper2-js": "^1.2.4",
+    "hyperformula": "^2.7.1",
     "polygon-clipping": "^0.15.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

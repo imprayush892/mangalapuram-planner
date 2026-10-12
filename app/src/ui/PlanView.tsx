@@ -321,11 +321,6 @@ export default function PlanView(): React.ReactElement {
           >
             Fit parcel
           </button>
-          {layers.deferredNote && (
-            <div className="max-w-md rounded border border-line bg-panel/85 px-2 py-1 text-[10px] leading-snug text-muted backdrop-blur-md">
-              26.4 ac deferred land is outside this survey and out of scope. The hospital waits for it.
-            </div>
-          )}
         </div>
         {raster?.legend && <Legend legend={raster.legend} />}
       </div>

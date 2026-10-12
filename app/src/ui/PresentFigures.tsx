@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLiveFinancials } from '../state/modelStore';
 import { usePresent, PRESENT_STEPS, hasPhases } from '../state/presentStore';
 import { useAnalysisForViews } from '../state/planningStore';
 import { useSite } from '../state/store';
@@ -206,6 +207,7 @@ export default function PresentFigures(): React.ReactElement | null {
   const plan = usePresent((st) => st.plans[st.option]);
   const option = usePresent((st) => st.option);
   const rules = useRules();
+  const live = useLiveFinancials(rules?.financials);
   const a = useAnalysisForViews();
   const site = useSite((st) => st.site);
   const s = PRESENT_STEPS[step];
@@ -218,7 +220,8 @@ export default function PresentFigures(): React.ReactElement | null {
   }, [key]);
   if (!s || !cardsOn || !rules) return null;
   // The option's own run of the model; the model as given only when no run is there yet.
-  const doc = pick(rules.financials, `cases.${option}.summary`, null) ? { summary: pick(rules.financials, `cases.${option}.summary`, {}) } : rules.programmeDraft;
+  const fin = live as typeof rules.financials;
+  const doc = pick(fin, `cases.${option}.summary`, null) ? { summary: pick(fin, `cases.${option}.summary`, {}) } : rules.programmeDraft;
   let body: React.ReactElement | null = null;
   if (s.card === 'land') body = <Land rows={pick<LandRow[]>(doc, 'summary.land', [])} total={pick<number>(doc, 'summary.land_total_ac', 73)} />;
   else if (s.card === 'tickets')

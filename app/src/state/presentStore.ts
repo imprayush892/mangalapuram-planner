@@ -568,3 +568,5 @@ export const usePresent = create<PresentState>((set, get) => ({
   },
   stash: (plan) => set((st) => (st.saved ? { saved: { ...st.saved, plan } } : {})),
 }));
+
+if (import.meta.env.DEV) (globalThis as unknown as { __present: typeof usePresent }).__present = usePresent;

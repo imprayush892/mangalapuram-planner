@@ -600,3 +600,20 @@ Each of these is a switch or an editable assumption, not a silent decision.
 - Result (villas; furthest walk to green; PAT, project IRR): D1 358, 236 m, ₹338.8 Cr, 20.5%; D2 364, 199 m, ₹343.3 Cr,
   20.9%; D3 311, 41 m, ₹298.2 Cr, 18.5%; D4 331, 45 m, ₹314.1 Cr, 19.4%; D5 304, 138 m, ₹290.2 Cr, 18.1%; D6 316, 135 m,
   ₹300.1 Cr, 18.8%. All 935 flats and 192 senior homes placed in every option.
+
+## 12 Oct 2026 · the clean app and the live model (owner; branch clean-app)
+
+- The app is what the owner uses: the presentation (the analysis steps and the six master plans) with its cards and
+  the financials, walk mode, 2D / 3D, the plan's stats, and the plans as DXF. The earlier planner's panels (rail,
+  levers, solve bar, scenarios, zone editing, siting, compliance, report, export panel) are removed; the app opens in
+  the presentation.
+- The Model tab opens the owner's draft financial model (Draft model.xlsx) live: every sheet, every formula,
+  recalculated in the browser (HyperFormula, GPL-3 licence key; IRR, TEXT with Excel's formats and MOD as Excel has
+  them are added; INDEX on one row and INDEX(range, i, 0) are rewritten on the way in). All 24,658 formulas match
+  Excel's saved values; each option's run matches tools/finance/run_model.py to the rupee. Any cell can be changed;
+  the change runs through the model as given and through every option (their land, villas and office split put in as
+  run_model.py does), and the presentation's financial figures are the live run. Edits stay in the browser; Download
+  writes the workbook with them.
+- The workbook is the owner's: it is not in the repository (which is public). sync-data copies it in from MODEL_XLSX
+  or ~/Downloads/Draft model.xlsx, as base64 text (data/model/draft_model.xlsx.txt).
+- No component codes are shown (C03, C16-1, OS-P12 ...): names only.

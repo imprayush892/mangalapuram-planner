@@ -3944,7 +3944,8 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       const l = progOf(z)!;
       const bs = buildings.filter((b) => b.zone === z.name);
       const ps = plots.filter((p) => p.zone === z.name);
-      const label = `${l.id} · ${z.name.charAt(0)}${z.name.slice(1).toLowerCase()}`;
+      // Owner 12 Oct: the name, no component code
+      const label = `${z.name.charAt(0)}${z.name.slice(1).toLowerCase()}`;
       if (z.use === 'villas') {
         const bua = ps.reduce((a, p) => a + p.builtUpM2, 0);
         // Owner 12 Oct: as many as the land holds, up to villas.max_per_acre on the zone's land (the model's
@@ -3994,7 +3995,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     for (const l of lines) {
       if (!l.deferred) continue;
       programme.push({
-        use: `${l.id} · ${(l.name ?? l.use).split(':')[0]}`,
+        use: `${(l.name ?? l.use).split(":")[0]}`,
         asked: l.bua_sft ? `${l.bua_sft.toLocaleString('en-IN')} sq ft` : `${l.units ?? 0} units`,
         placed: 'not in these 73 ac',
         met: true,

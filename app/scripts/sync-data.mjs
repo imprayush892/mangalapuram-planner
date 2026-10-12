@@ -53,6 +53,21 @@ if (existsSync(prebuilt)) {
   for (const rel of await listFiles(path.join(outDir, 'plans'))) bytes += (await stat(path.join(outDir, 'plans', rel))).size;
 }
 
+// The owner's draft financial model, for the app's Model tab (owner 12 Oct): kept out of the repository (it is the
+// owner's), read from MODEL_XLSX or ~/Downloads/Draft model.xlsx, and shipped as base64 text (a host that serves no
+// .xlsx still serves it).
+{
+  const { homedir } = await import('node:os');
+  const { readFile } = await import('node:fs/promises');
+  const src = process.env.MODEL_XLSX ?? path.join(homedir(), 'Downloads', 'Draft model.xlsx');
+  if (existsSync(src)) {
+    const to = path.join(outDir, 'model', 'draft_model.xlsx.txt');
+    await mkdir(path.dirname(to), { recursive: true });
+    await writeFile(to, (await readFile(src)).toString('base64'));
+    bytes += (await stat(to)).size;
+  } else console.warn(`sync-data: no financial model at ${src}: the Model tab will have nothing to open`);
+}
+
 for (const { from, to } of singleFiles) {
   if (!existsSync(from)) throw new Error(`missing source file: ${from}`);
   await mkdir(path.dirname(to), { recursive: true });

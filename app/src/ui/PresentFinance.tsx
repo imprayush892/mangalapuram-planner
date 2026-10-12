@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLiveFinancials } from '../state/modelStore';
 import { usePresent, PRESENT_OPTIONS, FORK_STEP } from '../state/presentStore';
 import type { OptionId } from '../state/presentStore';
 import { useRules } from '../state/useRules';
@@ -126,7 +127,8 @@ export default function PresentFinance(): React.ReactElement | null {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const doc = rules?.financials;
+  // Owner 12 Oct: the model live in the app (the Model tab's edits run through it); the precomputed run until it is ready.
+  const doc = useLiveFinancials(rules?.financials) as typeof rules extends { financials: infer F } ? F : never;
   const metrics = pick<Metric[]>(doc, 'metrics', []);
   const cases = pick<Record<string, Case>>(doc, 'cases', {});
   const cur = cases[option];
