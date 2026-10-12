@@ -786,7 +786,12 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     terraced: pick<boolean>(planning, 'least_earthwork.terraced_plots', false),
     batterMax: pick<number>(planning, 'least_earthwork.batter_max_step_m', 0),
     roadBanks: pick<boolean>(planning, 'least_earthwork.road_banks_on_green', false),
+    frontAtRoad: pick<boolean>(planning, 'least_earthwork.plot_front_at_road_level', false),
   };
+  // D7 variant (owner to decide, 12 Oct): the plots' platforms held to least_earthwork.plot_max (e.g. "1:4") instead of
+  // slope.plot_max; null keeps slope.plot_max.
+  const lePlotMax = pick<string | null>(planning, 'least_earthwork.plot_max', null);
+  const platLimit = ewMin && lePlotMax ? parseRatio(lePlotMax, 'least_earthwork.plot_max') : plotLimit;
   const penalty = num(planning, 'roads.routing.over_grade_penalty');
   const roadMode = (pick<string>(planning, 'options.road_orientation', 'terrain') === 'north_south' ? 'north_south' : 'terrain') as 'terrain' | 'north_south';
   const nsTol = pick<number>(planning, 'roads.north_south.tolerance_deg', 10);
@@ -3635,7 +3640,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     const b0 = d.b0;
     const b1 = d.b0 + d.d;
     const fall = platformFor(dem, rectSamples(d.f, d.a0, d.a0 + d.w, b0, b1, 2), Infinity, fallScratch).existingGrade;
-    const nLev = fall <= plotLimit ? 1 : Math.max(1, Math.min(le.houseLevels, Math.floor((gb1 - gb0) / le.levelMinDepth)));
+    const nLev = fall <= platLimit ? 1 : Math.max(1, Math.min(le.houseLevels, Math.floor((gb1 - gb0) / le.levelMinDepth)));
     const cuts = [b0, ...(gb0 - b0 > 0.75 ? [gb0] : []), ...Array.from({ length: nLev - 1 }, (_, q) => gb0 + ((q + 1) * (gb1 - gb0)) / nLev), ...(b1 - gb1 > 0.75 ? [gb1] : []), b1];
     let anchor: { a: number; b: number; z: number } | undefined;
     if (le.gardenToRoad && d.road) {
@@ -3647,7 +3652,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     let houseLevel: ((a: number, b: number) => number) | null = null;
     for (let q = 1; q < cuts.length; q += 1) {
       const smp = rectSamples(d.f, d.a0, d.a0 + d.w, cuts[q - 1]!, cuts[q]!, 1);
-      const pf = platformFor(dem, smp, plotLimit, delta, false, q === 1 && cuts[1]! <= gb0 + 1e-9 ? anchor : undefined);
+      const pf = platformFor(dem, smp, platLimit, delta, false, q === 1 && cuts[1]! <= gb0 + 1e-9 ? anchor : undefined);
       for (const sp of smp) {
         const c = dem.cellAt(sp.p);
         if (c) plotOfCell[c.j * nx + c.i] = i;
@@ -3660,12 +3665,15 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
       if (!houseLevel && cuts[q - 1]! >= gb0 - 1e-9) houseLevel = pf.level;
     }
     tot.existingGrade = fall;
-    tot.withinLimitAsIs = fall <= plotLimit;
+    tot.withinLimitAsIs = fall <= platLimit;
     return { ...tot, level: houseLevel ?? ((a: number, b: number) => dem.sampleBilinear(toWorld(d.f, a, b))) };
   };
   const plots: PlanPlot[] = keptDrafts.map((d, i) => {
     const smp = rectSamples(d.f, d.a0, d.a0 + d.w, d.b0, d.b0 + d.d, 1);
-    const pf0 = ewMin && le.terraced ? null : platformFor(dem, smp, plotLimit, delta);
+    // D7 (plot_front_at_road_level): the plot's plane through its street's finished level at the gate.
+    const front = ewMin && le.frontAtRoad && d.road ? dem.cellAt(toWorld(d.f, d.a0 + d.w / 2, d.b0 - 1)) : null;
+    const frontZ = front ? roadLevel[front.j * nx + front.i]! : Number.NaN;
+    const pf0 = ewMin && le.terraced ? null : platformFor(dem, smp, platLimit, delta, false, Number.isFinite(frontZ) ? { a: d.a0 + d.w / 2, b: d.b0, z: frontZ } : undefined);
     if (ewMin && !le.terraced) {
       for (const sp of smp) {
         const c = dem.cellAt(sp.p);
@@ -4164,12 +4172,14 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   let plinthVol = 0;
   let plinthMax = 0;
   // D7: a low step (to batter_max_step_m) between gardens, or a garden and the green, not at a house: a planted earth
-  // batter in the yard (1:1.5), not RCC; a road's cut or fill against the green, clear of every plot and building for
-  // the bank's width: a bank (cut 1:1.5, fill 1:2), its extra earth and turf priced (earthwork_costs batter_*, bank_*).
+  // batter in the yard (1:1.5), not RCC; a road's cut or fill against a park or unzoned land, clear of every plot and
+  // building for the bank's width: a bank (cut 1:1.5, fill 1:2), its extra earth and turf priced (earthwork_costs batter_*, bank_*).
   const built = ewMin ? or(rasterise(dem, plots.map((p) => [p.ring])), rasterise(dem, buildings.map((b) => [b.podium?.ring ?? b.ring]))) : null;
   const builtDist = built ? distanceTo(dem, built) : null;
   const isRoad = (k: number): boolean => network[k] === 1;
   const isGreen = (k: number): boolean => !!built && !built[k] && !isRoad(k) && plotOfCell[k]! < 0;
+  /** The public green (a park, or land no zone takes): where a road's bank may go. */
+  const isPark = (k: number): boolean => isGreen(k) && (zoneOf[k]! < 0 || zones[zoneOf[k]!]!.use === 'park' || zones[zoneOf[k]!]!.use === 'open');
   /** A garden (a plot's cell off its house) or the green: room for a batter. */
   const yard = (k: number): boolean => !isRoad(k) && !houseCells![k] && (plotOfCell[k]! >= 0 || isGreen(k));
   const batterRate = ewc('batter_rs_per_m_per_m_height', 1500);
@@ -4195,7 +4205,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           batterRs += dem.cell * h * batterRate;
           continue;
         }
-        if (houseCells && le.roadBanks && h <= maxWall && ((isRoad(k) && isGreen(k2)) || (isRoad(k2) && isGreen(k))) && builtDist![isRoad(k) ? k2 : k]! >= bankRate.land * h) {
+        if (houseCells && le.roadBanks && h <= maxWall && ((isRoad(k) && isPark(k2)) || (isRoad(k2) && isPark(k))) && builtDist![isRoad(k) ? k2 : k]! >= bankRate.land * h) {
           bankLenG += dem.cell;
           bankRsG += dem.cell * (bankRate.m3 * h * h * bankRate.earth + bankRate.face * h * bankRate.turf);
           bankLandM2 += dem.cell * bankRate.land * h;

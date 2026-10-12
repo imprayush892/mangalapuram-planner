@@ -428,8 +428,12 @@ least_earthwork:
   # A step between two gardens, or a garden and the green, up to this, away from the houses: a planted earth batter
   # (1:1.5) in the yards, not an RCC wall (assumptions earthwork_costs.batter_rs_per_m_per_m_height). 0: none.
   batter_max_step_m: 1.0
-  # A road's cut or fill against the green, with room for it clear of every plot and building: a bank, not a wall.
+  # A road's cut or fill against a park or unzoned land, with room for it clear of every plot and building: a bank, not a wall.
   road_banks_on_green: true
+  # Owner to decide (12 Oct): the plots' platforms held to this instead of slope.plot_max (1:5), e.g. "1:4"; null: 1:5.
+  plot_max: null
+  # Tried on D3 (12 Oct): each plot's plane through its street's level at the gate: more earth, more banks over 6 m. Off.
+  plot_front_at_road_level: false
   garden_at_road_level: true       # the garden starts at the road's finished level at the gate (no wall along the road)
   house_levels_max: 2              # a split-level house: two floor levels a storey (ASSUMPTION)
   house_level_min_depth_m: 4       # each level at least this deep (ASSUMPTION)
