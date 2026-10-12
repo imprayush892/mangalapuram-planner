@@ -1117,6 +1117,17 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     if (L.existingRoads.mask[k]) v = c.road;
     baseCost[k] = v;
   }
+  /** Owner 12 Oct: a villa street's link stays out of the land of the buildings (a clubhouse, the towers, the
+   * senior blocks, the school, retail and offices): only villa land, open space and the roads. */
+  const villaLinkCost = (): Float32Array => {
+    const out = Float32Array.from(baseCost);
+    const keepOut = new Set<Typology>(['clubhouse', 'apartments', 'senior', 'school', 'retail', 'office', 'commercial', 'hospital']);
+    for (let k = 0; k < n; k += 1) {
+      const zi = zoneOf[k]!;
+      if (zi >= 0 && keepOut.has(zones[zi]!.use) && !L.existingRoads.mask[k]) out[k] = Number.POSITIVE_INFINITY;
+    }
+    return out;
+  };
 
   /* ----------------------------------------------------------- roads */
   const roads: RoadRec[] = [];
@@ -1781,7 +1792,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     for (const r of roads) if (r.tier === 'primary') for (const k of r.cells) main[k] = 1;
     const comps = patches(dem, network);
     const inMain = (comp: number[]): boolean => comp.some((k) => main[k]);
-    const linkCost = Float32Array.from(baseCost);
+    const linkCost = villaLinkCost();
     let dropped = 0;
     for (const comp of comps.sort((a, b) => b.length - a.length)) {
       if (inMain(comp)) {
@@ -1815,6 +1826,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   if (isMix) {
     let linked = 0;
     const dead: number[] = [];
+    const endLinkCost = villaLinkCost();
     const reachCells = Math.ceil((width.tertiary / 2 + 2) / dem.cell);
     for (const r of [...roads]) {
       if (!r.kept || !r.row || r.tier !== 'tertiary' || r.centreline.length < 2) continue;
@@ -1834,7 +1846,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           }
         }
         if (meets) continue;
-        const rr = route({ dem, cost: baseCost, grade: lim.tertiary, overGradePenalty: penalty, sources: [c.j * nx + c.i], targets: others, dirWeight });
+        const rr = route({ dem, cost: endLinkCost, grade: lim.tertiary, overGradePenalty: penalty, sources: [c.j * nx + c.i], targets: others, dirWeight });
         if (rr.path && rr.path.length * dem.cell <= 80) {
           const link = addRoad('tertiary', lineOf(rr.path), "joins a villa street's end to the roads round the block (rows linked at both ends, owner 8 Oct)");
           if (link) {
@@ -2835,6 +2847,11 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           if (!(zoneTowers || zp) || cands.length > 0) break;
           cands = candidatesIn(siteLand(z), dims, apt.setback + P, turn);
         }
+        // Owner 12 Oct: a draft-model zone on a narrow strip of land: the towers it needs may stand turned off the
+        // contours where that is what fits (every flat placed).
+        if (zp && (zp.units ?? 0) > 0) {
+          for (const turn of [15, 30, 45, 60, 75]) cands = cands.concat(candidatesIn(siteLand(z), dims, apt.setback + P, turn));
+        }
         type T = Cand & { ring: Ring; pod: Ring; pLo: number; pHi: number; floorsCap: number; bc: number; hid: number };
         const pins = towerSites.filter((ts) => z.name.toUpperCase().startsWith(ts.match.toUpperCase())).map((ts) => ts.at);
         const towers: T[] = [];
@@ -3114,7 +3131,15 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     const carried: string[] = [];
     const fill = isMix && pick<boolean>(planning, `villas.categories.${villaSizing}.fill`, false);
     if (fill) {
-      // Owner 8 Oct: every villa the land holds is laid; nothing is trimmed to the model's counts.
+      // Owner 8 Oct: every villa the land holds is laid; nothing is trimmed to the model's counts. Owner 12 Oct: up to
+      // the zoning's count (villas.count_by_zoning): the steepest plots over it are left green.
+      const zk = ((x) => (x === 'green_pockets' || x === 'green_chain' ? x : 'model'))(pick<string>(planning, 'options.draft_zoning', 'model'));
+      const hi = pick<[number, number]>(planning, `villas.count_by_zoning.${zk}`, [0, Infinity])[1];
+      const over = keptDrafts.length - hi;
+      if (over > 0) {
+        for (const p of steepFirst.slice(0, over)) gone.add(p);
+        carried.push(`${over} plots over the ${hi} villas the zoning asks for are left green, the steepest first (owner 12 Oct)`);
+      }
     } else if (isMix) {
       // Each zone stops at its component's units. Owner 7 Oct (85% of the villa land in plots): a plot over the
       // count is not left empty; its row neighbours share it, each still a rectangle, within the growth limit.
@@ -3519,6 +3544,18 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   let pkgLeft = pkg?.units ?? 0;
   const yardRows = new Set<string>();
   let retyped = 0;
+  // Owner 12 Oct: no plot under a building of another use (a plot reshaped at the edge of the villa land can reach
+  // over it): such a plot is left out.
+  {
+    const clash = keptDrafts.filter((d) => draftsB.some((b) => multiPolyArea(intersectPolys([[d.ring]], [[b.placed.ring]])) > 1));
+    if (clash.length > 0) {
+      const out = new Set(clash);
+      const keep = keptDrafts.filter((d) => !out.has(d));
+      keptDrafts.length = 0;
+      keptDrafts.push(...keep);
+      notes.push(`${clash.length} plots at the edge of the villa land reached under another use's building and are left out`);
+    }
+  }
   const plots: PlanPlot[] = keptDrafts.map((d, i) => {
     const smp = rectSamples(d.f, d.a0, d.a0 + d.w, d.b0, d.b0 + d.d, 1);
     const pf = platformFor(dem, smp, plotLimit, delta);

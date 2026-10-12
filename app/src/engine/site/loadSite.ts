@@ -80,6 +80,7 @@ interface ZoneProps {
   component?: string;
   within?: string;
   water?: boolean;
+  green?: string;
   label_area_ac: number;
   drawn_area_ac: number;
   in_scope_ac: number;
@@ -174,7 +175,10 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
 
   const toZone = (f: GeoJsonFeatureCollection<ZoneProps>['features'][number], i: number): Zone => {
     const drawnGeom = geometryToMulti(f.geometry);
-    const geom = intersect(drawnGeom, parcel);
+    let geom = intersect(drawnGeom, parcel);
+    // The polygon clipper can lose a shape outright (seen on an optimised zone, owner 12 Oct, its edge on the
+    // parcel's): the optimiser's zones are clipped to the parcel already, so they keep their drawn outline.
+    if (f.properties.geometry_confidence === 'optimised' && multiPolyArea(geom) < 0.98 * multiPolyArea(drawnGeom)) geom = drawnGeom;
     return {
       id: slug(f.properties.name, i),
       name: f.properties.name,
@@ -188,6 +192,7 @@ export async function loadSite(src: AssetSource, opts: LoadSiteOptions = {}): Pr
       ...(f.properties.use ? { use: f.properties.use, phase: f.properties.phase, component: f.properties.component } : {}),
       ...(f.properties.within ? { within: f.properties.within } : {}),
       ...(f.properties.water ? { water: true } : {}),
+      ...(f.properties.green ? { green: f.properties.green } : {}),
     };
   };
   const zones: Zone[] = zonesFc.features.map(toZone);

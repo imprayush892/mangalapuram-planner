@@ -18,7 +18,7 @@ export interface ParcelPart {
   geom: MultiPoly;
 }
 
-export type GeometryConfidence = 'good' | 'approximate' | 'missing';
+export type GeometryConfidence = 'good' | 'approximate' | 'missing' | 'drawn' | 'optimised';
 
 export interface Zone {
   id: string;
@@ -40,6 +40,8 @@ export interface Zone {
   within?: string;
   /** A lake kept as water (owner 12 Oct): open space, counted on its own. */
   water?: boolean;
+  /** Owner 12 Oct: the kind of green: rc (large public open space), landscape, lake, zone (in the villa land). */
+  green?: string;
 }
 
 export interface SiteFeature {

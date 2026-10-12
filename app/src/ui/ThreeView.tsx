@@ -16,7 +16,7 @@ import { useRules } from '../state/useRules';
 import { pick } from '../engine/data/config';
 import { usePresent } from '../state/presentStore';
 import { zoneColour } from './draw';
-import { hexOf } from './presentKit';
+import { zoneHex } from './presentKit';
 import { draftZonesFor } from '../engine/pipeline/basis';
 import { useWalk } from '../state/walkStore';
 
@@ -107,7 +107,7 @@ export default function ThreeView(): React.ReactElement {
               ? // Owner 12 Oct: the option's own zoning (optimised, with its pockets or link), coloured by use.
                 draftZonesFor(site, zoningPlan.option.zoning ?? 'model', zoningPlan.option.roads)
                   .filter((z) => z.geom.length > 0)
-                  .map((z) => ({ geom: z.geom, colour: z.water ? '#2f7fa3' : hexOf(z.use ?? 'park') }))
+                  .map((z) => ({ geom: z.geom, colour: zoneHex(z) }))
               : site.zones.filter((z) => z.geom.length > 0).map((z) => ({ geom: z.geom, colour: zoneColour(z.name) }))
             : [],
         ) ?? undefined,

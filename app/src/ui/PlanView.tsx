@@ -23,7 +23,7 @@ import { useLayout } from '../state/layoutStore';
 import { useEditedSite } from '../state/useEditedSite';
 import { usePresent } from '../state/presentStore';
 import { draftZonesFor } from '../engine/pipeline/basis';
-import { hexOf } from './presentKit';
+import { zoneHex } from './presentKit';
 
 export default function PlanView(): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -83,7 +83,7 @@ export default function PlanView(): React.ReactElement {
     const zones = draftZonesFor(site, o.zoning ?? 'model', o.roads);
     return {
       shownSite: { ...site, zones },
-      shownColours: Object.fromEntries(zones.map((z) => [z.id, z.water ? '#2f7fa3' : hexOf(z.use ?? 'park')])) as Record<string, string>,
+      shownColours: Object.fromEntries(zones.map((z) => [z.id, zoneHex(z)])) as Record<string, string>,
     };
   }, [presenting, site, pipelineResult, presentPlan]);
   const pipelinePlan = useMemo(() => {

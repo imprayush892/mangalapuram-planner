@@ -369,58 +369,58 @@ cases:
         ₹116 L. Detail on ''Ticket Size Analysis''.'
   D1:
     label: Optimised zoning · roads to the ground
-    villas: 361
+    villas: 358
     villas_by_phase:
-    - 55
-    - 101
-    - 82
-    - 123
-    villa_land_ac: 28.124
-    villas_per_acre: 12.84
-    open_space_ac: 15.215
-    roads_ac: 3.622
+    - 43
+    - 95
+    - 98
+    - 122
+    villa_land_ac: 30.815
+    villas_per_acre: 11.62
+    open_space_ac: 12.359
+    roads_ac: 4.131
     parcel_ac: 73.544
-    plot_efficiency: 0.7142
+    plot_efficiency: 0.6744
     green_ac:
-      rcM2: 8.505
-      lakesM2: 2.189
+      rcM2: 5.052
+      lakesM2: 2.167
       zoneM2: 0.0
-      landscapeM2: 4.521
-      groundsM2: 17.195
-      clubM2: 3.168
+      landscapeM2: 5.141
+      groundsM2: 16.605
+      clubM2: 2.934
     inputs:
       C16: 73.544122
-      C33: 0.049248
+      C33: 0.056173
       C35: 0
-      C37: 7.860688
-      C41: 0.714237
-      D123: 0.186624
-      D124: 0.25463
-      D125: 0.244262
-      D126: 0.314484
-      H99: 55
-      H106: 101
-      H107: 82
-      H108: 123
-      D130: 0.216066
-      D131: 0.396122
-      D132: 0.288089
-      D133: 0.099723
+      C37: 5.004879
+      C41: 0.674359
+      D123: 0.132666
+      D124: 0.295772
+      D125: 0.2636
+      D126: 0.307961
+      H99: 43
+      H106: 95
+      H107: 98
+      H108: 122
+      D130: 0.217877
+      D131: 0.388268
+      D132: 0.290503
+      D133: 0.103352
       G97: 0.0
-      G98: 1.336346
-      G100: 0.568342
-      G101: 0.668173
-      G102: 1.949167
-      G103: 0.773934
+      G98: 1.341288
+      G100: 0.494211
+      G101: 0.681022
+      G102: 1.862186
+      G103: 0.85795
       G104: 0.296526
-      G105: 3.146146
-      G109: 1.264191
-      G110: 1.137673
-      G111: 3.282548
-      G112: 4.439001
-      G113: 4.299634
-      G114: 1.138662
-      G116: 1.038831
+      G105: 3.288478
+      G109: 1.186106
+      G110: 1.061565
+      G111: 3.373483
+      G112: 4.299634
+      G113: 4.224514
+      G114: 1.070461
+      G116: 0.956792
       G115: 1.244423
       C103: Commercial office (strata) - Phase 1, 40%
       D103: 1
@@ -444,45 +444,45 @@ cases:
       V115: 10
       X115: 8
     values:
-      units: 1488.0
-      saleable_lakh_sft: 28.847
-      revenue_cr: 2494.920169
-      cost_cr: 2001.473204
-      pbt_cr: 457.391982
-      pat_cr: 340.693295
-      pat_margin: 0.136555
-      project_irr: 0.206394
-      promoter_irr: 0.160811
-      peak_funding_cr: 471.982655
-      promoter_money_cr: 367.127198
-      peak_loan_cr: 131.842742
-      interest_cr: 36.054983
-      villa_units: 361.0
-      villa_revenue_cr: 810.083096
-      villa_margin: 0.256547
+      units: 1485.0
+      saleable_lakh_sft: 28.7835
+      revenue_cr: 2492.814882
+      cost_cr: 2000.30623
+      pbt_cr: 455.807904
+      pat_cr: 339.50793
+      pat_margin: 0.136195
+      project_irr: 0.204086
+      promoter_irr: 0.159541
+      peak_funding_cr: 472.795685
+      promoter_money_cr: 371.348809
+      peak_loan_cr: 128.042342
+      interest_cr: 36.700748
+      villa_units: 358.0
+      villa_revenue_cr: 807.977809
+      villa_margin: 0.241222
     text:
-      units: 1,488
+      units: 1,485
       saleable_lakh_sft: '28.8'
-      revenue_cr: 2,494.9
-      cost_cr: 2,001.5
-      pbt_cr: '457.4'
-      pat_cr: '340.7'
-      pat_margin: 13.7%
-      project_irr: 20.6%
-      promoter_irr: 16.1%
-      peak_funding_cr: '472.0'
-      promoter_money_cr: '367.1'
-      peak_loan_cr: '131.8'
-      interest_cr: '36.1'
-      villa_units: '361'
-      villa_revenue_cr: '810.1'
-      villa_margin: 25.7%
+      revenue_cr: 2,492.8
+      cost_cr: 2,000.3
+      pbt_cr: '455.8'
+      pat_cr: '339.5'
+      pat_margin: 13.6%
+      project_irr: 20.4%
+      promoter_irr: 16.0%
+      peak_funding_cr: '472.8'
+      promoter_money_cr: '371.3'
+      peak_loan_cr: '128.0'
+      interest_cr: '36.7'
+      villa_units: '358'
+      villa_revenue_cr: '808.0'
+      villa_margin: 24.1%
     summary:
       source: Draft model.xlsx · One-Page Summary
       land:
       - use: Apartments
-        acres: 13.358
-        share: 0.1816
+        acres: 13.239
+        share: 0.18
         phases:
         - 1
         - 2
@@ -490,8 +490,8 @@ cases:
         - 4
         cell: D9
       - use: Villas
-        acres: 28.124
-        share: 0.3824
+        acres: 30.815
+        share: 0.419
         phases:
         - 1
         - 2
@@ -499,28 +499,28 @@ cases:
         - 4
         cell: D10
       - use: Senior living
-        acres: 3.814
-        share: 0.0519
+        acres: 3.97
+        share: 0.054
         phases:
         - 1
         - 2
         cell: D11
       - use: Retail & F&B high street (leased)
-        acres: 1.139
-        share: 0.0155
+        acres: 1.07
+        share: 0.0146
         phases:
         - 3
         cell: D12
       - use: Commercial office
-        acres: 2.018
-        share: 0.0274
+        acres: 2.102
+        share: 0.0286
         phases:
         - 1
         - 3
         cell: D13
       - use: School (sale to operator)
-        acres: 3.087
-        share: 0.042
+        acres: 2.924
+        share: 0.0398
         phases:
         - 2
         - 3
@@ -531,8 +531,8 @@ cases:
         phases: []
         cell: D15
       - use: Clubhouses (amenity — cost only)
-        acres: 3.168
-        share: 0.0431
+        acres: 2.934
+        share: 0.0399
         phases:
         - 1
         - 2
@@ -546,13 +546,13 @@ cases:
         - 1
         cell: D17
       - use: Internal roads & trunk infrastructure
-        acres: 3.622
-        share: 0.0492
+        acres: 4.131
+        share: 0.0562
         phases: []
         cell: D18
       - use: Recreational open space
-        acres: 15.215
-        share: 0.2069
+        acres: 12.359
+        share: 0.1681
         phases: []
         cell: D19
       land_total_ac: 73.54
@@ -562,18 +562,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 167.13
+        value: 171.35
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 131.84
+        value: 128.04
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 36.05
+        value: 36.7
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -595,55 +595,55 @@ cases:
       tickets:
       - comp: V
         typology: Villas — 1,800 sft plot
-        units: 79
+        units: 78
         size_sft: 2000
         plot_or_carpet_sft: 1800
-        base_rate: 7754
-        base_ticket_lakh: 155.1
-        realised_rate: 8962
-        ticket_lakh: 179.2
-        revenue_cr: 141.6
+        base_rate: 7765
+        base_ticket_lakh: 155.3
+        realised_rate: 9006
+        ticket_lakh: 180.1
+        revenue_cr: 140.5
         phases: P1–P4
-        share_of_res_revenue: 0.0681
+        share_of_res_revenue: 0.0676
         row: 58
       - comp: V
         typology: Villas — 2,250 sft plot
-        units: 143
+        units: 140
         size_sft: 2400
         plot_or_carpet_sft: 2250
-        base_rate: 7986
-        base_ticket_lakh: 191.7
-        realised_rate: 9228
-        ticket_lakh: 221.5
-        revenue_cr: 316.7
+        base_rate: 7994
+        base_ticket_lakh: 191.9
+        realised_rate: 9263
+        ticket_lakh: 222.3
+        revenue_cr: 311.2
         phases: P1–P4
-        share_of_res_revenue: 0.1523
+        share_of_res_revenue: 0.1498
         row: 59
       - comp: V
         typology: Villas — 2,500 sft plot
-        units: 104
+        units: 103
         size_sft: 2550
         plot_or_carpet_sft: 2500
-        base_rate: 8142
-        base_ticket_lakh: 207.6
-        realised_rate: 9405
-        ticket_lakh: 239.8
-        revenue_cr: 249.4
+        base_rate: 8153
+        base_ticket_lakh: 207.9
+        realised_rate: 9451
+        ticket_lakh: 241.0
+        revenue_cr: 248.2
         phases: P1–P4
-        share_of_res_revenue: 0.1199
+        share_of_res_revenue: 0.1195
         row: 60
       - comp: V
         typology: Villas — 2,800 sft plot
-        units: 35
+        units: 37
         size_sft: 2700
         plot_or_carpet_sft: 2800
-        base_rate: 8378
-        base_ticket_lakh: 226.2
-        realised_rate: 9686
-        ticket_lakh: 261.5
-        revenue_cr: 91.5
+        base_rate: 8389
+        base_ticket_lakh: 226.5
+        realised_rate: 9737
+        ticket_lakh: 262.9
+        revenue_cr: 97.3
         phases: P1–P4
-        share_of_res_revenue: 0.044
+        share_of_res_revenue: 0.0468
         row: 61
       - comp: A
         typology: Apartments — 2BHK apartment
@@ -656,7 +656,7 @@ cases:
         ticket_lakh: 84.4
         revenue_cr: 236.2
         phases: P1–P4
-        share_of_res_revenue: 0.1136
+        share_of_res_revenue: 0.1137
         row: 62
       - comp: A
         typology: Apartments — 3BHK apartment
@@ -669,7 +669,7 @@ cases:
         ticket_lakh: 115.9
         revenue_cr: 541.2
         phases: P1–P4
-        share_of_res_revenue: 0.2602
+        share_of_res_revenue: 0.2605
         row: 63
       - comp: A
         typology: Apartments — 4BHK apartment
@@ -682,7 +682,7 @@ cases:
         ticket_lakh: 163.9
         revenue_cr: 308.1
         phases: P1–P4
-        share_of_res_revenue: 0.1481
+        share_of_res_revenue: 0.1483
         row: 64
       - comp: C04
         typology: Phase 1 — 32-unit senior living
@@ -711,67 +711,67 @@ cases:
         share_of_res_revenue: 0.0788
         row: 66
       tickets_average:
-        units: 1488
-        size_sft: 1714
-        ticket_lakh: 139.8
-        revenue_cr: 2079.7
+        units: 1485
+        size_sft: 1713
+        ticket_lakh: 139.9
+        revenue_cr: 2077.7
         row: 67
-      tickets_note: 'Villas: 361 units, avg 2,385 sft on 2,277 sft plots, avg ticket ₹221 L. Apartments: 935 units, avg 1,601 sft, avg ticket
+      tickets_note: 'Villas: 358 units, avg 2,387 sft on 2,281 sft plots, avg ticket ₹223 L. Apartments: 935 units, avg 1,601 sft, avg ticket
         ₹116 L. Detail on ''Ticket Size Analysis''.'
   D2:
     label: Optimised zoning · north–south roads (Vastu)
-    villas: 351
+    villas: 363
     villas_by_phase:
-    - 55
-    - 94
-    - 89
-    - 113
-    villa_land_ac: 28.124
-    villas_per_acre: 12.48
-    open_space_ac: 15.164
-    roads_ac: 3.673
+    - 48
+    - 96
+    - 102
+    - 117
+    villa_land_ac: 30.815
+    villas_per_acre: 11.78
+    open_space_ac: 12.289
+    roads_ac: 4.202
     parcel_ac: 73.544
-    plot_efficiency: 0.7125
+    plot_efficiency: 0.6754
     green_ac:
-      rcM2: 8.438
-      lakesM2: 2.192
+      rcM2: 4.882
+      lakesM2: 2.194
       zoneM2: 0.0
-      landscapeM2: 4.534
-      groundsM2: 16.796
-      clubM2: 3.168
+      landscapeM2: 5.213
+      groundsM2: 16.532
+      clubM2: 2.934
     inputs:
       C16: 73.544122
-      C33: 0.049941
+      C33: 0.057132
       C35: 0
-      C37: 7.809671
-      C41: 0.712472
-      D123: 0.186624
-      D124: 0.25463
-      D125: 0.244262
-      D126: 0.314484
-      H99: 55
-      H106: 94
-      H107: 89
-      H108: 113
-      D130: 0.225071
-      D131: 0.396011
-      D132: 0.282051
-      D133: 0.096866
+      C37: 4.934333
+      C41: 0.67538
+      D123: 0.132666
+      D124: 0.295772
+      D125: 0.2636
+      D126: 0.307961
+      H99: 48
+      H106: 96
+      H107: 102
+      H108: 117
+      D130: 0.22314
+      D131: 0.385675
+      D132: 0.289256
+      D133: 0.101928
       G97: 0.0
-      G98: 1.336346
-      G100: 0.568342
-      G101: 0.668173
-      G102: 1.949167
-      G103: 0.773934
+      G98: 1.341288
+      G100: 0.494211
+      G101: 0.681022
+      G102: 1.862186
+      G103: 0.85795
       G104: 0.296526
-      G105: 3.146146
-      G109: 1.264191
-      G110: 1.137673
-      G111: 3.282548
-      G112: 4.439001
-      G113: 4.299634
-      G114: 1.138662
-      G116: 1.038831
+      G105: 3.288478
+      G109: 1.186106
+      G110: 1.061565
+      G111: 3.373483
+      G112: 4.299634
+      G113: 4.224514
+      G114: 1.070461
+      G116: 0.956792
       G115: 1.244423
       C103: Commercial office (strata) - Phase 1, 40%
       D103: 1
@@ -795,45 +795,45 @@ cases:
       V115: 10
       X115: 8
     values:
-      units: 1478.0
-      saleable_lakh_sft: 28.602
-      revenue_cr: 2471.069227
-      cost_cr: 1989.849245
-      pbt_cr: 444.636477
-      pat_cr: 331.148351
-      pat_margin: 0.13401
-      project_irr: 0.202103
-      promoter_irr: 0.157288
-      peak_funding_cr: 471.618058
-      promoter_money_cr: 367.082841
-      peak_loan_cr: 131.508999
-      interest_cr: 36.583505
-      villa_units: 351.0
-      villa_revenue_cr: 786.232154
-      villa_margin: 0.247716
+      units: 1490.0
+      saleable_lakh_sft: 28.896
+      revenue_cr: 2501.490345
+      cost_cr: 2004.536454
+      pbt_cr: 460.441967
+      pat_cr: 342.975599
+      pat_margin: 0.137109
+      project_irr: 0.206791
+      promoter_irr: 0.16174
+      peak_funding_cr: 472.369184
+      promoter_money_cr: 369.580952
+      peak_loan_cr: 129.543178
+      interest_cr: 36.511924
+      villa_units: 363.0
+      villa_revenue_cr: 816.653272
+      villa_margin: 0.244475
     text:
-      units: 1,478
-      saleable_lakh_sft: '28.6'
-      revenue_cr: 2,471.1
-      cost_cr: 1,989.8
-      pbt_cr: '444.6'
-      pat_cr: '331.1'
-      pat_margin: 13.4%
-      project_irr: 20.2%
-      promoter_irr: 15.7%
-      peak_funding_cr: '471.6'
-      promoter_money_cr: '367.1'
-      peak_loan_cr: '131.5'
-      interest_cr: '36.6'
-      villa_units: '351'
-      villa_revenue_cr: '786.2'
-      villa_margin: 24.8%
+      units: 1,490
+      saleable_lakh_sft: '28.9'
+      revenue_cr: 2,501.5
+      cost_cr: 2,004.5
+      pbt_cr: '460.4'
+      pat_cr: '343.0'
+      pat_margin: 13.7%
+      project_irr: 20.7%
+      promoter_irr: 16.2%
+      peak_funding_cr: '472.4'
+      promoter_money_cr: '369.6'
+      peak_loan_cr: '129.5'
+      interest_cr: '36.5'
+      villa_units: '363'
+      villa_revenue_cr: '816.7'
+      villa_margin: 24.4%
     summary:
       source: Draft model.xlsx · One-Page Summary
       land:
       - use: Apartments
-        acres: 13.358
-        share: 0.1816
+        acres: 13.239
+        share: 0.18
         phases:
         - 1
         - 2
@@ -841,8 +841,8 @@ cases:
         - 4
         cell: D9
       - use: Villas
-        acres: 28.124
-        share: 0.3824
+        acres: 30.815
+        share: 0.419
         phases:
         - 1
         - 2
@@ -850,28 +850,28 @@ cases:
         - 4
         cell: D10
       - use: Senior living
-        acres: 3.814
-        share: 0.0519
+        acres: 3.97
+        share: 0.054
         phases:
         - 1
         - 2
         cell: D11
       - use: Retail & F&B high street (leased)
-        acres: 1.139
-        share: 0.0155
+        acres: 1.07
+        share: 0.0146
         phases:
         - 3
         cell: D12
       - use: Commercial office
-        acres: 2.018
-        share: 0.0274
+        acres: 2.102
+        share: 0.0286
         phases:
         - 1
         - 3
         cell: D13
       - use: School (sale to operator)
-        acres: 3.087
-        share: 0.042
+        acres: 2.924
+        share: 0.0398
         phases:
         - 2
         - 3
@@ -882,8 +882,8 @@ cases:
         phases: []
         cell: D15
       - use: Clubhouses (amenity — cost only)
-        acres: 3.168
-        share: 0.0431
+        acres: 2.934
+        share: 0.0399
         phases:
         - 1
         - 2
@@ -897,13 +897,13 @@ cases:
         - 1
         cell: D17
       - use: Internal roads & trunk infrastructure
-        acres: 3.673
-        share: 0.0499
+        acres: 4.202
+        share: 0.0571
         phases: []
         cell: D18
       - use: Recreational open space
-        acres: 15.164
-        share: 0.2062
+        acres: 12.289
+        share: 0.1671
         phases: []
         cell: D19
       land_total_ac: 73.54
@@ -913,18 +913,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 167.08
+        value: 169.58
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 131.51
+        value: 129.54
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 36.58
+        value: 36.51
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -946,53 +946,404 @@ cases:
       tickets:
       - comp: V
         typology: Villas — 1,800 sft plot
-        units: 78
+        units: 81
         size_sft: 2000
         plot_or_carpet_sft: 1800
-        base_rate: 7754
-        base_ticket_lakh: 155.1
-        realised_rate: 8954
-        ticket_lakh: 179.1
-        revenue_cr: 139.7
+        base_rate: 7759
+        base_ticket_lakh: 155.2
+        realised_rate: 8978
+        ticket_lakh: 179.6
+        revenue_cr: 145.4
         phases: P1–P4
-        share_of_res_revenue: 0.0679
+        share_of_res_revenue: 0.0697
         row: 58
       - comp: V
         typology: Villas — 2,250 sft plot
         units: 139
         size_sft: 2400
         plot_or_carpet_sft: 2250
-        base_rate: 7985
-        base_ticket_lakh: 191.6
-        realised_rate: 9220
-        ticket_lakh: 221.3
-        revenue_cr: 307.6
+        base_rate: 7994
+        base_ticket_lakh: 191.9
+        realised_rate: 9252
+        ticket_lakh: 222.0
+        revenue_cr: 308.6
         phases: P1–P4
-        share_of_res_revenue: 0.1496
+        share_of_res_revenue: 0.1479
         row: 59
       - comp: V
         typology: Villas — 2,500 sft plot
-        units: 100
+        units: 106
         size_sft: 2550
         plot_or_carpet_sft: 2500
-        base_rate: 8140
-        base_ticket_lakh: 207.6
-        realised_rate: 9394
-        ticket_lakh: 239.5
-        revenue_cr: 239.5
+        base_rate: 8148
+        base_ticket_lakh: 207.8
+        realised_rate: 9428
+        ticket_lakh: 240.4
+        revenue_cr: 254.8
         phases: P1–P4
-        share_of_res_revenue: 0.1165
+        share_of_res_revenue: 0.1222
+        row: 60
+      - comp: V
+        typology: Villas — 2,800 sft plot
+        units: 37
+        size_sft: 2700
+        plot_or_carpet_sft: 2800
+        base_rate: 8380
+        base_ticket_lakh: 226.3
+        realised_rate: 9693
+        ticket_lakh: 261.7
+        revenue_cr: 96.8
+        phases: P1–P4
+        share_of_res_revenue: 0.0464
+        row: 61
+      - comp: A
+        typology: Apartments — 2BHK apartment
+        units: 280
+        size_sft: 1200
+        plot_or_carpet_sft: 840
+        base_rate: 5920
+        base_ticket_lakh: 71.0
+        realised_rate: 7029
+        ticket_lakh: 84.4
+        revenue_cr: 236.2
+        phases: P1–P4
+        share_of_res_revenue: 0.1132
+        row: 62
+      - comp: A
+        typology: Apartments — 3BHK apartment
+        units: 467
+        size_sft: 1600
+        plot_or_carpet_sft: 1120
+        base_rate: 6099
+        base_ticket_lakh: 97.6
+        realised_rate: 7243
+        ticket_lakh: 115.9
+        revenue_cr: 541.2
+        phases: P1–P4
+        share_of_res_revenue: 0.2594
+        row: 63
+      - comp: A
+        typology: Apartments — 4BHK apartment
+        units: 188
+        size_sft: 2200
+        plot_or_carpet_sft: 1540
+        base_rate: 6274
+        base_ticket_lakh: 138.0
+        realised_rate: 7449
+        ticket_lakh: 163.9
+        revenue_cr: 308.1
+        phases: P1–P4
+        share_of_res_revenue: 0.1477
+        row: 64
+      - comp: C04
+        typology: Phase 1 — 32-unit senior living
+        units: 32
+        size_sft: 1000
+        plot_or_carpet_sft: null
+        base_rate: 9000
+        base_ticket_lakh: 90.0
+        realised_rate: 9749
+        ticket_lakh: 97.5
+        revenue_cr: 31.2
+        phases: '1'
+        share_of_res_revenue: 0.015
+        row: 65
+      - comp: C07
+        typology: Senior citizens enclave — 160 units
+        units: 160
+        size_sft: 1000
+        plot_or_carpet_sft: null
+        base_rate: 9000
+        base_ticket_lakh: 90.0
+        realised_rate: 10239
+        ticket_lakh: 102.4
+        revenue_cr: 163.8
+        phases: '2'
+        share_of_res_revenue: 0.0785
+        row: 66
+      tickets_average:
+        units: 1490
+        size_sft: 1714
+        ticket_lakh: 140.0
+        revenue_cr: 2086.2
+        row: 67
+      tickets_note: 'Villas: 363 units, avg 2,385 sft on 2,279 sft plots, avg ticket ₹222 L. Apartments: 935 units, avg 1,601 sft, avg ticket
+        ₹116 L. Detail on ''Ticket Size Analysis''.'
+  D3:
+    label: Green pockets · roads to the ground
+    villas: 356
+    villas_by_phase:
+    - 33
+    - 107
+    - 104
+    - 112
+    villa_land_ac: 30.079
+    villas_per_acre: 11.84
+    open_space_ac: 13.062
+    roads_ac: 4.165
+    parcel_ac: 73.544
+    plot_efficiency: 0.6719
+    green_ac:
+      rcM2: 4.547
+      lakesM2: 2.161
+      zoneM2: 1.573
+      landscapeM2: 4.781
+      groundsM2: 16.463
+      clubM2: 2.934
+    inputs:
+      C16: 73.544122
+      C33: 0.056631
+      C35: 0
+      C37: 5.707522
+      C41: 0.671867
+      D123: 0.109822
+      D124: 0.311524
+      D125: 0.279912
+      D126: 0.298741
+      H99: 33
+      H106: 107
+      H107: 104
+      H108: 112
+      D130: 0.233146
+      D131: 0.379213
+      D132: 0.292135
+      D133: 0.095506
+      G97: 0.0
+      G98: 1.341288
+      G100: 0.494211
+      G101: 0.681022
+      G102: 1.862186
+      G103: 0.85795
+      G104: 0.296526
+      G105: 3.288478
+      G109: 1.186106
+      G110: 1.061565
+      G111: 3.373483
+      G112: 4.299634
+      G113: 4.224514
+      G114: 1.070461
+      G116: 0.956792
+      G115: 1.244423
+      C103: Commercial office (strata) - Phase 1, 40%
+      D103: 1
+      E103: Commercial
+      F103: Y
+      H103: 1
+      I103: 90000
+      K103: Office
+      L103: 1.15
+      P103: 3
+      Q103: 10
+      U103: 7500
+      V103: 3
+      X103: 6
+      Z103: COMM
+      AB103: 0.04
+      C115: Commercial office (strata) - Phase 3, 60%
+      D115: 3
+      I115: 135000
+      P115: 10
+      V115: 10
+      X115: 8
+    values:
+      units: 1483.0
+      saleable_lakh_sft: 28.708
+      revenue_cr: 2485.371648
+      cost_cr: 1996.622158
+      pbt_cr: 452.82527
+      pat_cr: 337.276025
+      pat_margin: 0.135704
+      project_irr: 0.20313
+      promoter_irr: 0.158263
+      peak_funding_cr: 474.365413
+      promoter_money_cr: 375.048901
+      peak_loan_cr: 125.610783
+      interest_cr: 35.924219
+      villa_units: 356.0
+      villa_revenue_cr: 800.534575
+      villa_margin: 0.241871
+    text:
+      units: 1,483
+      saleable_lakh_sft: '28.7'
+      revenue_cr: 2,485.4
+      cost_cr: 1,996.6
+      pbt_cr: '452.8'
+      pat_cr: '337.3'
+      pat_margin: 13.6%
+      project_irr: 20.3%
+      promoter_irr: 15.8%
+      peak_funding_cr: '474.4'
+      promoter_money_cr: '375.0'
+      peak_loan_cr: '125.6'
+      interest_cr: '35.9'
+      villa_units: '356'
+      villa_revenue_cr: '800.5'
+      villa_margin: 24.2%
+    summary:
+      source: Draft model.xlsx · One-Page Summary
+      land:
+      - use: Apartments
+        acres: 13.239
+        share: 0.18
+        phases:
+        - 1
+        - 2
+        - 3
+        - 4
+        cell: D9
+      - use: Villas
+        acres: 30.079
+        share: 0.409
+        phases:
+        - 1
+        - 2
+        - 3
+        - 4
+        cell: D10
+      - use: Senior living
+        acres: 3.97
+        share: 0.054
+        phases:
+        - 1
+        - 2
+        cell: D11
+      - use: Retail & F&B high street (leased)
+        acres: 1.07
+        share: 0.0146
+        phases:
+        - 3
+        cell: D12
+      - use: Commercial office
+        acres: 2.102
+        share: 0.0286
+        phases:
+        - 1
+        - 3
+        cell: D13
+      - use: School (sale to operator)
+        acres: 2.924
+        share: 0.0398
+        phases:
+        - 2
+        - 3
+        cell: D14
+      - use: Hospital (sale to operator)
+        acres: 0.0
+        share: 0.0
+        phases: []
+        cell: D15
+      - use: Clubhouses (amenity — cost only)
+        acres: 2.934
+        share: 0.0399
+        phases:
+        - 1
+        - 2
+        - 3
+        - 4
+        cell: D16
+      - use: Sales office & entry (cost only)
+        acres: 0.0
+        share: 0.0
+        phases:
+        - 1
+        cell: D17
+      - use: Internal roads & trunk infrastructure
+        acres: 4.165
+        share: 0.0566
+        phases: []
+        cell: D18
+      - use: Recreational open space
+        acres: 13.062
+        share: 0.1776
+        phases: []
+        cell: D19
+      land_total_ac: 73.54
+      funding:
+      - label: Promoter equity committed
+        value: 200.0
+        unit: ₹ Cr
+        cell: K8
+      - label: Additional promoter top-up
+        value: 175.05
+        unit: ₹ Cr
+        cell: K9
+      - label: Peak construction loan
+        value: 125.61
+        unit: ₹ Cr
+        cell: K10
+      - label: Loan limit / rate
+        text: 300 Cr @ 15.0%
+        cell: K11
+      - label: Interest & fees
+        value: 35.92
+        unit: ₹ Cr
+        cell: K12
+      - label: Cumulative cash turns positive
+        text: FY32 Q1
+        cell: K13
+      - label: Land rate
+        text: 5.0 Cr/acre + 7% stamp/reg
+        cell: K14
+      - label: Price / cost escalation p.a.
+        text: 5% / 6%
+        cell: K15
+      - label: RERA escrow share
+        value: 70.0
+        unit: '%'
+        cell: K16
+      - label: Payment plan (apartments)
+        text: 10 / 20 / 65 / 5% (book/agree/build/possess)
+        cell: K17
+      tickets:
+      - comp: V
+        typology: Villas — 1,800 sft plot
+        units: 83
+        size_sft: 2000
+        plot_or_carpet_sft: 1800
+        base_rate: 7771
+        base_ticket_lakh: 155.4
+        realised_rate: 8998
+        ticket_lakh: 180.0
+        revenue_cr: 149.4
+        phases: P1–P4
+        share_of_res_revenue: 0.0721
+        row: 58
+      - comp: V
+        typology: Villas — 2,250 sft plot
+        units: 135
+        size_sft: 2400
+        plot_or_carpet_sft: 2250
+        base_rate: 8007
+        base_ticket_lakh: 192.2
+        realised_rate: 9274
+        ticket_lakh: 222.6
+        revenue_cr: 300.5
+        phases: P1–P4
+        share_of_res_revenue: 0.1451
+        row: 59
+      - comp: V
+        typology: Villas — 2,500 sft plot
+        units: 104
+        size_sft: 2550
+        plot_or_carpet_sft: 2500
+        base_rate: 8160
+        base_ticket_lakh: 208.1
+        realised_rate: 9451
+        ticket_lakh: 241.0
+        revenue_cr: 250.6
+        phases: P1–P4
+        share_of_res_revenue: 0.1211
         row: 60
       - comp: V
         typology: Villas — 2,800 sft plot
         units: 34
         size_sft: 2700
         plot_or_carpet_sft: 2800
-        base_rate: 8376
-        base_ticket_lakh: 226.2
-        realised_rate: 9682
-        ticket_lakh: 261.4
-        revenue_cr: 88.9
+        base_rate: 8395
+        base_ticket_lakh: 226.7
+        realised_rate: 9735
+        ticket_lakh: 262.9
+        revenue_cr: 89.4
         phases: P1–P4
         share_of_res_revenue: 0.0432
         row: 61
@@ -1007,7 +1358,7 @@ cases:
         ticket_lakh: 84.4
         revenue_cr: 236.2
         phases: P1–P4
-        share_of_res_revenue: 0.1149
+        share_of_res_revenue: 0.1141
         row: 62
       - comp: A
         typology: Apartments — 3BHK apartment
@@ -1020,7 +1371,7 @@ cases:
         ticket_lakh: 115.9
         revenue_cr: 541.2
         phases: P1–P4
-        share_of_res_revenue: 0.2632
+        share_of_res_revenue: 0.2614
         row: 63
       - comp: A
         typology: Apartments — 4BHK apartment
@@ -1033,7 +1384,7 @@ cases:
         ticket_lakh: 163.9
         revenue_cr: 308.1
         phases: P1–P4
-        share_of_res_revenue: 0.1498
+        share_of_res_revenue: 0.1488
         row: 64
       - comp: C04
         typology: Phase 1 — 32-unit senior living
@@ -1046,7 +1397,7 @@ cases:
         ticket_lakh: 97.5
         revenue_cr: 31.2
         phases: '1'
-        share_of_res_revenue: 0.0152
+        share_of_res_revenue: 0.0151
         row: 65
       - comp: C07
         typology: Senior citizens enclave — 160 units
@@ -1059,70 +1410,70 @@ cases:
         ticket_lakh: 102.4
         revenue_cr: 163.8
         phases: '2'
-        share_of_res_revenue: 0.0797
+        share_of_res_revenue: 0.0791
         row: 66
       tickets_average:
-        units: 1478
-        size_sft: 1709
-        ticket_lakh: 139.1
-        revenue_cr: 2056.2
+        units: 1483
+        size_sft: 1710
+        ticket_lakh: 139.6
+        revenue_cr: 2070.3
         row: 67
-      tickets_note: 'Villas: 351 units, avg 2,383 sft on 2,275 sft plots, avg ticket ₹221 L. Apartments: 935 units, avg 1,601 sft, avg ticket
+      tickets_note: 'Villas: 356 units, avg 2,379 sft on 2,271 sft plots, avg ticket ₹222 L. Apartments: 935 units, avg 1,601 sft, avg ticket
         ₹116 L. Detail on ''Ticket Size Analysis''.'
-  D3:
-    label: Green pockets · roads to the ground
-    villas: 340
+  D4:
+    label: Green pockets · north–south roads (Vastu)
+    villas: 354
     villas_by_phase:
-    - 51
-    - 99
-    - 78
-    - 112
-    villa_land_ac: 27.22
-    villas_per_acre: 12.49
-    open_space_ac: 16.122
-    roads_ac: 3.619
+    - 38
+    - 101
+    - 105
+    - 110
+    villa_land_ac: 30.152
+    villas_per_acre: 11.74
+    open_space_ac: 12.955
+    roads_ac: 4.199
     parcel_ac: 73.544
-    plot_efficiency: 0.6977
+    plot_efficiency: 0.6703
     green_ac:
-      rcM2: 8.502
-      lakesM2: 2.191
-      zoneM2: 0.907
-      landscapeM2: 4.522
-      groundsM2: 17.18
-      clubM2: 3.168
+      rcM2: 4.406
+      lakesM2: 2.185
+      zoneM2: 1.484
+      landscapeM2: 4.88
+      groundsM2: 16.424
+      clubM2: 2.934
     inputs:
       C16: 73.544122
-      C33: 0.049205
+      C33: 0.057091
       C35: 0
-      C37: 8.767225
-      C41: 0.697744
-      D123: 0.18679
-      D124: 0.263081
-      D125: 0.24754
-      D126: 0.302589
-      H99: 51
-      H106: 99
-      H107: 78
-      H108: 112
-      D130: 0.214706
-      D131: 0.4
-      D132: 0.291176
-      D133: 0.094118
+      C37: 5.60059
+      C41: 0.670341
+      D123: 0.112801
+      D124: 0.312572
+      D125: 0.276578
+      D126: 0.29805
+      H99: 38
+      H106: 101
+      H107: 105
+      H108: 110
+      D130: 0.20904
+      D131: 0.39548
+      D132: 0.299435
+      D133: 0.096045
       G97: 0.0
-      G98: 1.336346
-      G100: 0.568342
-      G101: 0.668173
-      G102: 1.949167
-      G103: 0.773934
+      G98: 1.341288
+      G100: 0.494211
+      G101: 0.681022
+      G102: 1.862186
+      G103: 0.85795
       G104: 0.296526
-      G105: 3.146146
-      G109: 1.264191
-      G110: 1.137673
-      G111: 3.282548
-      G112: 4.439001
-      G113: 4.299634
-      G114: 1.138662
-      G116: 1.038831
+      G105: 3.288478
+      G109: 1.186106
+      G110: 1.061565
+      G111: 3.373483
+      G112: 4.299634
+      G113: 4.224514
+      G114: 1.070461
+      G116: 0.956792
       G115: 1.244423
       C103: Commercial office (strata) - Phase 1, 40%
       D103: 1
@@ -1146,45 +1497,45 @@ cases:
       V115: 10
       X115: 8
     values:
-      units: 1467.0
-      saleable_lakh_sft: 28.352
-      revenue_cr: 2447.752676
-      cost_cr: 1978.33171
-      pbt_cr: 433.208379
-      pat_cr: 322.596705
-      pat_margin: 0.131793
-      project_irr: 0.197777
-      promoter_irr: 0.153301
-      peak_funding_cr: 472.233527
-      promoter_money_cr: 368.499734
-      peak_loan_cr: 130.592488
-      interest_cr: 36.212586
-      villa_units: 340.0
-      villa_revenue_cr: 762.915603
-      villa_margin: 0.243623
+      units: 1481.0
+      saleable_lakh_sft: 28.7005
+      revenue_cr: 2484.295331
+      cost_cr: 1995.896091
+      pbt_cr: 452.158184
+      pat_cr: 336.776844
+      pat_margin: 0.135562
+      project_irr: 0.203369
+      promoter_irr: 0.158581
+      peak_funding_cr: 473.554152
+      promoter_money_cr: 373.128017
+      peak_loan_cr: 126.876372
+      interest_cr: 36.241057
+      villa_units: 354.0
+      villa_revenue_cr: 799.458259
+      villa_margin: 0.241346
     text:
-      units: 1,467
-      saleable_lakh_sft: '28.4'
-      revenue_cr: 2,447.8
-      cost_cr: 1,978.3
-      pbt_cr: '433.2'
-      pat_cr: '322.6'
-      pat_margin: 13.2%
-      project_irr: 19.8%
-      promoter_irr: 15.3%
-      peak_funding_cr: '472.2'
-      promoter_money_cr: '368.5'
-      peak_loan_cr: '130.6'
+      units: 1,481
+      saleable_lakh_sft: '28.7'
+      revenue_cr: 2,484.3
+      cost_cr: 1,995.9
+      pbt_cr: '452.2'
+      pat_cr: '336.8'
+      pat_margin: 13.6%
+      project_irr: 20.3%
+      promoter_irr: 15.9%
+      peak_funding_cr: '473.6'
+      promoter_money_cr: '373.1'
+      peak_loan_cr: '126.9'
       interest_cr: '36.2'
-      villa_units: '340'
-      villa_revenue_cr: '762.9'
-      villa_margin: 24.4%
+      villa_units: '354'
+      villa_revenue_cr: '799.5'
+      villa_margin: 24.1%
     summary:
       source: Draft model.xlsx · One-Page Summary
       land:
       - use: Apartments
-        acres: 13.358
-        share: 0.1816
+        acres: 13.239
+        share: 0.18
         phases:
         - 1
         - 2
@@ -1192,8 +1543,8 @@ cases:
         - 4
         cell: D9
       - use: Villas
-        acres: 27.22
-        share: 0.3701
+        acres: 30.152
+        share: 0.41
         phases:
         - 1
         - 2
@@ -1201,28 +1552,28 @@ cases:
         - 4
         cell: D10
       - use: Senior living
-        acres: 3.814
-        share: 0.0519
+        acres: 3.97
+        share: 0.054
         phases:
         - 1
         - 2
         cell: D11
       - use: Retail & F&B high street (leased)
-        acres: 1.139
-        share: 0.0155
+        acres: 1.07
+        share: 0.0146
         phases:
         - 3
         cell: D12
       - use: Commercial office
-        acres: 2.018
-        share: 0.0274
+        acres: 2.102
+        share: 0.0286
         phases:
         - 1
         - 3
         cell: D13
       - use: School (sale to operator)
-        acres: 3.087
-        share: 0.042
+        acres: 2.924
+        share: 0.0398
         phases:
         - 2
         - 3
@@ -1233,8 +1584,8 @@ cases:
         phases: []
         cell: D15
       - use: Clubhouses (amenity — cost only)
-        acres: 3.168
-        share: 0.0431
+        acres: 2.934
+        share: 0.0399
         phases:
         - 1
         - 2
@@ -1248,13 +1599,13 @@ cases:
         - 1
         cell: D17
       - use: Internal roads & trunk infrastructure
-        acres: 3.619
-        share: 0.0492
+        acres: 4.199
+        share: 0.0571
         phases: []
         cell: D18
       - use: Recreational open space
-        acres: 16.122
-        share: 0.2192
+        acres: 12.955
+        share: 0.1762
         phases: []
         cell: D19
       land_total_ac: 73.54
@@ -1264,18 +1615,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 168.5
+        value: 173.13
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 130.59
+        value: 126.88
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 36.21
+        value: 36.24
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -1297,55 +1648,55 @@ cases:
       tickets:
       - comp: V
         typology: Villas — 1,800 sft plot
-        units: 73
+        units: 74
         size_sft: 2000
         plot_or_carpet_sft: 1800
-        base_rate: 7755
-        base_ticket_lakh: 155.1
-        realised_rate: 8953
-        ticket_lakh: 179.1
-        revenue_cr: 130.7
+        base_rate: 7768
+        base_ticket_lakh: 155.4
+        realised_rate: 8992
+        ticket_lakh: 179.8
+        revenue_cr: 133.1
         phases: P1–P4
         share_of_res_revenue: 0.0643
         row: 58
       - comp: V
         typology: Villas — 2,250 sft plot
-        units: 135
+        units: 140
         size_sft: 2400
         plot_or_carpet_sft: 2250
-        base_rate: 7988
-        base_ticket_lakh: 191.7
-        realised_rate: 9219
-        ticket_lakh: 221.3
-        revenue_cr: 298.7
+        base_rate: 8001
+        base_ticket_lakh: 192.0
+        realised_rate: 9260
+        ticket_lakh: 222.2
+        revenue_cr: 311.1
         phases: P1–P4
-        share_of_res_revenue: 0.1469
+        share_of_res_revenue: 0.1504
         row: 59
       - comp: V
         typology: Villas — 2,500 sft plot
-        units: 100
+        units: 105
         size_sft: 2550
         plot_or_carpet_sft: 2500
-        base_rate: 8143
-        base_ticket_lakh: 207.6
-        realised_rate: 9401
-        ticket_lakh: 239.7
-        revenue_cr: 239.7
+        base_rate: 8157
+        base_ticket_lakh: 208.0
+        realised_rate: 9446
+        ticket_lakh: 240.9
+        revenue_cr: 252.9
         phases: P1–P4
-        share_of_res_revenue: 0.1179
+        share_of_res_revenue: 0.1222
         row: 60
       - comp: V
         typology: Villas — 2,800 sft plot
-        units: 32
+        units: 35
         size_sft: 2700
         plot_or_carpet_sft: 2800
-        base_rate: 8373
-        base_ticket_lakh: 226.1
-        realised_rate: 9673
-        ticket_lakh: 261.2
-        revenue_cr: 83.6
+        base_rate: 8387
+        base_ticket_lakh: 226.4
+        realised_rate: 9705
+        ticket_lakh: 262.0
+        revenue_cr: 91.7
         phases: P1–P4
-        share_of_res_revenue: 0.0411
+        share_of_res_revenue: 0.0443
         row: 61
       - comp: A
         typology: Apartments — 2BHK apartment
@@ -1358,7 +1709,7 @@ cases:
         ticket_lakh: 84.4
         revenue_cr: 236.2
         phases: P1–P4
-        share_of_res_revenue: 0.1162
+        share_of_res_revenue: 0.1141
         row: 62
       - comp: A
         typology: Apartments — 3BHK apartment
@@ -1371,7 +1722,7 @@ cases:
         ticket_lakh: 115.9
         revenue_cr: 541.2
         phases: P1–P4
-        share_of_res_revenue: 0.2662
+        share_of_res_revenue: 0.2615
         row: 63
       - comp: A
         typology: Apartments — 4BHK apartment
@@ -1384,7 +1735,7 @@ cases:
         ticket_lakh: 163.9
         revenue_cr: 308.1
         phases: P1–P4
-        share_of_res_revenue: 0.1515
+        share_of_res_revenue: 0.1489
         row: 64
       - comp: C04
         typology: Phase 1 — 32-unit senior living
@@ -1397,7 +1748,7 @@ cases:
         ticket_lakh: 97.5
         revenue_cr: 31.2
         phases: '1'
-        share_of_res_revenue: 0.0153
+        share_of_res_revenue: 0.0151
         row: 65
       - comp: C07
         typology: Senior citizens enclave — 160 units
@@ -1410,421 +1761,70 @@ cases:
         ticket_lakh: 102.4
         revenue_cr: 163.8
         phases: '2'
-        share_of_res_revenue: 0.0806
+        share_of_res_revenue: 0.0792
         row: 66
       tickets_average:
-        units: 1467
-        size_sft: 1704
-        ticket_lakh: 138.6
-        revenue_cr: 2033.2
+        units: 1481
+        size_sft: 1712
+        ticket_lakh: 139.7
+        revenue_cr: 2069.3
         row: 67
-      tickets_note: 'Villas: 340 units, avg 2,386 sft on 2,279 sft plots, avg ticket ₹221 L. Apartments: 935 units, avg 1,601 sft, avg ticket
-        ₹116 L. Detail on ''Ticket Size Analysis''.'
-  D4:
-    label: Green pockets · north–south roads (Vastu)
-    villas: 341
-    villas_by_phase:
-    - 56
-    - 90
-    - 90
-    - 105
-    villa_land_ac: 27.551
-    villas_per_acre: 12.38
-    open_space_ac: 15.744
-    roads_ac: 3.666
-    parcel_ac: 73.544
-    plot_efficiency: 0.7077
-    green_ac:
-      rcM2: 8.438
-      lakesM2: 2.192
-      zoneM2: 0.58
-      landscapeM2: 4.534
-      groundsM2: 16.785
-      clubM2: 3.168
-    inputs:
-      C16: 73.544122
-      C33: 0.049842
-      C35: 0
-      C37: 8.389254
-      C41: 0.707682
-      D123: 0.185872
-      D124: 0.254538
-      D125: 0.249336
-      D126: 0.310253
-      H99: 56
-      H106: 90
-      H107: 90
-      H108: 105
-      D130: 0.222874
-      D131: 0.390029
-      D132: 0.290323
-      D133: 0.096774
-      G97: 0.0
-      G98: 1.336346
-      G100: 0.568342
-      G101: 0.668173
-      G102: 1.949167
-      G103: 0.773934
-      G104: 0.296526
-      G105: 3.146146
-      G109: 1.264191
-      G110: 1.137673
-      G111: 3.282548
-      G112: 4.439001
-      G113: 4.299634
-      G114: 1.138662
-      G116: 1.038831
-      G115: 1.244423
-      C103: Commercial office (strata) - Phase 1, 40%
-      D103: 1
-      E103: Commercial
-      F103: Y
-      H103: 1
-      I103: 90000
-      K103: Office
-      L103: 1.15
-      P103: 3
-      Q103: 10
-      U103: 7500
-      V103: 3
-      X103: 6
-      Z103: COMM
-      AB103: 0.04
-      C115: Commercial office (strata) - Phase 3, 60%
-      D115: 3
-      I115: 135000
-      P115: 10
-      V115: 10
-      X115: 8
-    values:
-      units: 1468.0
-      saleable_lakh_sft: 28.368
-      revenue_cr: 2448.071934
-      cost_cr: 1978.558816
-      pbt_cr: 432.63792
-      pat_cr: 322.16983
-      pat_margin: 0.131601
-      project_irr: 0.198222
-      promoter_irr: 0.153929
-      peak_funding_cr: 471.323299
-      promoter_money_cr: 366.701885
-      peak_loan_cr: 131.619817
-      interest_cr: 36.875198
-      villa_units: 341.0
-      villa_revenue_cr: 763.234861
-      villa_margin: 0.241854
-    text:
-      units: 1,468
-      saleable_lakh_sft: '28.4'
-      revenue_cr: 2,448.1
-      cost_cr: 1,978.6
-      pbt_cr: '432.6'
-      pat_cr: '322.2'
-      pat_margin: 13.2%
-      project_irr: 19.8%
-      promoter_irr: 15.4%
-      peak_funding_cr: '471.3'
-      promoter_money_cr: '366.7'
-      peak_loan_cr: '131.6'
-      interest_cr: '36.9'
-      villa_units: '341'
-      villa_revenue_cr: '763.2'
-      villa_margin: 24.2%
-    summary:
-      source: Draft model.xlsx · One-Page Summary
-      land:
-      - use: Apartments
-        acres: 13.358
-        share: 0.1816
-        phases:
-        - 1
-        - 2
-        - 3
-        - 4
-        cell: D9
-      - use: Villas
-        acres: 27.551
-        share: 0.3746
-        phases:
-        - 1
-        - 2
-        - 3
-        - 4
-        cell: D10
-      - use: Senior living
-        acres: 3.814
-        share: 0.0519
-        phases:
-        - 1
-        - 2
-        cell: D11
-      - use: Retail & F&B high street (leased)
-        acres: 1.139
-        share: 0.0155
-        phases:
-        - 3
-        cell: D12
-      - use: Commercial office
-        acres: 2.018
-        share: 0.0274
-        phases:
-        - 1
-        - 3
-        cell: D13
-      - use: School (sale to operator)
-        acres: 3.087
-        share: 0.042
-        phases:
-        - 2
-        - 3
-        cell: D14
-      - use: Hospital (sale to operator)
-        acres: 0.0
-        share: 0.0
-        phases: []
-        cell: D15
-      - use: Clubhouses (amenity — cost only)
-        acres: 3.168
-        share: 0.0431
-        phases:
-        - 1
-        - 2
-        - 3
-        - 4
-        cell: D16
-      - use: Sales office & entry (cost only)
-        acres: 0.0
-        share: 0.0
-        phases:
-        - 1
-        cell: D17
-      - use: Internal roads & trunk infrastructure
-        acres: 3.666
-        share: 0.0498
-        phases: []
-        cell: D18
-      - use: Recreational open space
-        acres: 15.744
-        share: 0.2141
-        phases: []
-        cell: D19
-      land_total_ac: 73.54
-      funding:
-      - label: Promoter equity committed
-        value: 200.0
-        unit: ₹ Cr
-        cell: K8
-      - label: Additional promoter top-up
-        value: 166.7
-        unit: ₹ Cr
-        cell: K9
-      - label: Peak construction loan
-        value: 131.62
-        unit: ₹ Cr
-        cell: K10
-      - label: Loan limit / rate
-        text: 300 Cr @ 15.0%
-        cell: K11
-      - label: Interest & fees
-        value: 36.88
-        unit: ₹ Cr
-        cell: K12
-      - label: Cumulative cash turns positive
-        text: FY32 Q1
-        cell: K13
-      - label: Land rate
-        text: 5.0 Cr/acre + 7% stamp/reg
-        cell: K14
-      - label: Price / cost escalation p.a.
-        text: 5% / 6%
-        cell: K15
-      - label: RERA escrow share
-        value: 70.0
-        unit: '%'
-        cell: K16
-      - label: Payment plan (apartments)
-        text: 10 / 20 / 65 / 5% (book/agree/build/possess)
-        cell: K17
-      tickets:
-      - comp: V
-        typology: Villas — 1,800 sft plot
-        units: 75
-        size_sft: 2000
-        plot_or_carpet_sft: 1800
-        base_rate: 7752
-        base_ticket_lakh: 155.0
-        realised_rate: 8942
-        ticket_lakh: 178.8
-        revenue_cr: 134.1
-        phases: P1–P4
-        share_of_res_revenue: 0.066
-        row: 58
-      - comp: V
-        typology: Villas — 2,250 sft plot
-        units: 135
-        size_sft: 2400
-        plot_or_carpet_sft: 2250
-        base_rate: 7981
-        base_ticket_lakh: 191.6
-        realised_rate: 9204
-        ticket_lakh: 220.9
-        revenue_cr: 298.2
-        phases: P1–P4
-        share_of_res_revenue: 0.1467
-        row: 59
-      - comp: V
-        typology: Villas — 2,500 sft plot
-        units: 98
-        size_sft: 2550
-        plot_or_carpet_sft: 2500
-        base_rate: 8139
-        base_ticket_lakh: 207.5
-        realised_rate: 9386
-        ticket_lakh: 239.3
-        revenue_cr: 234.6
-        phases: P1–P4
-        share_of_res_revenue: 0.1153
-        row: 60
-      - comp: V
-        typology: Villas — 2,800 sft plot
-        units: 33
-        size_sft: 2700
-        plot_or_carpet_sft: 2800
-        base_rate: 8375
-        base_ticket_lakh: 226.1
-        realised_rate: 9663
-        ticket_lakh: 260.9
-        revenue_cr: 86.1
-        phases: P1–P4
-        share_of_res_revenue: 0.0423
-        row: 61
-      - comp: A
-        typology: Apartments — 2BHK apartment
-        units: 280
-        size_sft: 1200
-        plot_or_carpet_sft: 840
-        base_rate: 5920
-        base_ticket_lakh: 71.0
-        realised_rate: 7029
-        ticket_lakh: 84.4
-        revenue_cr: 236.2
-        phases: P1–P4
-        share_of_res_revenue: 0.1161
-        row: 62
-      - comp: A
-        typology: Apartments — 3BHK apartment
-        units: 467
-        size_sft: 1600
-        plot_or_carpet_sft: 1120
-        base_rate: 6099
-        base_ticket_lakh: 97.6
-        realised_rate: 7243
-        ticket_lakh: 115.9
-        revenue_cr: 541.2
-        phases: P1–P4
-        share_of_res_revenue: 0.2661
-        row: 63
-      - comp: A
-        typology: Apartments — 4BHK apartment
-        units: 188
-        size_sft: 2200
-        plot_or_carpet_sft: 1540
-        base_rate: 6274
-        base_ticket_lakh: 138.0
-        realised_rate: 7449
-        ticket_lakh: 163.9
-        revenue_cr: 308.1
-        phases: P1–P4
-        share_of_res_revenue: 0.1515
-        row: 64
-      - comp: C04
-        typology: Phase 1 — 32-unit senior living
-        units: 32
-        size_sft: 1000
-        plot_or_carpet_sft: null
-        base_rate: 9000
-        base_ticket_lakh: 90.0
-        realised_rate: 9749
-        ticket_lakh: 97.5
-        revenue_cr: 31.2
-        phases: '1'
-        share_of_res_revenue: 0.0153
-        row: 65
-      - comp: C07
-        typology: Senior citizens enclave — 160 units
-        units: 160
-        size_sft: 1000
-        plot_or_carpet_sft: null
-        base_rate: 9000
-        base_ticket_lakh: 90.0
-        realised_rate: 10239
-        ticket_lakh: 102.4
-        revenue_cr: 163.8
-        phases: '2'
-        share_of_res_revenue: 0.0806
-        row: 66
-      tickets_average:
-        units: 1468
-        size_sft: 1704
-        ticket_lakh: 138.5
-        revenue_cr: 2033.5
-        row: 67
-      tickets_note: 'Villas: 341 units, avg 2,384 sft on 2,276 sft plots, avg ticket ₹221 L. Apartments: 935 units, avg 1,601 sft, avg ticket
+      tickets_note: 'Villas: 354 units, avg 2,391 sft on 2,284 sft plots, avg ticket ₹223 L. Apartments: 935 units, avg 1,601 sft, avg ticket
         ₹116 L. Detail on ''Ticket Size Analysis''.'
   D5:
     label: Green link · roads to the ground
-    villas: 308
+    villas: 307
     villas_by_phase:
-    - 48
-    - 80
-    - 79
-    - 101
-    villa_land_ac: 26.129
-    villas_per_acre: 11.79
-    open_space_ac: 16.732
-    roads_ac: 4.1
+    - 32
+    - 94
+    - 97
+    - 84
+    villa_land_ac: 28.87
+    villas_per_acre: 10.63
+    open_space_ac: 13.866
+    roads_ac: 4.57
     parcel_ac: 73.544
-    plot_efficiency: 0.6806
+    plot_efficiency: 0.6414
     green_ac:
-      rcM2: 8.543
-      lakesM2: 2.189
-      zoneM2: 1.468
-      landscapeM2: 4.531
-      groundsM2: 17.083
-      clubM2: 3.168
+      rcM2: 4.547
+      lakesM2: 2.161
+      zoneM2: 2.384
+      landscapeM2: 4.774
+      groundsM2: 16.451
+      clubM2: 2.934
     inputs:
       C16: 73.544122
-      C33: 0.055747
+      C33: 0.062137
       C35: 0
-      C37: 9.37732
-      C41: 0.680591
-      D123: 0.180594
-      D124: 0.256819
-      D125: 0.250766
-      D126: 0.311821
-      H99: 48
-      H106: 80
-      H107: 79
-      H108: 101
-      D130: 0.227273
-      D131: 0.386364
-      D132: 0.279221
-      D133: 0.107143
+      C37: 6.511475
+      C41: 0.641423
+      D123: 0.120378
+      D124: 0.314606
+      D125: 0.282012
+      D126: 0.283005
+      H99: 32
+      H106: 94
+      H107: 97
+      H108: 84
+      D130: 0.237785
+      D131: 0.374593
+      D132: 0.286645
+      D133: 0.100977
       G97: 0.0
-      G98: 1.336346
-      G100: 0.568342
-      G101: 0.668173
-      G102: 1.949167
-      G103: 0.773934
+      G98: 1.341288
+      G100: 0.494211
+      G101: 0.681022
+      G102: 1.862186
+      G103: 0.85795
       G104: 0.296526
-      G105: 3.146146
-      G109: 1.264191
-      G110: 1.137673
-      G111: 3.282548
-      G112: 4.439001
-      G113: 4.299634
-      G114: 1.138662
-      G116: 1.038831
+      G105: 3.288478
+      G109: 1.186106
+      G110: 1.061565
+      G111: 3.373483
+      G112: 4.299634
+      G113: 4.224514
+      G114: 1.070461
+      G116: 0.956792
       G115: 1.244423
       C103: Commercial office (strata) - Phase 1, 40%
       D103: 1
@@ -1848,45 +1848,45 @@ cases:
       V115: 10
       X115: 8
     values:
-      units: 1435.0
-      saleable_lakh_sft: 27.5765
-      revenue_cr: 2375.39456
-      cost_cr: 1943.073687
-      pbt_cr: 394.370053
-      pat_cr: 293.533986
-      pat_margin: 0.123573
-      project_irr: 0.182969
-      promoter_irr: 0.140943
-      peak_funding_cr: 471.561013
-      promoter_money_cr: 369.512792
-      peak_loan_cr: 128.77066
-      interest_cr: 37.950821
-      villa_units: 308.0
-      villa_revenue_cr: 690.557488
-      villa_margin: 0.218529
+      units: 1434.0
+      saleable_lakh_sft: 27.536
+      revenue_cr: 2372.012455
+      cost_cr: 1941.166476
+      pbt_cr: 393.859841
+      pat_cr: 293.152194
+      pat_margin: 0.123588
+      project_irr: 0.18276
+      promoter_irr: 0.140388
+      peak_funding_cr: 473.807995
+      promoter_money_cr: 375.356059
+      peak_loan_cr: 124.687608
+      interest_cr: 36.986138
+      villa_units: 307.0
+      villa_revenue_cr: 687.175382
+      villa_margin: 0.198508
     text:
-      units: 1,435
-      saleable_lakh_sft: '27.6'
-      revenue_cr: 2,375.4
-      cost_cr: 1,943.1
-      pbt_cr: '394.4'
-      pat_cr: '293.5'
+      units: 1,434
+      saleable_lakh_sft: '27.5'
+      revenue_cr: 2,372.0
+      cost_cr: 1,941.2
+      pbt_cr: '393.9'
+      pat_cr: '293.2'
       pat_margin: 12.4%
       project_irr: 18.3%
-      promoter_irr: 14.1%
-      peak_funding_cr: '471.6'
-      promoter_money_cr: '369.5'
-      peak_loan_cr: '128.8'
-      interest_cr: '38.0'
-      villa_units: '308'
-      villa_revenue_cr: '690.6'
-      villa_margin: 21.9%
+      promoter_irr: 14.0%
+      peak_funding_cr: '473.8'
+      promoter_money_cr: '375.4'
+      peak_loan_cr: '124.7'
+      interest_cr: '37.0'
+      villa_units: '307'
+      villa_revenue_cr: '687.2'
+      villa_margin: 19.9%
     summary:
       source: Draft model.xlsx · One-Page Summary
       land:
       - use: Apartments
-        acres: 13.358
-        share: 0.1816
+        acres: 13.239
+        share: 0.18
         phases:
         - 1
         - 2
@@ -1894,8 +1894,8 @@ cases:
         - 4
         cell: D9
       - use: Villas
-        acres: 26.129
-        share: 0.3553
+        acres: 28.87
+        share: 0.3926
         phases:
         - 1
         - 2
@@ -1903,28 +1903,28 @@ cases:
         - 4
         cell: D10
       - use: Senior living
-        acres: 3.814
-        share: 0.0519
+        acres: 3.97
+        share: 0.054
         phases:
         - 1
         - 2
         cell: D11
       - use: Retail & F&B high street (leased)
-        acres: 1.139
-        share: 0.0155
+        acres: 1.07
+        share: 0.0146
         phases:
         - 3
         cell: D12
       - use: Commercial office
-        acres: 2.018
-        share: 0.0274
+        acres: 2.102
+        share: 0.0286
         phases:
         - 1
         - 3
         cell: D13
       - use: School (sale to operator)
-        acres: 3.087
-        share: 0.042
+        acres: 2.924
+        share: 0.0398
         phases:
         - 2
         - 3
@@ -1935,8 +1935,8 @@ cases:
         phases: []
         cell: D15
       - use: Clubhouses (amenity — cost only)
-        acres: 3.168
-        share: 0.0431
+        acres: 2.934
+        share: 0.0399
         phases:
         - 1
         - 2
@@ -1950,13 +1950,13 @@ cases:
         - 1
         cell: D17
       - use: Internal roads & trunk infrastructure
-        acres: 4.1
-        share: 0.0557
+        acres: 4.57
+        share: 0.0621
         phases: []
         cell: D18
       - use: Recreational open space
-        acres: 16.732
-        share: 0.2275
+        acres: 13.866
+        share: 0.1885
         phases: []
         cell: D19
       land_total_ac: 73.54
@@ -1966,18 +1966,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 169.51
+        value: 175.36
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 128.77
+        value: 124.69
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 37.95
+        value: 36.99
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -1999,55 +1999,55 @@ cases:
       tickets:
       - comp: V
         typology: Villas — 1,800 sft plot
-        units: 70
+        units: 73
         size_sft: 2000
         plot_or_carpet_sft: 1800
-        base_rate: 7753
-        base_ticket_lakh: 155.1
-        realised_rate: 8959
-        ticket_lakh: 179.2
-        revenue_cr: 125.4
+        base_rate: 7767
+        base_ticket_lakh: 155.3
+        realised_rate: 8966
+        ticket_lakh: 179.3
+        revenue_cr: 130.9
         phases: P1–P4
-        share_of_res_revenue: 0.0639
+        share_of_res_revenue: 0.0668
         row: 58
       - comp: V
         typology: Villas — 2,250 sft plot
-        units: 120
+        units: 116
         size_sft: 2400
         plot_or_carpet_sft: 2250
-        base_rate: 7985
-        base_ticket_lakh: 191.6
-        realised_rate: 9225
-        ticket_lakh: 221.4
-        revenue_cr: 265.7
+        base_rate: 8002
+        base_ticket_lakh: 192.0
+        realised_rate: 9238
+        ticket_lakh: 221.7
+        revenue_cr: 257.2
         phases: P1–P4
-        share_of_res_revenue: 0.1354
+        share_of_res_revenue: 0.1313
         row: 59
       - comp: V
         typology: Villas — 2,500 sft plot
-        units: 85
+        units: 88
         size_sft: 2550
         plot_or_carpet_sft: 2500
-        base_rate: 8142
-        base_ticket_lakh: 207.6
-        realised_rate: 9412
-        ticket_lakh: 240.0
-        revenue_cr: 204.0
+        base_rate: 8158
+        base_ticket_lakh: 208.0
+        realised_rate: 9419
+        ticket_lakh: 240.2
+        revenue_cr: 211.4
         phases: P1–P4
-        share_of_res_revenue: 0.104
+        share_of_res_revenue: 0.1079
         row: 60
       - comp: V
         typology: Villas — 2,800 sft plot
-        units: 33
+        units: 30
         size_sft: 2700
         plot_or_carpet_sft: 2800
-        base_rate: 8375
-        base_ticket_lakh: 226.1
-        realised_rate: 9678
-        ticket_lakh: 261.3
-        revenue_cr: 86.2
+        base_rate: 8392
+        base_ticket_lakh: 226.6
+        realised_rate: 9691
+        ticket_lakh: 261.7
+        revenue_cr: 78.5
         phases: P1–P4
-        share_of_res_revenue: 0.044
+        share_of_res_revenue: 0.0401
         row: 61
       - comp: A
         typology: Apartments — 2BHK apartment
@@ -2060,7 +2060,7 @@ cases:
         ticket_lakh: 84.4
         revenue_cr: 236.2
         phases: P1–P4
-        share_of_res_revenue: 0.1204
+        share_of_res_revenue: 0.1206
         row: 62
       - comp: A
         typology: Apartments — 3BHK apartment
@@ -2073,7 +2073,7 @@ cases:
         ticket_lakh: 115.9
         revenue_cr: 541.2
         phases: P1–P4
-        share_of_res_revenue: 0.2759
+        share_of_res_revenue: 0.2763
         row: 63
       - comp: A
         typology: Apartments — 4BHK apartment
@@ -2086,7 +2086,7 @@ cases:
         ticket_lakh: 163.9
         revenue_cr: 308.1
         phases: P1–P4
-        share_of_res_revenue: 0.157
+        share_of_res_revenue: 0.1573
         row: 64
       - comp: C04
         typology: Phase 1 — 32-unit senior living
@@ -2112,70 +2112,70 @@ cases:
         ticket_lakh: 102.4
         revenue_cr: 163.8
         phases: '2'
-        share_of_res_revenue: 0.0835
+        share_of_res_revenue: 0.0836
         row: 66
       tickets_average:
-        units: 1435
-        size_sft: 1688
-        ticket_lakh: 136.7
-        revenue_cr: 1961.8
+        units: 1434
+        size_sft: 1687
+        ticket_lakh: 136.6
+        revenue_cr: 1958.4
         row: 67
-      tickets_note: 'Villas: 308 units, avg 2,383 sft on 2,276 sft plots, avg ticket ₹221 L. Apartments: 935 units, avg 1,601 sft, avg ticket
+      tickets_note: 'Villas: 307 units, avg 2,377 sft on 2,268 sft plots, avg ticket ₹221 L. Apartments: 935 units, avg 1,601 sft, avg ticket
         ₹116 L. Detail on ''Ticket Size Analysis''.'
   D6:
     label: Green link · north–south roads (Vastu)
-    villas: 300
+    villas: 315
     villas_by_phase:
-    - 43
-    - 78
-    - 80
-    - 99
-    villa_land_ac: 26.163
-    villas_per_acre: 11.47
-    open_space_ac: 16.788
-    roads_ac: 4.01
+    - 32
+    - 98
+    - 98
+    - 87
+    villa_land_ac: 28.858
+    villas_per_acre: 10.92
+    open_space_ac: 13.789
+    roads_ac: 4.659
     parcel_ac: 73.544
-    plot_efficiency: 0.6657
+    plot_efficiency: 0.6406
     green_ac:
-      rcM2: 8.478
-      lakesM2: 2.188
-      zoneM2: 1.581
-      landscapeM2: 4.542
-      groundsM2: 16.801
-      clubM2: 3.168
+      rcM2: 4.384
+      lakesM2: 2.185
+      zoneM2: 2.329
+      landscapeM2: 4.891
+      groundsM2: 16.38
+      clubM2: 2.934
     inputs:
       C16: 73.544122
-      C33: 0.054519
+      C33: 0.063346
       C35: 0
-      C37: 9.434034
-      C41: 0.665712
-      D123: 0.175942
-      D124: 0.256678
-      D125: 0.250217
-      D126: 0.317163
-      H99: 43
-      H106: 78
-      H107: 80
-      H108: 99
-      D130: 0.233333
-      D131: 0.393333
-      D132: 0.276667
-      D133: 0.096667
+      C37: 6.434359
+      C41: 0.64059
+      D123: 0.112481
+      D124: 0.32227
+      D125: 0.282128
+      D126: 0.283121
+      H99: 32
+      H106: 98
+      H107: 98
+      H108: 87
+      D130: 0.225397
+      D131: 0.393651
+      D132: 0.292063
+      D133: 0.088889
       G97: 0.0
-      G98: 1.336346
-      G100: 0.568342
-      G101: 0.668173
-      G102: 1.949167
-      G103: 0.773934
+      G98: 1.341288
+      G100: 0.494211
+      G101: 0.681022
+      G102: 1.862186
+      G103: 0.85795
       G104: 0.296526
-      G105: 3.146146
-      G109: 1.264191
-      G110: 1.137673
-      G111: 3.282548
-      G112: 4.439001
-      G113: 4.299634
-      G114: 1.138662
-      G116: 1.038831
+      G105: 3.288478
+      G109: 1.186106
+      G110: 1.061565
+      G111: 3.373483
+      G112: 4.299634
+      G113: 4.224514
+      G114: 1.070461
+      G116: 0.956792
       G115: 1.244423
       C103: Commercial office (strata) - Phase 1, 40%
       D103: 1
@@ -2199,45 +2199,45 @@ cases:
       V115: 10
       X115: 8
     values:
-      units: 1427.0
-      saleable_lakh_sft: 27.3725
-      revenue_cr: 2356.909181
-      cost_cr: 1934.174296
-      pbt_cr: 384.29201
-      pat_cr: 285.992586
-      pat_margin: 0.121342
-      project_irr: 0.178777
-      promoter_irr: 0.137302
-      peak_funding_cr: 471.945137
-      promoter_money_cr: 371.313222
-      peak_loan_cr: 127.189391
-      interest_cr: 38.442875
-      villa_units: 300.0
-      villa_revenue_cr: 672.072109
-      villa_margin: 0.209107
+      units: 1442.0
+      saleable_lakh_sft: 27.739
+      revenue_cr: 2391.277313
+      cost_cr: 1950.540086
+      pbt_cr: 404.107894
+      pat_cr: 300.820812
+      pat_margin: 0.125799
+      project_irr: 0.186574
+      promoter_irr: 0.143654
+      peak_funding_cr: 473.988375
+      promoter_money_cr: 375.310045
+      peak_loan_cr: 124.927208
+      interest_cr: 36.629333
+      villa_units: 315.0
+      villa_revenue_cr: 706.44024
+      villa_margin: 0.208115
     text:
-      units: 1,427
-      saleable_lakh_sft: '27.4'
-      revenue_cr: 2,356.9
-      cost_cr: 1,934.2
-      pbt_cr: '384.3'
-      pat_cr: '286.0'
-      pat_margin: 12.1%
-      project_irr: 17.9%
-      promoter_irr: 13.7%
-      peak_funding_cr: '471.9'
-      promoter_money_cr: '371.3'
-      peak_loan_cr: '127.2'
-      interest_cr: '38.4'
-      villa_units: '300'
-      villa_revenue_cr: '672.1'
-      villa_margin: 20.9%
+      units: 1,442
+      saleable_lakh_sft: '27.7'
+      revenue_cr: 2,391.3
+      cost_cr: 1,950.5
+      pbt_cr: '404.1'
+      pat_cr: '300.8'
+      pat_margin: 12.6%
+      project_irr: 18.7%
+      promoter_irr: 14.4%
+      peak_funding_cr: '474.0'
+      promoter_money_cr: '375.3'
+      peak_loan_cr: '124.9'
+      interest_cr: '36.6'
+      villa_units: '315'
+      villa_revenue_cr: '706.4'
+      villa_margin: 20.8%
     summary:
       source: Draft model.xlsx · One-Page Summary
       land:
       - use: Apartments
-        acres: 13.358
-        share: 0.1816
+        acres: 13.239
+        share: 0.18
         phases:
         - 1
         - 2
@@ -2245,8 +2245,8 @@ cases:
         - 4
         cell: D9
       - use: Villas
-        acres: 26.163
-        share: 0.3557
+        acres: 28.858
+        share: 0.3924
         phases:
         - 1
         - 2
@@ -2254,28 +2254,28 @@ cases:
         - 4
         cell: D10
       - use: Senior living
-        acres: 3.814
-        share: 0.0519
+        acres: 3.97
+        share: 0.054
         phases:
         - 1
         - 2
         cell: D11
       - use: Retail & F&B high street (leased)
-        acres: 1.139
-        share: 0.0155
+        acres: 1.07
+        share: 0.0146
         phases:
         - 3
         cell: D12
       - use: Commercial office
-        acres: 2.018
-        share: 0.0274
+        acres: 2.102
+        share: 0.0286
         phases:
         - 1
         - 3
         cell: D13
       - use: School (sale to operator)
-        acres: 3.087
-        share: 0.042
+        acres: 2.924
+        share: 0.0398
         phases:
         - 2
         - 3
@@ -2286,8 +2286,8 @@ cases:
         phases: []
         cell: D15
       - use: Clubhouses (amenity — cost only)
-        acres: 3.168
-        share: 0.0431
+        acres: 2.934
+        share: 0.0399
         phases:
         - 1
         - 2
@@ -2301,13 +2301,13 @@ cases:
         - 1
         cell: D17
       - use: Internal roads & trunk infrastructure
-        acres: 4.01
-        share: 0.0545
+        acres: 4.659
+        share: 0.0633
         phases: []
         cell: D18
       - use: Recreational open space
-        acres: 16.788
-        share: 0.2283
+        acres: 13.789
+        share: 0.1875
         phases: []
         cell: D19
       land_total_ac: 73.54
@@ -2317,18 +2317,18 @@ cases:
         unit: ₹ Cr
         cell: K8
       - label: Additional promoter top-up
-        value: 171.31
+        value: 175.31
         unit: ₹ Cr
         cell: K9
       - label: Peak construction loan
-        value: 127.19
+        value: 124.93
         unit: ₹ Cr
         cell: K10
       - label: Loan limit / rate
         text: 300 Cr @ 15.0%
         cell: K11
       - label: Interest & fees
-        value: 38.44
+        value: 36.63
         unit: ₹ Cr
         cell: K12
       - label: Cumulative cash turns positive
@@ -2350,55 +2350,55 @@ cases:
       tickets:
       - comp: V
         typology: Villas — 1,800 sft plot
-        units: 70
+        units: 71
         size_sft: 2000
         plot_or_carpet_sft: 1800
-        base_rate: 7757
-        base_ticket_lakh: 155.1
-        realised_rate: 8974
+        base_rate: 7770
+        base_ticket_lakh: 155.4
+        realised_rate: 8977
         ticket_lakh: 179.5
-        revenue_cr: 125.6
+        revenue_cr: 127.5
         phases: P1–P4
-        share_of_res_revenue: 0.0646
+        share_of_res_revenue: 0.0645
         row: 58
       - comp: V
         typology: Villas — 2,250 sft plot
-        units: 117
+        units: 123
         size_sft: 2400
         plot_or_carpet_sft: 2250
-        base_rate: 7989
-        base_ticket_lakh: 191.7
-        realised_rate: 9244
-        ticket_lakh: 221.8
-        revenue_cr: 259.6
+        base_rate: 8001
+        base_ticket_lakh: 192.0
+        realised_rate: 9237
+        ticket_lakh: 221.7
+        revenue_cr: 272.7
         phases: P1–P4
-        share_of_res_revenue: 0.1335
+        share_of_res_revenue: 0.1379
         row: 59
       - comp: V
         typology: Villas — 2,500 sft plot
-        units: 83
+        units: 92
         size_sft: 2550
         plot_or_carpet_sft: 2500
-        base_rate: 8144
-        base_ticket_lakh: 207.7
-        realised_rate: 9416
-        ticket_lakh: 240.1
-        revenue_cr: 199.3
+        base_rate: 8159
+        base_ticket_lakh: 208.1
+        realised_rate: 9420
+        ticket_lakh: 240.2
+        revenue_cr: 221.0
         phases: P1–P4
-        share_of_res_revenue: 0.1025
+        share_of_res_revenue: 0.1118
         row: 60
       - comp: V
         typology: Villas — 2,800 sft plot
-        units: 30
+        units: 29
         size_sft: 2700
         plot_or_carpet_sft: 2800
-        base_rate: 8381
-        base_ticket_lakh: 226.3
-        realised_rate: 9701
-        ticket_lakh: 261.9
-        revenue_cr: 78.6
+        base_rate: 8390
+        base_ticket_lakh: 226.5
+        realised_rate: 9687
+        ticket_lakh: 261.5
+        revenue_cr: 75.8
         phases: P1–P4
-        share_of_res_revenue: 0.0404
+        share_of_res_revenue: 0.0384
         row: 61
       - comp: A
         typology: Apartments — 2BHK apartment
@@ -2411,7 +2411,7 @@ cases:
         ticket_lakh: 84.4
         revenue_cr: 236.2
         phases: P1–P4
-        share_of_res_revenue: 0.1215
+        share_of_res_revenue: 0.1194
         row: 62
       - comp: A
         typology: Apartments — 3BHK apartment
@@ -2424,7 +2424,7 @@ cases:
         ticket_lakh: 115.9
         revenue_cr: 541.2
         phases: P1–P4
-        share_of_res_revenue: 0.2785
+        share_of_res_revenue: 0.2737
         row: 63
       - comp: A
         typology: Apartments — 4BHK apartment
@@ -2437,7 +2437,7 @@ cases:
         ticket_lakh: 163.9
         revenue_cr: 308.1
         phases: P1–P4
-        share_of_res_revenue: 0.1585
+        share_of_res_revenue: 0.1558
         row: 64
       - comp: C04
         typology: Phase 1 — 32-unit senior living
@@ -2450,7 +2450,7 @@ cases:
         ticket_lakh: 97.5
         revenue_cr: 31.2
         phases: '1'
-        share_of_res_revenue: 0.0161
+        share_of_res_revenue: 0.0158
         row: 65
       - comp: C07
         typology: Senior citizens enclave — 160 units
@@ -2463,13 +2463,13 @@ cases:
         ticket_lakh: 102.4
         revenue_cr: 163.8
         phases: '2'
-        share_of_res_revenue: 0.0843
+        share_of_res_revenue: 0.0828
         row: 66
       tickets_average:
-        units: 1427
-        size_sft: 1683
-        ticket_lakh: 136.2
-        revenue_cr: 1943.6
+        units: 1442
+        size_sft: 1691
+        ticket_lakh: 137.1
+        revenue_cr: 1977.5
         row: 67
-      tickets_note: 'Villas: 300 units, avg 2,378 sft on 2,269 sft plots, avg ticket ₹221 L. Apartments: 935 units, avg 1,601 sft, avg ticket
+      tickets_note: 'Villas: 315 units, avg 2,381 sft on 2,272 sft plots, avg ticket ₹221 L. Apartments: 935 units, avg 1,601 sft, avg ticket
         ₹116 L. Detail on ''Ticket Size Analysis''.'

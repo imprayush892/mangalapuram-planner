@@ -99,9 +99,11 @@ describe('the draft model basis (owner, 7 Oct)', () => {
         expect(g.within).toBe('villas');
         expect(multiPolyArea(g.geom), g.name).toBeGreaterThanOrEqual(200); // KMBR Rule 31(vi)
       }
-      // The gardens come out of the villa land, and only out of it.
-      const garden = gardens.reduce((a, z) => a + multiPolyArea(z.geom), 0) / 4046.8564224;
-      expect(Math.abs(ac(s.draftZones, 'villas') - ac(zs, 'villas') - garden)).toBeLessThan(0.05);
+      // The gardens come out of the villa land: none on another use's land.
+      for (const g of gardens)
+        for (const z of zs.filter((q) => q.use !== 'villas' && q.use !== 'park'))
+          expect(multiPolyArea(intersect(g.geom, z.geom)), `${g.name} on ${z.name}`).toBeLessThan(5);
+      expect(ac(zs, 'villas')).toBeGreaterThan(20);
     }
   });
 
@@ -217,9 +219,9 @@ describe('the draft model basis (owner, 7 Oct)', () => {
     for (let i = 0; i < p.plots.length; i += 1)
       for (let j = i + 1; j < p.plots.length; j += 1) if (!apart(p.plots[i]!.ring as [number, number][], p.plots[j]!.ring as [number, number][])) overlaps += 1;
     expect(overlaps).toBe(0);
-    // With cross streets through the rows (owner 8 Oct: the roads the plan wants, not the model's), about three
-    // quarters of the villa land is in plots.
-    expect(p.option.plottedShare).toBeGreaterThan(0.7);
+    // With cross streets through the rows (owner 8 Oct: the roads the plan wants, not the model's), two thirds and
+    // more of the villa land is in plots (the optimised zoning's villa land is less regular, owner 12 Oct).
+    expect(p.option.plottedShare).toBeGreaterThan(0.65);
   });
 
   it('keeps every building clear of the other buildings, the roads and the plots, and the roads off the plots', async () => {

@@ -34,6 +34,18 @@ export function colourOf(use: string): string {
   return t ? rgb(TYPOLOGY_RGB[t]) : 'rgb(120,130,136)';
 }
 
+/** Owner 12 Oct: each kind of green its own green (and a lake blue), so the map tells them apart. */
+export const GREEN_HEX = { rc: '#3e8e4a', zone: '#a6d96a', landscape: '#7fb59a', lake: '#2f7fa3', club: '#5fc4b8' } as const;
+
+/** A zone's colour on the map: by use, and each kind of green its own. */
+export function zoneHex(z: { use?: string; within?: string; water?: boolean; green?: string }): string {
+  if (z.water || z.green === 'lake') return GREEN_HEX.lake;
+  if (z.within || z.green === 'zone') return GREEN_HEX.zone;
+  if (z.use === 'park') return z.green === 'landscape' ? GREEN_HEX.landscape : GREEN_HEX.rc;
+  if (z.use === 'clubhouse') return GREEN_HEX.club;
+  return hexOf(z.use ?? 'park');
+}
+
 /** The same colour as #rrggbb, for the map overlays (they add their own alpha). */
 export function hexOf(use: string): string {
   const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(colourOf(use))!;

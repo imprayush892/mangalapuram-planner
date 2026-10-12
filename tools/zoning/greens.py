@@ -30,18 +30,22 @@ AC = 4046.8564224
 REACH = 150.0           # m walk to green (owner 12 Oct, D3/D4)
 # The owner also asks for the green to be spread evenly across the villas: the pockets are placed to a closer reach,
 # SPREAD, so each neighbourhood of villas gets its own (the 150 m rule is then met with room to spare).
-SPREAD = float(os.environ.get("SPREAD", 100.0))
+SPREAD = float(os.environ.get("SPREAD", 50.0))   # owner 12 Oct: many small pockets, every villa with green in sight
 LINK_W = float(os.environ.get("LINK_W", 10.0))      # the link's width, m
-LINK_GAP = float(os.environ.get("LINK_GAP", 85.0))  # waypoints until no villa land is further than this from green
+LINK_GAP = float(os.environ.get("LINK_GAP", 110.0))  # waypoints until no villa land is further than this from green
+BEAD_STEP = float(os.environ.get("BEAD_STEP", 80.0))   # owner 12 Oct: the link a chain of green spaces, a pocket park
+BEAD_SIDE = float(os.environ.get("BEAD_SIDE", 26.0))   # every BEAD_STEP along it, BEAD_SIDE square (about 0.17 ac)
 LINK_PARK_AC = float(os.environ.get("LINK_PARK_AC", 1.0))   # the link joins the lakes, the villa clubs and parks this big
 GREEN_MIN_M2 = 1000.0   # a park counts as green from 0.25 ac (a strip of landscape at the edge does not)
-POCKET_M2 = 450.0       # a pocket garden: plots on one street until about 0.11 ac (KMBR's 200 m2 minimum met)
+POCKET_M2 = 200.0       # a pocket garden: as small as a badminton court with its margins (owner 12 Oct), one plot,
+                        # two where one plot is under KMBR's 200 m2 for a piece of open space (Rule 31(vi))
 STEP = 2.0              # walk raster, m
 
 mode, base_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
 assert mode in ("pockets", "link", "check")   # check <plan.json> <zones.geojson>: the walk to green on a finished plan
 BASE = json.load(open(base_path, encoding="utf-8"))
-ZFC = json.load(open(out_path if mode == "check" else os.path.join(REPO, "data", "processed", "zones_draft_model.geojson"), encoding="utf-8"))
+# the zoning the gardens are carved from: the optimised zoning, or (BASE_ZONES) the green options' own, with more villa land
+ZFC = json.load(open(out_path if mode == "check" else os.environ.get("BASE_ZONES") or os.path.join(REPO, "data", "processed", "zones_draft_model.geojson"), encoding="utf-8"))
 FEATS = ZFC["features"]
 ZG = [shape(f["geometry"]).buffer(0) for f in FEATS]
 PR = [f["properties"] for f in FEATS]
@@ -135,7 +139,7 @@ def cover(cur, target, used, label):
             break
         pick = [best]
         for b in sorted(range(N), key=lambda b: PLOTS[b].centroid.distance(PLOTS[best].centroid))[1:10]:
-            if sum(PLOTS[q].area for q in pick) >= POCKET_M2 or len(pick) >= 3:
+            if sum(PLOTS[q].area for q in pick) >= POCKET_M2 or len(pick) >= 2:
                 break
             if b not in used and PQ[b]["roadId"] == PQ[best]["roadId"] and any(touching(b, q) for q in pick):
                 pick.append(b)
@@ -173,6 +177,9 @@ else:
     other = unary_union([ROADS.buffer(2), walk_poly, unary_union([ZG[k] for k in GREEN if not PR[k].get("water")])])
     other = unary_union([other, PARCEL_ROADS]).buffer(0)
     PASS = VIL | shapely.contains_xy(other, rx, ry)
+    from scipy.ndimage import distance_transform_edt
+    _dv = distance_transform_edt(VIL) * R
+    CENTRAL = np.clip(_dv / max(1.0, np.percentile(_dv[VIL], 95)), 0, 1)
     ridx = -np.ones((rny, rnx), int)
     ridx[PASS] = np.arange(int(PASS.sum()))
     rr, cc, ww = [], [], []
@@ -182,7 +189,10 @@ else:
         a, b = ridx[sa], ridx[sb]
         ok = (a >= 0) & (b >= 0)
         both = (VIL[sa] & VIL[sb])[ok]
-        rr += list(a[ok]); cc += list(b[ok]); ww += list(np.where(both, d, 3 * d))
+        # owner 12 Oct: the link runs through the middle of the villa land: a step costs less the further it is from
+        # the villa land's edge
+        cen = ((CENTRAL[sa] + CENTRAL[sb]) / 2)[ok]
+        rr += list(a[ok]); cc += list(b[ok]); ww += list(np.where(both, d * (1.6 - cen), 3 * d))
     RM = int(PASS.sum())
     RG = coo_matrix((ww + ww, (rr + cc, cc + rr)), shape=(RM, RM)).tocsr()
     RXY = np.column_stack([rx[PASS], ry[PASS]])
@@ -231,7 +241,13 @@ else:
         if len(path) > 1:
             PATHS.append(LineString(RXY[path]).simplify(R * 1.5))
         print(f"  + {terminals[best][0]}: {bd:.0f} m")
-    corridor = unary_union([ln.buffer(LINK_W / 2, cap_style=1, join_style=2) for ln in PATHS]).intersection(villa_poly)
+    # the beads: a pocket park every BEAD_STEP along the link
+    beads = []
+    for ln in PATHS:
+        for t in np.arange(BEAD_STEP / 2, ln.length, BEAD_STEP):
+            beads.append(ln.interpolate(t).buffer(BEAD_SIDE / 2, cap_style=3))
+    print(f"  {len(beads)} pocket parks on the link")
+    corridor = unary_union([ln.buffer(LINK_W / 2, cap_style=1, join_style=2) for ln in PATHS] + beads).intersection(villa_poly)
     corridor = corridor.buffer(-1).buffer(1).buffer(0)
     gardens = [q for q in getattr(corridor, "geoms", [corridor]) if q.area >= 200]
     print(f"green link: {sum(q.area for q in gardens) / AC:.2f} ac in {len(gardens)} pieces, {sum(ln.length for ln in PATHS):.0f} m of line")
@@ -245,6 +261,7 @@ else:
 gpolys = []
 for item in gardens:
     g = unary_union([PLOTS[q].buffer(0.3) for q in item]).buffer(-0.3).buffer(0) if isinstance(item, list) else item
+    g = g.intersection(unary_union([ZG[k] for k in VILLA])).buffer(0)      # on the villa land only (a plot may reach past it)
     if g.area >= 200:
         gpolys.append(g)
 allg = unary_union(gpolys).buffer(0)

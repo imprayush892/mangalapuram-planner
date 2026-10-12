@@ -553,3 +553,26 @@ Each of these is a switch or an editable assumption, not a silent decision.
   Every option: 935 flats and 192 senior homes placed in full; 73.54 ac counted once.
 - Re-plan order: `python tools/zoning/optimise.py`; plan D1/D2; `greens.py pockets|link <D1|D2 plan>` for D3-D6
   (all in tools/zoning/replan_all.sh; it needs the untracked scratch test app/src/engine/__tests__/_draft.test.ts); `npm run plans`; `python tools/finance/run_model.py`; `npm run build:deploy`.
+
+## 12 Oct 2026 · the premium land is the villas'; the green by kind; pockets and the link reworked (owner)
+
+- The hilltops (outlook) and the lake fronts are the premium land: the villas take them. Senior living goes to the
+  low, secluded ground off them (optimise.py: level, outlook, lake front all count against it), the school too, as
+  one campus split into its two stages (not by the west lake: a lake-front villa sells better). The towers stand at
+  the edge of the site (never among the villas, so they block no villa's view) and only where the airport line leaves
+  a full 20 floors; the apartment clubhouse is grown with the Phase 4 towers, a compact block beside them. No zone
+  grows across a fixed road.
+- Each kind of green its own colour on the map: RC parks (from 0.25 ac) deep green, the green in the villas lime,
+  landscape strips sage, clubhouses teal, lakes blue.
+- D3/D4: many small pocket gardens, a single plot each (two where a plot is under KMBR's 200 m2): every villa within
+  50 m walk of green (owner: "as small as a badminton court, but many, so each villa feels surrounded by green").
+- D5/D6: the link is a chain of pocket parks (26 m square, every 80 m) on a 10 m green path, routed through the middle
+  of the villa land (a step costs less the further it is from the villa land's edge), joining the lakes, the villa
+  clubs and the large parks.
+- The green options start from a zoning with more villa land (33 ac pockets, 34.5 ac link; D1/D2 31.5 ac), so the
+  gardens come out of the parks rather than the villa count; the engine leaves the steepest villas over a zoning's
+  upper count green; a plot that reaches under another use's building is left out; villa streets' links stay off
+  the other uses' land.
+- Result (villas; furthest walk to green; PAT, project IRR): D1 358, 335 m, ₹339.5 Cr, 20.4%; D2 363, 307 m, ₹343.0 Cr,
+  20.7%; D3 356, 47 m, ₹337.3 Cr, 20.3%; D4 354, 47 m, ₹336.8 Cr, 20.3%; D5 307, 123 m, ₹293.2 Cr, 18.3%; D6 315, 94 m,
+  ₹300.8 Cr, 18.7%. All 935 flats and 192 senior homes placed in every option.

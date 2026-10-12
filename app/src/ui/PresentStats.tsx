@@ -4,7 +4,7 @@ import { phaseOf } from '../state/presentStore';
 import type { AnalysisResult } from '../engine/pipeline/analysis';
 import type { PlanResult } from '../engine/pipeline/plan';
 import type { Dem } from '../engine/terrain/dem';
-import { AC, acs, n0, Big, Bars, Heading, Tiles, colourOf } from './presentKit';
+import { AC, acs, n0, Big, Bars, Heading, Tiles, colourOf, GREEN_HEX } from './presentKit';
 
 /**
  * The presentation's stats for the land analysis (steps 1-7 and the zoning) and for the phases the master plan
@@ -289,12 +289,12 @@ function ZoningCard({ plan }: { plan: PlanResult | undefined }): React.ReactElem
 function GreenCard({ plan }: { plan: PlanResult }): React.ReactElement {
   const g = plan.land.green;
   const rows = [
-    { label: 'RC parks (large, public)', value: g.rcM2 / AC, colour: colourOf('park') },
-    { label: 'Lakes', value: g.lakesM2 / AC, colour: WATER },
-    { label: 'Green in the villas', value: g.zoneM2 / AC, colour: colourOf('park') },
-    { label: 'Clubhouse zones', value: g.clubM2 / AC, colour: colourOf('clubhouse') },
-    { label: 'Landscape strips, edge', value: g.landscapeM2 / AC, colour: colourOf('park') },
-    { label: 'Grounds round buildings', value: g.groundsM2 / AC, colour: colourOf('park') },
+    { label: 'RC parks (large, public)', value: g.rcM2 / AC, colour: GREEN_HEX.rc },
+    { label: 'Lakes', value: g.lakesM2 / AC, colour: GREEN_HEX.lake },
+    { label: 'Green in the villas', value: g.zoneM2 / AC, colour: GREEN_HEX.zone },
+    { label: 'Clubhouse zones', value: g.clubM2 / AC, colour: GREEN_HEX.club },
+    { label: 'Landscape strips, edge', value: g.landscapeM2 / AC, colour: GREEN_HEX.landscape },
+    { label: 'Grounds round buildings', value: g.groundsM2 / AC, colour: '#c3d9a6' },
   ].filter((r) => r.value > 0.005);
   const open = (plan.land.openSpaceM2 + g.clubM2) / AC;
   return (
