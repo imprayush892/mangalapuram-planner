@@ -51,10 +51,11 @@ POCKET_M2 = 200.0       # a pocket garden: as small as a badminton court with it
 STEP = 2.0              # walk raster, m
 
 mode, base_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
-assert mode in ("pockets", "link", "check")   # check <plan.json> <zones.geojson>: the walk to green on a finished plan
+assert mode in ("pockets", "link", "check", "fill")   # check <plan.json> <zones.geojson>: the walk to green on a finished plan
+# fill <plan.json> <zones.geojson>: the villa land a finished plan leaves without plots or streets becomes green (owner 12 Oct, D6)
 BASE = json.load(open(base_path, encoding="utf-8"))
 # the zoning the gardens are carved from: the optimised zoning, or (BASE_ZONES) the green options' own, with more villa land
-ZFC = json.load(open(out_path if mode == "check" else os.environ.get("BASE_ZONES") or os.path.join(REPO, "data", "processed", "zones_draft_model.geojson"), encoding="utf-8"))
+ZFC = json.load(open(out_path if mode in ("check", "fill") else os.environ.get("BASE_ZONES") or os.path.join(REPO, "data", "processed", "zones_draft_model.geojson"), encoding="utf-8"))
 FEATS = ZFC["features"]
 ZG = [shape(f["geometry"]).buffer(0) for f in FEATS]
 PR = [f["properties"] for f in FEATS]
@@ -161,6 +162,32 @@ def cover(cur, target, used, label):
     return out_gardens
 
 
+if mode == "fill":
+    # Owner 12 Oct: the land along the green link where no villa stands is green, not villa land. Each piece of the
+    # villa zones the plan leaves without a plot or a street (100 m² and more, 4 m across and more) joins the green.
+    built = unary_union([PLOTS[a].buffer(0.3) for a in range(N)] + [ROADS] + [mp(b["geom"]) for b in BASE["blocks"] if b["typology"] not in ("villas", "open", "park")]).buffer(0)
+    left = unary_union([ZG[k] for k in VILLA]).difference(built).buffer(-2.0).buffer(2.0).buffer(0)
+    pieces = sorted([q for q in getattr(left, "geoms", [left]) if q.area >= 100], key=lambda g: (-g.centroid.y, g.centroid.x))
+    allg = unary_union(pieces).buffer(0)
+    VILLA0 = {k: ZG[k] for k in VILLA}
+    out = []
+    for k, f in enumerate(FEATS):
+        if k in VILLA:
+            ZG[k] = ZG[k].difference(allg).buffer(0)
+            f = dict(f, geometry=mapping(ZG[k]), properties=dict(f["properties"], drawn_area_ac=round(ZG[k].area / AC, 3),
+                                                                 in_scope_ac=round(ZG[k].area / AC, 3), label_area_ac=round(ZG[k].area / AC, 3)))
+        out.append(f)
+    n0 = sum(1 for p in PR if str(p.get("component", "")).startswith("OS-F"))
+    for n, g in enumerate(pieces, n0 + 1):
+        k = max(VILLA, key=lambda k: VILLA0[k].intersection(g).area)
+        out.append({"type": "Feature", "geometry": mapping(MultiPolygon([g] if g.geom_type == "Polygon" else list(g.geoms))), "properties": {
+            "name": f"LINK GREEN {n}", "use": "park", "phase": PR[k]["phase"], "component": f"OS-F{n}", "label_area_ac": round(g.area / AC, 3),
+            "drawn_area_ac": round(g.area / AC, 3), "in_scope_ac": round(g.area / AC, 3), "geometry_confidence": "optimised",
+            "within": "villas", "pocket": "verge", "green": "zone", "why": "villa land the plan leaves without a villa or a street: green, along the link",
+            "pieces": 1}})
+    print(f"fill: {len(pieces)} pieces, {allg.area / AC:.2f} ac of villa land without a villa becomes green")
+    json.dump(dict(ZFC, features=out), open(out_path, "w", encoding="utf-8"))
+    sys.exit(0)
 if mode == "check":
     far = int((base_d > REACH).sum())
     print(f"CHECK {os.path.basename(base_path)}: {N} villas; walk to green mean {base_d.mean():.0f} m, farthest {base_d.max():.0f} m; "

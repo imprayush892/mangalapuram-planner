@@ -31,6 +31,10 @@ BASE_ZONES="$W/zones_link_base.geojson" python tools/zoning/greens.py link "$W/b
 BASE_ZONES="$W/zones_link_base.geojson" python tools/zoning/greens.py link "$W/base_D6.json" "$P/zones_draft_model_chain_ns.geojson" | tail -1
 plan 'options.draft_zoning="green_pockets"'
 plan 'options.draft_zoning="green_chain"'
+# owner 12 Oct: the link options' villa land left without a villa is green; then the link options again
+python tools/zoning/greens.py fill "$W/D5.json" "$P/zones_draft_model_chain.geojson" | tail -1
+python tools/zoning/greens.py fill "$W/D6.json" "$P/zones_draft_model_chain_ns.geojson" | tail -1
+plan 'options.draft_zoning="green_chain"'
 for d in "1 zones_draft_model" "2 zones_draft_model" "3 zones_draft_model_pockets" "4 zones_draft_model_pockets_ns" "5 zones_draft_model_chain" "6 zones_draft_model_chain_ns"; do
   set -- $d
   head -1 "$W/D$1.txt"

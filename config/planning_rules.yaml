@@ -216,6 +216,10 @@ villas:
   # Owner 12 Oct (optimised zoning): villas as the land holds, never more than max_per_acre on a villa zone's land;
   # the count each zoning aims for (D1/D2 350-370; the green options may go lower, but not below 300, owner 9 Oct).
   max_per_acre: 15
+  # Owner 12 Oct (Vastu): no villa's entrance on the south. The bearings (from north, clockwise) a plot may not face:
+  # north-south roads (D2, D4, D6) not south-east, south or south-west; roads to the ground (D1, D3, D5) not south or
+  # south-west (south-east is fine there, the grid's angle is the one with the least cut and fill).
+  facing_forbidden_deg: {north_south: [112.5, 247.5], terrain: [157.5, 247.5]}
   # (owner 12 Oct, later: villas on the land the towers give up; the count up to 420, 15 an acre still the limit)
   count_by_zoning: {model: [350, 420], green_pockets: [300, 420], green_chain: [300, 420]}
   # Villa land is 80% plots and 20% roads, with 5% leeway either way; the open space comes from the

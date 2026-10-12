@@ -1495,6 +1495,12 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
   const vfh = num(planning, 'villas.floor_height_m');
   const tw = width.tertiary;
 
+  // Owner 12 Oct (Vastu): no villa's entrance on the south. North-south roads (D2, D4, D6): not south-east, south or
+  // south-west; roads to the ground (D1, D3, D5): not south or south-west. A plot facing that way is not laid.
+  const [faceLo, faceHi] = pick<Record<string, [number, number]>>(planning, 'villas.facing_forbidden_deg', {})[roadMode] ?? [999, -999];
+  const facingOk = (deg: number): boolean => !isMix || !(deg >= faceLo && deg <= faceHi);   // the draft model's plans (D1-D6)
+  const facingOf = (f: Frame): number => (((Math.atan2(-f.v[0], -f.v[1]) * 180) / Math.PI) + 360) % 360;
+
   /* ------------------------------------- 8c streets in the villa zones */
   // The shallowest plot a street can still serve: the smallest type's front and rear yards and the narrowest house.
   const yShallow = yardsFor(sftToM2(minRule.plot_sft[0]), buaOf(minRule.name));
@@ -1597,54 +1603,52 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
           }
           return best;
         };
-        const turnFr = (fr: Frame, deg: number): Frame => {
-          const t = (deg * Math.PI) / 180;
-          return {
-            c: fr.c,
-            u: [Math.cos(t) * fr.u[0] + Math.sin(t) * fr.v[0], Math.cos(t) * fr.u[1] + Math.sin(t) * fr.v[1]],
-            v: [-Math.sin(t) * fr.u[0] + Math.cos(t) * fr.v[0], -Math.sin(t) * fr.u[1] + Math.cos(t) * fr.v[1]],
-          };
+        // The streets' climb: the ground's rise along them (the frame's u), summed over the piece.
+        const climb = (fr: Frame): number => {
+          let gsum = 0;
+          for (let q = 0; q < piece.length; q += 7) {
+            const k = piece[q]!;
+            const i = k % nx;
+            const j = (k - i) / nx;
+            const zl = dem.at(i - 1, j);
+            const zr = dem.at(i + 1, j);
+            const zd = dem.at(i, j - 1);
+            const zu = dem.at(i, j + 1);
+            if (![zl, zr, zd, zu].every(Number.isFinite)) continue;
+            gsum += Math.abs(((zr - zl) / (2 * dem.cell)) * fr.u[0] + ((zu - zd) / (2 * dem.cell)) * fr.u[1]);
+          }
+          return gsum;
         };
-        // Every degree, so a grid can square up to a straight zone edge (owner 7 Oct: 85% plots).
-        const turns = roadMode === 'north_south' ? [] : Array.from({ length: 61 }, (_, i) => i - 30).filter((d) => d !== 0);
-        const base = f;
-        let bestN = countFor(base);
-        for (const d of turns) {
-          const fr = turnFr(base, d);
-          const n = countFor(fr);
-          if (n > bestN) {
-            bestN = n;
-            f = fr;
+        // a grid both of whose rows face an allowed way (the plots face +v and -v)
+        const gridOk = (fr: Frame): boolean => facingOk(facingOf(fr)) && facingOk(facingOf({ c: fr.c, u: fr.u, v: [-fr.v[0], -fr.v[1]] }));
+        let bestN = -1;
+        if (roadMode !== 'north_south') {
+          // Owner 12 Oct (roads to the ground): every degree the facings allow, the streets that climb least (the
+          // least cut and fill); among those within a quarter of the gentlest, the most plots.
+          const cands: { fr: Frame; n: number; g: number }[] = [];
+          for (let b = 0; b < 180; b += 1) {
+            const th = (b * Math.PI) / 180;
+            const fr: Frame = { c: f.c, u: [Math.sin(th), Math.cos(th)], v: [-Math.cos(th), Math.sin(th)] };
+            if (gridOk(fr)) cands.push({ fr, n: countFor(fr), g: climb(fr) });
+          }
+          const gMin = Math.min(...cands.map((c) => c.g));
+          const tolG = pick<number>(planning, 'roads.terrain_grid_climb_tolerance', 1.25);
+          for (const c of cands) {
+            if (c.g <= tolG * gMin + 1e-9 && c.n > bestN) {
+              bestN = c.n;
+              f = c.fr;
+            }
           }
         }
         if (roadMode === 'north_south') {
-          // Vastu: north-south (or east-west) within the tolerance; among those whose streets climb no
-          // more than a quarter over the gentlest, the most plots (a street straight up the hill is not
-          // worth a few plots: it is cut to 1:6 the whole way).
-          const climb = (fr: Frame): number => {
-            let gsum = 0;
-            for (let q = 0; q < piece.length; q += 7) {
-              const k = piece[q]!;
-              const i = k % nx;
-              const j = (k - i) / nx;
-              const zl = dem.at(i - 1, j);
-              const zr = dem.at(i + 1, j);
-              const zd = dem.at(i, j - 1);
-              const zu = dem.at(i, j + 1);
-              if (![zl, zr, zd, zu].every(Number.isFinite)) continue;
-              gsum += Math.abs(((zr - zl) / (2 * dem.cell)) * fr.u[0] + ((zu - zd) / (2 * dem.cell)) * fr.u[1]);
-            }
-            return gsum;
-          };
+          // Vastu: north-south streets within the tolerance (owner 12 Oct: the plots face east and west, never
+          // south; an east-west street would turn one row of every pair to the south); among those whose streets
+          // climb no more than a quarter over the gentlest, the most plots.
           const cands: { fr: Frame; n: number; g: number }[] = [];
           for (let t = -nsTol; t <= nsTol + 1e-9; t += 1) {
             const th = (t * Math.PI) / 180;
-            for (const fr of [
-              { c: f.c, u: [Math.cos(th), -Math.sin(th)] as Pt, v: [Math.sin(th), Math.cos(th)] as Pt },
-              { c: f.c, u: [Math.sin(th), Math.cos(th)] as Pt, v: [-Math.cos(th), Math.sin(th)] as Pt },
-            ]) {
-              cands.push({ fr, n: countFor(fr), g: climb(fr) });
-            }
+            const fr: Frame = { c: f.c, u: [Math.sin(th), Math.cos(th)] as Pt, v: [-Math.cos(th), Math.sin(th)] as Pt };
+            cands.push({ fr, n: countFor(fr), g: climb(fr) });
           }
           const gMin = Math.min(...cands.map((c) => c.g));
           bestN = -1;
@@ -1912,11 +1916,12 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
     const centre = toWorld(f, a0 + w / 2, b0 + d / 2);
     const cc = dem.cellAt(centre);
     if (!cc || !villaLand[cc.j * nx + cc.i]) return false;
+    if (!facingOk(facingOf(f))) return false;
     if (plotIndex.overlaps(ring)) return false;
     if (!landOk(rectSamples(f, a0, a0 + w, b0, b0 + d, 1.5)) || !clearOfRoads(ring)) return false;
     plotIndex.add(ring);
     const zi = zoneOf[cc.j * nx + cc.i]!;
-    const facingDeg = (((Math.atan2(-f.v[0], -f.v[1]) * 180) / Math.PI) + 360) % 360;
+    const facingDeg = facingOf(f);
     const zoneName = zi >= 0 ? zones[zi]!.name : '';
     drafts.push({ ring, f, a0, b0, w, d, road, zone: zoneName, facingDeg, kind });
     if (road) road.plots += 1;
@@ -2124,6 +2129,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
         for (const side of [1, -1] as const) {
           const v: Pt = [-t[1] * side, t[0] * side];
           const f: Frame = side > 0 ? { c: A, u: t, v } : { c: A, u: [-t[0], -t[1]], v };
+          if (!facingOk(facingOf(f))) continue;
           const depthAt = (u: number): number => {
             let dd = 0;
             while (dd < plotD && free(f, u, off + dd + 0.5)) dd += 0.5;
@@ -2159,7 +2165,7 @@ export function runPlan(input: PlanInput, analysis: AnalysisResult): PlanResult 
                   d: core,
                   road: r,
                   zone: zoneName,
-                  facingDeg: (((Math.atan2(-f.v[0], -f.v[1]) * 180) / Math.PI) + 360) % 360,
+                  facingDeg: facingOf(f),
                   kind,
                 });
                 plotIndex.add(ring);
